@@ -1,8 +1,3 @@
-#include "types.orc"
-#include "constants.orc"
-#include "utils.orc"
-
-
 opcode isCharWordBoundry(char:i):i
   ires = 0
   if (char == giNEWLINE_TOKEN || \
@@ -184,7 +179,7 @@ endop
 ;;     }
 ;; }
 
-;; FIXME: reversed :S
+;; Csound's declare type order is reversed relative to typed opcode definitions.
 declare read_form(reader:MalValue):MalReader
 
 opcode read_atom(reader:MalReader):MalValue
@@ -195,21 +190,27 @@ opcode read_atom(reader:MalReader):MalValue
     v.type = giNUMBER_TYPE
     inum = strtod:i(Stoken)
     v.number = inum
-    print inum
+  elseif strcmp("nil", Stoken) == 0 then
+    v.type = giNIL_TYPE
+  elseif strcmp("true", Stoken) == 0 then
+    v.type = giTRUE_TYPE
+  elseif strcmp("false", Stoken) == 0 then
+    v.type = giFALSE_TYPE
+  else
+    v.type = giSYMBOL_TYPE
+    v.string = Stoken
   endif
 
   xout v
 endop
 
 opcode read_list(reader:MalReader, endToken:S):MalValue
-  prints "read_list!\n"
   newList:MalValue = MalMkValue(giLIST_TYPE)
   currentToken:MalReader = MalNextToken(reader)
 
   while(strcmp(currentToken.peek, endToken) != 0) do
-    prints "currentToken.peek %s\n", currentToken.peek
-    next:MalValue read_form(currentToken)
-    next = MalAppendValue(newList, next)
+    next:MalValue = read_form(currentToken)
+    newList = MalAppendValue(newList, next)
     currentToken = MalNextToken(currentToken)
   od
 
@@ -219,21 +220,18 @@ endop
 
 
 opcode read_form(reader:MalReader):MalValue
-  prints "data: %s pos %d\n", reader.peek, reader.position
   Stoken = reader.peek
   istrChar  = strchar:i(Stoken, 0)
-  prints "read_form Stoken %s\n", Stoken
   if strcmp("(", Stoken) == 0 then
     xout read_list(reader, ")")
   elseif strcmp("'", Stoken) == 0 then
     v:MalValue = MalMkValue(giQUOTE_TYPE)
     reader = MalNextToken(reader)
     l:MalValue[] = v.list
-    prints "read_form PRE\n"
     next:MalValue = read_form(reader)
-    prints "read_form POST\n"
     l[0] = next
     v.length = 1
+    v.list = l
     ;; car:MalValue = l[0]
     ;; car = read_form(reader)
     xout v
@@ -260,12 +258,6 @@ endop
 
 opcode read_str(input:S):MalValue
   tstruct:MalTokens = tokenize(input)
-
-  indx = 0
-  while (indx < tstruct.length) do
-    prints "token: %s\n", tstruct.tokens[indx]
-    indx += 1
-  od
 
   reader:MalReader = MalMkReader(tstruct)
   val:MalValue = read_form(reader)

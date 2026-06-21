@@ -1,6 +1,3 @@
-#include "constants.orc"
-#include "types.orc"
-
 opcode MalNextToken(reader:MalReader):MalReader
   if (reader.position + 1 >= reader.length) then
     reader.done = 1
@@ -13,9 +10,10 @@ opcode MalNextToken(reader:MalReader):MalReader
 endop
 
 opcode MalAppendValue(destination:MalValue, value:MalValue):MalValue
-  print destination.length
+  list:MalValue[] = destination.list
+  list[destination.length] = value
   destination.length += 1
-  destination.list[destination.length] = value
+  destination.list = list
   xout destination
 endop
 
@@ -32,10 +30,10 @@ opcode MalMkValue(type:i):MalValue
 endop
 
 opcode MalIsNumericString(token:S):i
-  iascii = strchar(token, 0)
+  iascii = strchar:i(token, 0)
+  ires = 0
   if (iascii >= 48 && iascii < 58) then
-    xout 1
-  else
-    xout 0
+    ires = 1
   endif
+  xout ires
 endop

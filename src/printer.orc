@@ -1,51 +1,35 @@
-#include "constants.orc"
-
 ;; struct MalValue type:i, list:MalValue[], number:i, string:S
 
 opcode pr_str(ast:MalValue):S
   Sout = ""
-  prints "START %d \n", ast.type
-  ;; if (giPLACEHOLDER == ast.type) then
-  ;;   indx = 0
-  ;;   prints "AST length %d \n", ast.length
-  ;;   while (indx < ast.length) do
-  ;;     Sout strcat Sout, pr_str(ast.list[indx])
-  ;;     indx += 1
-  ;;   od
   if (giNUMBER_TYPE == ast.type) then
-    Snext = sprintf(" %.5f", ast.number)
+    Snext = sprintf("%.5f", ast.number)
     Sout strcat Sout, Snext
   elseif (giNIL_TYPE == ast.type) then
-    Sout strcat Sout, " nil"
+    Sout strcat Sout, "nil"
+  elseif (giTRUE_TYPE == ast.type) then
+    Sout strcat Sout, "true"
+  elseif (giFALSE_TYPE == ast.type) then
+    Sout strcat Sout, "false"
+  elseif (giSYMBOL_TYPE == ast.type) then
+    Sout strcat Sout, ast.string
   elseif (giQUOTE_TYPE == ast.type) then
-    if (ast.type == giQUOTE_TYPE) then
-      prints("11 THEY ARE EQUAL FFS\n")
-    else
-      prints("11 WTF FFS\n")
-    endif
-
     Sout strcat Sout, "'"
     indx = 0
-    prints "QUOTE %d \n", ast.length
     while (indx < ast.length) do
-      prints "PRECAT\n"
       next:MalValue = ast.list[indx]
-      prints "FOO type %d\n", next.type
       Snext = pr_str(next)
-      prints "BAR %s %s\n", Sout, Snext
       Sout strcat Sout, Snext
-      prints "POSTCAT\n"
       indx += 1
     od
   elseif (giLIST_TYPE == ast.type) then
-    prints "LIST %d \n", ast.length
-    ilen = lenarray:i(ast.list)
     indx = 0
     Sout strcat Sout, "("
-    while (indx < ilen) do
-      Sout strcat Sout, " "
+    while (indx < ast.length) do
+      if (indx > 0) then
+        Sout strcat Sout, " "
+      endif
       Sout strcat Sout, pr_str(ast.list[indx])
-      Sout strcat Sout, " "
       indx += 1
     od
     Sout strcat Sout, ")"
@@ -53,7 +37,6 @@ opcode pr_str(ast:MalValue):S
     Sout = ""
     ;; prints "MALError: unhandled type %d quote-type %d number %d \n", ast.type, giQUOTE_TYPE, ast.number
   endif
-  prints "Sout: %s\n", Sout
   xout(Sout)
 endop
 
