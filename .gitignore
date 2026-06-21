@@ -1,0 +1,7 @@
+*.aif
+*~
+*#
+DS_Store
+deleteme*
+/mal
+/csound
