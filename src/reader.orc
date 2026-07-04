@@ -1,3 +1,6 @@
+;; Csound's declare type order is reversed relative to typed opcode definitions.
+declare read_form(reader:MalValue):MalReader
+
 opcode isCharWordBoundry(char:i):i
   ires = 0
   if (char == giNEWLINE_TOKEN || \
@@ -10,7 +13,8 @@ opcode isCharWordBoundry(char:i):i
       char == giCURLY_OPEN_TOKEN || \
       char == giCURLY_CLOSE_TOKEN  || \
       char == giBRACKET_OPEN_TOKEN  || \
-      char == giBRACKET_CLOSE_TOKEN) then
+      char == giBRACKET_CLOSE_TOKEN) \
+      then
     ires = 1
   endif
   xout(ires)
@@ -179,8 +183,6 @@ endop
 ;;     }
 ;; }
 
-;; Csound's declare type order is reversed relative to typed opcode definitions.
-declare read_form(reader:MalValue):MalReader
 
 opcode read_atom(reader:MalReader):MalValue
   Stoken = reader.peek
@@ -209,6 +211,9 @@ opcode read_list(reader:MalReader, endToken:S):MalValue
   currentToken:MalReader = MalNextToken(reader)
 
   while(strcmp(currentToken.peek, endToken) != 0) do
+    if currentToken.done == 1 then
+      xout MalMkError(sprintf("expected '%s', got EOF", endToken))
+    endif
     next:MalValue = read_form(currentToken)
     newList = MalAppendValue(newList, next)
     currentToken = MalNextToken(currentToken)
@@ -258,7 +263,6 @@ endop
 
 opcode read_str(input:S):MalValue
   tstruct:MalTokens = tokenize(input)
-
   reader:MalReader = MalMkReader(tstruct)
   val:MalValue = read_form(reader)
   xout val

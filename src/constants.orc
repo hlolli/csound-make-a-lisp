@@ -1,4 +1,3 @@
-
 // identifier types
 giERROR_TYPE = -1
 giQUOTE_TYPE = 1

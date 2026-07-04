@@ -1,8 +1,4 @@
-#include "src/types.orc"
-#include "src/constants.orc"
-#include "src/utils.orc"
-#include "src/reader.orc"
-#include "src/printer.orc"
+#include "src/main.orc"
 
 opcode READ(input:S):MalValue
   xout read_str(input)
@@ -18,11 +14,26 @@ opcode PRINT(ast:MalValue):S
   xout Sprintout
 endop
 
+opcode REP(input:S):S
+  xout PRINT(EVAL(READ(input)))
+endop
+
 opcode REPL(input:S):void
-  prints "AST: %s\n", PRINT(EVAL(READ(input)))
+  prints "AST: %s\n", REP(input)
+endop
+
+opcode ASSERT_REP(input:S, expected:S):void
+  actual:S = REP(input)
+  if (strcmp(actual, expected) == 0) then
+    prints "REPL %s, Assertion success\n", input
+  else
+    prints "REPL %s, Assertion failed: expected '%s', got '%s'\n", input, expected, actual
+    exitnow(1)
+  endif
 endop
 
 instr TEST
+  prints "Testing basic reader functionality\n"
   NumberAst:MalValue = READ("123")
   if (NumberAst.type == giNUMBER_TYPE && NumberAst.number == 123) then
     prints "READ number, Assertion success\n"
@@ -32,16 +43,43 @@ instr TEST
   endif
 
   NilAst:MalValue = READ("nil")
-  TrueAst:MalValue = READ("true")
-  FalseAst:MalValue = READ("false")
-  SymbolAst:MalValue = READ("abc")
-  if (NilAst.type == giNIL_TYPE && TrueAst.type == giTRUE_TYPE && \
-      FalseAst.type == giFALSE_TYPE && SymbolAst.type == giSYMBOL_TYPE && \
-      strcmp(SymbolAst.string, "abc") == 0) then
-    prints "READ atoms, Assertion success\n"
+  if (NilAst.type == giNIL_TYPE) then
+    prints "READ nil, Assertion success\n"
   else
-    prints "READ atoms, Assertion failed\n"
+    prints "READ nil, Assertion failed: expected type=%d, got type=%d\n", \
+      giNIL_TYPE, NilAst.type
     exitnow(1)
+  endif
+
+  TrueAst:MalValue = READ("true")
+  if (TrueAst.type == giTRUE_TYPE) then
+    prints "READ true, Assertion success\n"
+  else
+    prints "READ true, Assertion failed: expected type=%d, got type=%d\n", \
+      giTRUE_TYPE, TrueAst.type
+    exitnow(1)
+  endif
+
+  FalseAst:MalValue = READ("false")
+  if (FalseAst.type == giFALSE_TYPE) then
+    prints "READ false, Assertion success\n"
+  else
+    prints "READ false, Assertion failed: expected type=%d, got type=%d\n", \
+      giFALSE_TYPE, FalseAst.type
+    exitnow(1)
+  endif
+
+  SymbolAst:MalValue = READ("abc")
+  if (SymbolAst.type != giSYMBOL_TYPE) then
+    prints "READ symbol type, Assertion failed: expected type=%d, got type=%d\n", \
+      giSYMBOL_TYPE, SymbolAst.type
+    exitnow(1)
+  elseif (strcmp(SymbolAst.string, "abc") != 0) then
+    prints "READ symbol string, Assertion failed: expected 'abc', got '%s'\n", \
+      SymbolAst.string
+    exitnow(1)
+  else
+    prints "READ symbol, Assertion success\n"
   endif
 
   QuoteAst:MalValue = READ("'(123 456)")
@@ -61,22 +99,16 @@ instr TEST
     exitnow(1)
   endif
 
-  ;; SRES1 = REPL("\"string\" :kw1 \"string\" :kw2")
-  ;; prints "SRES1: %s \n", SRES1
-  ;; SRES2 = REPL(":keyword")
-  ;; prints "SRES2: %s \n", SRES2
-  ;; SRES3 = REPL("true")
-  ;; prints "SRES3: %s \n", SRES3
-  ;; SRES4 = REPL("123")
-  ;; prints "SRES4: %s \n", SRES4
-  ;; SRES5 = REPL("123 ")
-  ;; prints "SRES5: '%s'\n", SRES5
-  ;; SRES6 = REPL("abc")
-  ;; prints "SRES6: '%s'\n", SRES6
-  ;; SRES7 = REPL("abc")
-  ;; prints "SRES7: '%s'\n", SRES7
-  ;; SRES8 = REPL("abc ")
-  ;; prints "SRES8: '%s'\n", SRES8
+  ;; Not ready yet: strings and keywords need dedicated reader support.
+  ;; ASSERT_REP("\"string\" :kw1 \"string\" :kw2", "\"string\" :kw1 \"string\" :kw2")
+  ;; ASSERT_REP(":keyword", ":keyword")
+
+  ASSERT_REP("true", "true")
+  ASSERT_REP("123", "123.00000")
+  ASSERT_REP("123 ", "123.00000")
+  ASSERT_REP("abc", "abc")
+  ASSERT_REP("abc", "abc")
+  ASSERT_REP("abc ", "abc")
   REPL("'(123 456)")
   REPL("(nil true false abc)")
   ;; prints "SRES9: %s\n", SRES9
