@@ -209,14 +209,17 @@ endop
 opcode read_list(reader:MalReader, endToken:S):MalValue
   newList:MalValue = MalMkValue(giLIST_TYPE)
   currentToken:MalReader = MalNextToken(reader)
+  ierror = 0
 
-  while(strcmp(currentToken.peek, endToken) != 0) do
+  while(strcmp(currentToken.peek, endToken) != 0 && ierror == 0) do
     if currentToken.done == 1 then
-      xout MalMkError(sprintf("expected '%s', got EOF", endToken))
+      newList = MalMkError(sprintf("expected '%s', got EOF", endToken))
+      ierror = 1
+    else
+      next:MalValue = read_form(currentToken)
+      newList = MalAppendValue(newList, next)
+      currentToken = MalNextToken(currentToken)
     endif
-    next:MalValue = read_form(currentToken)
-    newList = MalAppendValue(newList, next)
-    currentToken = MalNextToken(currentToken)
   od
 
   xout newList

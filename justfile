@@ -17,5 +17,8 @@ smoke:
 reader:
     {{csound}} {{csound_flags}} tests/step1-reader.orc
 
+unit:
+    {{csound}} {{csound_flags}} tests/unit-tests.orc
+
 status:
     @git status --short
