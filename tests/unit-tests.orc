@@ -39,9 +39,14 @@ instr TEST_ERRORS
   ASSERT_READ_ERROR("(", "expected ')', got EOF")
   ASSERT_READ_ERROR("(123", "expected ')', got EOF")
   ASSERT_READ_ERROR("(123 456", "expected ')', got EOF")
+  ASSERT_READ_ERROR("(123 (456)", "expected ')', got EOF")
   ASSERT_READ_ERROR("[", "expected ']', got EOF")
   ASSERT_READ_ERROR("[123", "expected ']', got EOF")
   ASSERT_READ_ERROR("[123 456", "expected ']', got EOF")
+  ASSERT_READ_ERROR("[123 [456]", "expected ']', got EOF")
+  ASSERT_READ_ERROR("{", "expected '}', got EOF")
+  ASSERT_READ_ERROR("{\"a\" 1", "expected '}', got EOF")
+  ASSERT_READ_ERROR("{:a {:b 2}", "expected '}', got EOF")
   ASSERT_READ_ERROR("\"unterminated", "expected '\"', got EOF")
 endin
 

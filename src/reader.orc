@@ -286,11 +286,14 @@ opcode read_sequence(reader:MalReader, endToken:S, sequenceType:i):MalReadResult
   newSequence:MalValue = MalMkValue(sequenceType)
   currentToken:MalReader = MalNextToken(reader)
   ierror = 0
+  ifoundEnd = 0
 
-  while(strcmp(currentToken.peek, endToken) != 0 && ierror == 0) do
+  while(ifoundEnd == 0 && ierror == 0) do
     if currentToken.done == 1 then
       newSequence = MalMkError(sprintf("expected '%s', got EOF", endToken))
       ierror = 1
+    elseif strcmp(currentToken.peek, endToken) == 0 then
+      ifoundEnd = 1
     else
       next:MalReadResult = read_form(currentToken)
       nextValue:MalValue = MalReadResultValue(next)
@@ -319,8 +322,12 @@ opcode read_vector(reader:MalReader, endToken:S):MalReadResult
   xout read_sequence(reader, endToken, $MAL_VECTOR_TYPE)
 endop
 
-opcode read_reader_macro(reader:MalReader, macroType:i, macroToken:S):MalReadResult
-  v:MalValue = MalMkValue(macroType)
+opcode read_hash_map(reader:MalReader, endToken:S):MalReadResult
+  xout read_sequence(reader, endToken, $MAL_HASH_MAP_TYPE)
+endop
+
+opcode read_reader_macro(reader:MalReader, macroSymbol:S, macroToken:S):MalReadResult
+  v:MalValue = MalMkValue($MAL_LIST_TYPE)
   reader = MalNextToken(reader)
 
   if reader.done == 1 then
@@ -329,13 +336,13 @@ opcode read_reader_macro(reader:MalReader, macroType:i, macroToken:S):MalReadRes
   else
     next:MalReadResult = read_form(reader)
     nextValue:MalValue = MalReadResultValue(next)
-    v = MalAppendValue(v, nextValue)
+    v = MalMkList2(MalMkSymbol(macroSymbol), nextValue)
     xout MalMkReadResult(v, MalReadResultReader(next))
   endif
 endop
 
 opcode read_with_meta(reader:MalReader):MalReadResult
-  v:MalValue = MalMkValue($MAL_WITH_META_TYPE)
+  v:MalValue = MalMkValue($MAL_LIST_TYPE)
   reader = MalNextToken(reader)
 
   if reader.done == 1 then
@@ -354,8 +361,7 @@ opcode read_with_meta(reader:MalReader):MalReadResult
     else
       form:MalReadResult = read_form(formReader)
       formValue:MalValue = MalReadResultValue(form)
-      v = MalAppendValue(v, formValue)
-      v = MalAppendValue(v, metaValue)
+      v = MalMkList3(MalMkSymbol("with-meta"), formValue, metaValue)
       xout MalMkReadResult(v, MalReadResultReader(form))
     endif
   endif
@@ -370,19 +376,21 @@ opcode read_form(reader:MalReader):MalReadResult
     xout read_list(reader, ")")
   elseif strcmp("[", Stoken) == 0 then
     xout read_vector(reader, "]")
+  elseif strcmp("{", Stoken) == 0 then
+    xout read_hash_map(reader, "}")
   elseif strcmp("'", Stoken) == 0 then
-    xout read_reader_macro(reader, $MAL_QUOTE_TYPE, "'")
+    xout read_reader_macro(reader, "quote", "'")
   elseif strcmp("`", Stoken) == 0 then
-    xout read_reader_macro(reader, $MAL_QUASI_QUOTE_TYPE, "`")
+    xout read_reader_macro(reader, "quasiquote", "`")
   elseif (itokenLen == 2 && istrChar == $MAL_TILDE_TOKEN && \
           strchar:i(Stoken, 1) == $MAL_AT_TOKEN) then
     SspliceQuote = sprintf("%c%c", $MAL_TILDE_TOKEN, $MAL_AT_TOKEN)
-    xout read_reader_macro(reader, $MAL_SPLICE_QUOTE_TYPE, SspliceQuote)
+    xout read_reader_macro(reader, "splice-unquote", SspliceQuote)
   elseif strcmp("~", Stoken) == 0 then
-    xout read_reader_macro(reader, $MAL_UNQUOTE_TYPE, "~")
+    xout read_reader_macro(reader, "unquote", "~")
   elseif (itokenLen == 1 && istrChar == $MAL_AT_TOKEN) then
     Sderef = sprintf("%c", $MAL_AT_TOKEN)
-    xout read_reader_macro(reader, $MAL_DEREF_TYPE, Sderef)
+    xout read_reader_macro(reader, "deref", Sderef)
   elseif strcmp("^", Stoken) == 0 then
     xout read_with_meta(reader)
   ;; elseif istrChar >= 48 && istrChar < 58 then

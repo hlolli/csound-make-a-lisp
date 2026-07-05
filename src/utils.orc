@@ -29,6 +29,33 @@ opcode MalMkValue(type:i):MalValue
   xout(val)
 endop
 
+opcode MalMkSymbol(name:S):MalValue
+  val:MalValue = MalMkValue($MAL_SYMBOL_TYPE)
+  val.string = name
+  xout val
+endop
+
+opcode MalMkList1(first:MalValue):MalValue
+  val:MalValue = MalMkValue($MAL_LIST_TYPE)
+  val = MalAppendValue(val, first)
+  xout val
+endop
+
+opcode MalMkList2(first:MalValue, second:MalValue):MalValue
+  val:MalValue = MalMkValue($MAL_LIST_TYPE)
+  val = MalAppendValue(val, first)
+  val = MalAppendValue(val, second)
+  xout val
+endop
+
+opcode MalMkList3(first:MalValue, second:MalValue, third:MalValue):MalValue
+  val:MalValue = MalMkValue($MAL_LIST_TYPE)
+  val = MalAppendValue(val, first)
+  val = MalAppendValue(val, second)
+  val = MalAppendValue(val, third)
+  xout val
+endop
+
 opcode MalMkReadResult(value:MalValue, reader:MalReader):MalReadResult
   result:MalReadResult init value.type, value.number, value.string, value.list, \
     value.length, reader.peek, reader.position, reader.tokens, reader.length, \

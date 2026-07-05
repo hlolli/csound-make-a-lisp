@@ -118,11 +118,14 @@ instr TEST
   endif
 
   QuoteAst:MalValue = READ("'(123 456)")
-  if (QuoteAst.type == $MAL_QUOTE_TYPE && QuoteAst.length == 1) then
-    ListAst:MalValue = QuoteAst.list[0]
+  if (QuoteAst.type == $MAL_LIST_TYPE && QuoteAst.length == 2) then
+    QuoteSymbolAst:MalValue = QuoteAst.list[0]
+    ListAst:MalValue = QuoteAst.list[1]
     FirstAst:MalValue = ListAst.list[0]
     SecondAst:MalValue = ListAst.list[1]
-    if (ListAst.type == $MAL_LIST_TYPE && ListAst.length == 2 && \
+    if (QuoteSymbolAst.type == $MAL_SYMBOL_TYPE && \
+        strcmp(QuoteSymbolAst.string, "quote") == 0 && \
+        ListAst.type == $MAL_LIST_TYPE && ListAst.length == 2 && \
         FirstAst.number == 123 && SecondAst.number == 456) then
       prints "READ quote/list, Assertion success\n"
     else
@@ -135,9 +138,12 @@ instr TEST
   endif
 
   QuasiQuoteAst:MalValue = READ("`abc")
-  if (QuasiQuoteAst.type == $MAL_QUASI_QUOTE_TYPE && QuasiQuoteAst.length == 1) then
-    QuasiQuoteValueAst:MalValue = QuasiQuoteAst.list[0]
-    if (QuasiQuoteValueAst.type == $MAL_SYMBOL_TYPE && \
+  if (QuasiQuoteAst.type == $MAL_LIST_TYPE && QuasiQuoteAst.length == 2) then
+    QuasiQuoteSymbolAst:MalValue = QuasiQuoteAst.list[0]
+    QuasiQuoteValueAst:MalValue = QuasiQuoteAst.list[1]
+    if (QuasiQuoteSymbolAst.type == $MAL_SYMBOL_TYPE && \
+        strcmp(QuasiQuoteSymbolAst.string, "quasiquote") == 0 && \
+        QuasiQuoteValueAst.type == $MAL_SYMBOL_TYPE && \
         strcmp(QuasiQuoteValueAst.string, "abc") == 0) then
       prints "READ quasiquote, Assertion success\n"
     else
@@ -152,9 +158,12 @@ instr TEST
   endif
 
   UnquoteAst:MalValue = READ("~abc")
-  if (UnquoteAst.type == $MAL_UNQUOTE_TYPE && UnquoteAst.length == 1) then
-    UnquoteValueAst:MalValue = UnquoteAst.list[0]
-    if (UnquoteValueAst.type == $MAL_SYMBOL_TYPE && \
+  if (UnquoteAst.type == $MAL_LIST_TYPE && UnquoteAst.length == 2) then
+    UnquoteSymbolAst:MalValue = UnquoteAst.list[0]
+    UnquoteValueAst:MalValue = UnquoteAst.list[1]
+    if (UnquoteSymbolAst.type == $MAL_SYMBOL_TYPE && \
+        strcmp(UnquoteSymbolAst.string, "unquote") == 0 && \
+        UnquoteValueAst.type == $MAL_SYMBOL_TYPE && \
         strcmp(UnquoteValueAst.string, "abc") == 0) then
       prints "READ unquote, Assertion success\n"
     else
@@ -171,9 +180,12 @@ instr TEST
   SspliceQuote = sprintf("%c%c", $MAL_TILDE_TOKEN, $MAL_AT_TOKEN)
   SspliceQuoteInput = sprintf("%sabc", SspliceQuote)
   SpliceQuoteAst:MalValue = READ(SspliceQuoteInput)
-  if (SpliceQuoteAst.type == $MAL_SPLICE_QUOTE_TYPE && SpliceQuoteAst.length == 1) then
-    SpliceQuoteValueAst:MalValue = SpliceQuoteAst.list[0]
-    if (SpliceQuoteValueAst.type == $MAL_SYMBOL_TYPE && \
+  if (SpliceQuoteAst.type == $MAL_LIST_TYPE && SpliceQuoteAst.length == 2) then
+    SpliceQuoteSymbolAst:MalValue = SpliceQuoteAst.list[0]
+    SpliceQuoteValueAst:MalValue = SpliceQuoteAst.list[1]
+    if (SpliceQuoteSymbolAst.type == $MAL_SYMBOL_TYPE && \
+        strcmp(SpliceQuoteSymbolAst.string, "splice-unquote") == 0 && \
+        SpliceQuoteValueAst.type == $MAL_SYMBOL_TYPE && \
         strcmp(SpliceQuoteValueAst.string, "abc") == 0) then
       prints "READ splice-unquote, Assertion success\n"
     else
@@ -189,9 +201,12 @@ instr TEST
 
   SderefInput = sprintf("%cabc", $MAL_AT_TOKEN)
   DerefAst:MalValue = READ(SderefInput)
-  if (DerefAst.type == $MAL_DEREF_TYPE && DerefAst.length == 1) then
-    DerefValueAst:MalValue = DerefAst.list[0]
-    if (DerefValueAst.type == $MAL_SYMBOL_TYPE && \
+  if (DerefAst.type == $MAL_LIST_TYPE && DerefAst.length == 2) then
+    DerefSymbolAst:MalValue = DerefAst.list[0]
+    DerefValueAst:MalValue = DerefAst.list[1]
+    if (DerefSymbolAst.type == $MAL_SYMBOL_TYPE && \
+        strcmp(DerefSymbolAst.string, "deref") == 0 && \
+        DerefValueAst.type == $MAL_SYMBOL_TYPE && \
         strcmp(DerefValueAst.string, "abc") == 0) then
       prints "READ deref, Assertion success\n"
     else
@@ -206,10 +221,13 @@ instr TEST
   endif
 
   WithMetaAst:MalValue = READ("^:private abc")
-  if (WithMetaAst.type == $MAL_WITH_META_TYPE && WithMetaAst.length == 2) then
-    WithMetaValueAst:MalValue = WithMetaAst.list[0]
-    WithMetaMetaAst:MalValue = WithMetaAst.list[1]
-    if (WithMetaValueAst.type == $MAL_SYMBOL_TYPE && \
+  if (WithMetaAst.type == $MAL_LIST_TYPE && WithMetaAst.length == 3) then
+    WithMetaSymbolAst:MalValue = WithMetaAst.list[0]
+    WithMetaValueAst:MalValue = WithMetaAst.list[1]
+    WithMetaMetaAst:MalValue = WithMetaAst.list[2]
+    if (WithMetaSymbolAst.type == $MAL_SYMBOL_TYPE && \
+        strcmp(WithMetaSymbolAst.string, "with-meta") == 0 && \
+        WithMetaValueAst.type == $MAL_SYMBOL_TYPE && \
         strcmp(WithMetaValueAst.string, "abc") == 0 && \
         WithMetaMetaAst.type == $MAL_KEYWORD_TYPE && \
         strcmp(WithMetaMetaAst.string, "private") == 0) then
@@ -245,6 +263,31 @@ instr TEST
     exitnow(1)
   endif
 
+  HashMapAst:MalValue = READ("{\"abc\" 1 :b \"whatever\"}")
+  if (HashMapAst.type == $MAL_HASH_MAP_TYPE && HashMapAst.length == 4) then
+    HashMapFirstKeyAst:MalValue = HashMapAst.list[0]
+    HashMapFirstValueAst:MalValue = HashMapAst.list[1]
+    HashMapSecondKeyAst:MalValue = HashMapAst.list[2]
+    HashMapSecondValueAst:MalValue = HashMapAst.list[3]
+    if (HashMapFirstKeyAst.type == $MAL_STRING_TYPE && \
+        strcmp(HashMapFirstKeyAst.string, "abc") == 0 && \
+        HashMapFirstValueAst.type == $MAL_NUMBER_TYPE && \
+        HashMapFirstValueAst.number == 1 && \
+        HashMapSecondKeyAst.type == $MAL_KEYWORD_TYPE && \
+        strcmp(HashMapSecondKeyAst.string, "b") == 0 && \
+        HashMapSecondValueAst.type == $MAL_STRING_TYPE && \
+        strcmp(HashMapSecondValueAst.string, "whatever") == 0) then
+      prints "READ hash-map, Assertion success\n"
+    else
+      prints "READ hash-map value, Assertion failed\n"
+      exitnow(1)
+    endif
+  else
+    prints "READ hash-map, Assertion failed: type=%d length=%d\n", \
+      HashMapAst.type, HashMapAst.length
+    exitnow(1)
+  endif
+
   ASSERT_REP("true", "true")
   ASSERT_REP("123", "123.00000")
   ASSERT_REP("-123", "-123.00000")
@@ -258,19 +301,26 @@ instr TEST
   ASSERT_REP("\"line\\nnext\"", "\"line\\nnext\"")
   ASSERT_REP(":keyword", ":keyword")
   ASSERT_REP("(nil :keyword abc)", "(nil :keyword abc)")
-  ASSERT_REP("`abc", "`abc")
-  ASSERT_REP("~abc", "~abc")
-  ASSERT_REP(SspliceQuoteInput, SspliceQuoteInput)
-  ASSERT_REP(SderefInput, SderefInput)
-  ASSERT_REP("^:private abc", "^:private abc")
+  ASSERT_REP("'abc", "(quote abc)")
+  ASSERT_REP("`abc", "(quasiquote abc)")
+  ASSERT_REP("~abc", "(unquote abc)")
+  ASSERT_REP(SspliceQuoteInput, "(splice-unquote abc)")
+  ASSERT_REP(SderefInput, "(deref abc)")
+  ASSERT_REP("^:private abc", "(with-meta abc :private)")
   SspliceQuoteList = sprintf("`(abc ~value %svalues)", SspliceQuote)
-  ASSERT_REP(SspliceQuoteList, SspliceQuoteList)
+  ASSERT_REP(SspliceQuoteList, "(quasiquote (abc (unquote value) (splice-unquote values)))")
   ASSERT_REP("[+ 1 2]", "[+ 1.00000 2.00000]")
   ASSERT_REP("[]", "[]")
   ASSERT_REP("[ ]", "[]")
   ASSERT_REP("[[3 4]]", "[[3.00000 4.00000]]")
   ASSERT_REP("[+ 1 [+ 2 3]]", "[+ 1.00000 [+ 2.00000 3.00000]]")
   ASSERT_REP("([])", "([])")
+  ASSERT_REP("{}", "{}")
+  ASSERT_REP("{ }", "{}")
+  ASSERT_REP("{\"abc\" 1}", "{\"abc\" 1.00000}")
+  ASSERT_REP("{\"a\" {\"b\" 2}}", "{\"a\" {\"b\" 2.00000}}")
+  ASSERT_REP("{:a {:b 2}}", "{:a {:b 2.00000}}")
+  ASSERT_REP("({})", "({})")
   ASSERT_REP("(1 -2 3)", "(1.00000 -2.00000 3.00000)")
   ASSERT_REP("(1 (2 3) 4)", "(1.00000 (2.00000 3.00000) 4.00000)")
   REPL("'(123 456)")
