@@ -35,6 +35,24 @@ opcode MalMkSymbol(name:S):MalValue
   xout val
 endop
 
+opcode MalMkBuiltin(name:S):MalValue
+  val:MalValue = MalMkValue($MAL_BUILTIN_TYPE)
+  val.string = name
+  xout val
+endop
+
+opcode MalMkBuiltinOperator(name:S):MalValue
+  val:MalValue = MalMkValue($MAL_BUILTIN_OPERATOR_TYPE)
+  val.string = name
+  xout val
+endop
+
+opcode MalMkBuiltinOpcode(name:S):MalValue
+  val:MalValue = MalMkValue($MAL_BUILTIN_OPCODE_TYPE)
+  val.string = name
+  xout val
+endop
+
 opcode MalMkList1(first:MalValue):MalValue
   val:MalValue = MalMkValue($MAL_LIST_TYPE)
   val = MalAppendValue(val, first)

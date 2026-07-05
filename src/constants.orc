@@ -16,6 +16,9 @@
 #define MAL_NIL_TYPE #14#
 #define MAL_TRUE_TYPE #15#
 #define MAL_FALSE_TYPE #16#
+#define MAL_BUILTIN_TYPE #17#
+#define MAL_BUILTIN_OPERATOR_TYPE #18#
+#define MAL_BUILTIN_OPCODE_TYPE #19#
 
 // tokens
 #define MAL_TAB_TOKEN #9#

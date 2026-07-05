@@ -34,6 +34,24 @@ opcode ASSERT_READ_ERROR(input:S, expected:S):void
   endif
 endop
 
+opcode ASSERT_BUILTIN(value:MalValue, expectedType:i, expectedName:S, expectedPrint:S):void
+  if (value.type != expectedType) then
+    prints "BUILTIN %s, Assertion failed: expected type=%d, got type=%d\n", \
+      expectedName, expectedType, value.type
+    exitnow(1)
+  elseif (strcmp(value.string, expectedName) != 0) then
+    prints "BUILTIN %s, Assertion failed: expected name='%s', got '%s'\n", \
+      expectedName, expectedName, value.string
+    exitnow(1)
+  elseif (strcmp(pr_str(value), expectedPrint) != 0) then
+    prints "BUILTIN %s, Assertion failed: expected print='%s', got '%s'\n", \
+      expectedName, expectedPrint, pr_str(value)
+    exitnow(1)
+  else
+    prints "BUILTIN %s, Assertion success\n", expectedName
+  endif
+endop
+
 instr TEST_ERRORS
   prints "Testing error handling\n"
   ASSERT_READ_ERROR("(", "expected ')', got EOF")
@@ -67,5 +85,13 @@ instr TEST_ERRORS
   ASSERT_READ_ERROR(strcat(strcat(Squote, Sbackslash), Squote), "expected '\"', got EOF")
 endin
 
+instr TEST_BUILTINS
+  prints "Testing builtin value representation\n"
+  ASSERT_BUILTIN(MalMkBuiltin("core"), $MAL_BUILTIN_TYPE, "core", "#<builtin:core>")
+  ASSERT_BUILTIN(MalMkBuiltinOperator("+"), $MAL_BUILTIN_OPERATOR_TYPE, "+", "#<builtin-operator:+>")
+  ASSERT_BUILTIN(MalMkBuiltinOpcode("oscili"), $MAL_BUILTIN_OPCODE_TYPE, "oscili", "#<builtin-opcode:oscili>")
+endin
+
 schedule("TEST_ERRORS", 0, 0)
+schedule("TEST_BUILTINS", 0, 0)
 event_i("e", 0, 0)

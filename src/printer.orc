@@ -105,6 +105,15 @@ opcode MalPrintNumber(number:i):S
   xout Sout
 endop
 
+opcode MalPrintBuiltin(kind:S, name:S):S
+  Sout = "#<"
+  Sout strcat Sout, kind
+  Sout strcat Sout, ":"
+  Sout strcat Sout, name
+  Sout strcat Sout, ">"
+  xout Sout
+endop
+
 opcode pr_str_unreadably(ast:MalValue):S
   Sout = ""
   if ($MAL_NUMBER_TYPE == ast.type) then
@@ -148,6 +157,12 @@ opcode pr_str_unreadably(ast:MalValue):S
     Sout = MalPrintDelimitedFormsUnreadably(ast, "[", "]")
   elseif ($MAL_HASH_MAP_TYPE == ast.type) then
     Sout = MalPrintDelimitedFormsUnreadably(ast, "{", "}")
+  elseif ($MAL_BUILTIN_TYPE == ast.type) then
+    Sout = MalPrintBuiltin("builtin", ast.string)
+  elseif ($MAL_BUILTIN_OPERATOR_TYPE == ast.type) then
+    Sout = MalPrintBuiltin("builtin-operator", ast.string)
+  elseif ($MAL_BUILTIN_OPCODE_TYPE == ast.type) then
+    Sout = MalPrintBuiltin("builtin-opcode", ast.string)
   else
     Sout = ""
   endif
@@ -210,6 +225,12 @@ opcode pr_str(ast:MalValue):S
     Sout = MalPrintDelimitedForms(ast, "[", "]")
   elseif ($MAL_HASH_MAP_TYPE == ast.type) then
     Sout = MalPrintDelimitedForms(ast, "{", "}")
+  elseif ($MAL_BUILTIN_TYPE == ast.type) then
+    Sout = MalPrintBuiltin("builtin", ast.string)
+  elseif ($MAL_BUILTIN_OPERATOR_TYPE == ast.type) then
+    Sout = MalPrintBuiltin("builtin-operator", ast.string)
+  elseif ($MAL_BUILTIN_OPCODE_TYPE == ast.type) then
+    Sout = MalPrintBuiltin("builtin-opcode", ast.string)
   else
     Sout = ""
     ;; prints "MALError: unhandled type %d quote-type %d number %d \n", ast.type, $MAL_QUOTE_TYPE, ast.number
