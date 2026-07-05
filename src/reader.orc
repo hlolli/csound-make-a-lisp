@@ -248,15 +248,36 @@ opcode MalDecodeStringToken(token:S):S
   xout Sout
 endop
 
+opcode MalStringTokenHasClosingQuote(token:S):i
+  itokenLen = strlen(token)
+  ires = 0
+
+  if (itokenLen >= 2 && \
+      strchar:i(token, 0) == $MAL_DOUBLE_QUOTE_TOKEN && \
+      strchar:i(token, itokenLen - 1) == $MAL_DOUBLE_QUOTE_TOKEN) then
+    ibackslashCount = 0
+    indx = itokenLen - 2
+
+    while (indx > 0 && strchar:i(token, indx) == $MAL_BACKSLASH_TOKEN) do
+      ibackslashCount += 1
+      indx -= 1
+    od
+
+    ires = (ibackslashCount % 2 == 0 ? 1 : 0)
+  endif
+
+  xout ires
+endop
+
 
 opcode read_atom(reader:MalReader):MalValue
   Stoken = reader.peek
   v:MalValue = MalMkValue($MAL_NUMBER_TYPE)
   itokenLen = strlen(Stoken)
   ifirstChar = strchar:i(Stoken, 0)
-  ilastChar = itokenLen > 0 ? strchar:i(Stoken, itokenLen - 1) : -1
 
-  if (ifirstChar == $MAL_DOUBLE_QUOTE_TOKEN && ilastChar != $MAL_DOUBLE_QUOTE_TOKEN) then
+  if (ifirstChar == $MAL_DOUBLE_QUOTE_TOKEN && \
+      MalStringTokenHasClosingQuote(Stoken) == 0) then
     v = MalMkError("expected '\"', got EOF")
   elseif (ifirstChar == $MAL_DOUBLE_QUOTE_TOKEN) then
     v.type = $MAL_STRING_TYPE

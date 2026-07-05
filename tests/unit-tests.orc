@@ -58,6 +58,11 @@ instr TEST_ERRORS
   ASSERT_READ_ERROR("`]", "unexpected ']'")
   ASSERT_READ_ERROR("^:meta }", "unexpected '}'")
   ASSERT_READ_ERROR("\"unterminated", "expected '\"', got EOF")
+  Squote = sprintf("%c", $MAL_DOUBLE_QUOTE_TOKEN)
+  Sbackslash = sprintf("%c", $MAL_BACKSLASH_TOKEN)
+  ASSERT_READ_ERROR(Squote, "expected '\"', got EOF")
+  ASSERT_READ_ERROR(strcat(Squote, Sbackslash), "expected '\"', got EOF")
+  ASSERT_READ_ERROR(strcat(strcat(Squote, Sbackslash), Squote), "expected '\"', got EOF")
 endin
 
 schedule("TEST_ERRORS", 0, 0)
