@@ -104,6 +104,8 @@ opcode pr_str(ast:MalValue):S
     endif
   elseif ($MAL_LIST_TYPE == ast.type) then
     Sout = MalPrintDelimitedForms(ast, "(", ")")
+  elseif ($MAL_VECTOR_TYPE == ast.type) then
+    Sout = MalPrintDelimitedForms(ast, "[", "]")
   else
     Sout = ""
     ;; prints "MALError: unhandled type %d quote-type %d number %d \n", ast.type, $MAL_QUOTE_TYPE, ast.number

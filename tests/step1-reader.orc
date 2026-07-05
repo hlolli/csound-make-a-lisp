@@ -225,6 +225,26 @@ instr TEST
     exitnow(1)
   endif
 
+  VectorAst:MalValue = READ("[abc :keyword]")
+  if (VectorAst.type == $MAL_VECTOR_TYPE && VectorAst.length == 2) then
+    VectorFirstAst:MalValue = VectorAst.list[0]
+    VectorSecondAst:MalValue = VectorAst.list[1]
+    if (VectorFirstAst.type == $MAL_SYMBOL_TYPE && \
+        strcmp(VectorFirstAst.string, "abc") == 0 && \
+        VectorSecondAst.type == $MAL_KEYWORD_TYPE && \
+        strcmp(VectorSecondAst.string, "keyword") == 0) then
+      prints "READ vector, Assertion success\n"
+    else
+      prints "READ vector value, Assertion failed: first-type=%d first-string=%s second-type=%d second-string=%s\n", \
+        VectorFirstAst.type, VectorFirstAst.string, VectorSecondAst.type, VectorSecondAst.string
+      exitnow(1)
+    endif
+  else
+    prints "READ vector, Assertion failed: type=%d length=%d\n", \
+      VectorAst.type, VectorAst.length
+    exitnow(1)
+  endif
+
   ASSERT_REP("true", "true")
   ASSERT_REP("123", "123.00000")
   ASSERT_REP("-123", "-123.00000")
@@ -245,6 +265,12 @@ instr TEST
   ASSERT_REP("^:private abc", "^:private abc")
   SspliceQuoteList = sprintf("`(abc ~value %svalues)", SspliceQuote)
   ASSERT_REP(SspliceQuoteList, SspliceQuoteList)
+  ASSERT_REP("[+ 1 2]", "[+ 1.00000 2.00000]")
+  ASSERT_REP("[]", "[]")
+  ASSERT_REP("[ ]", "[]")
+  ASSERT_REP("[[3 4]]", "[[3.00000 4.00000]]")
+  ASSERT_REP("[+ 1 [+ 2 3]]", "[+ 1.00000 [+ 2.00000 3.00000]]")
+  ASSERT_REP("([])", "([])")
   ASSERT_REP("(1 -2 3)", "(1.00000 -2.00000 3.00000)")
   ASSERT_REP("(1 (2 3) 4)", "(1.00000 (2.00000 3.00000) 4.00000)")
   REPL("'(123 456)")

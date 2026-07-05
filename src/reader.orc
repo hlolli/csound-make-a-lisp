@@ -282,19 +282,19 @@ opcode read_atom(reader:MalReader):MalValue
   xout v
 endop
 
-opcode read_list(reader:MalReader, endToken:S):MalReadResult
-  newList:MalValue = MalMkValue($MAL_LIST_TYPE)
+opcode read_sequence(reader:MalReader, endToken:S, sequenceType:i):MalReadResult
+  newSequence:MalValue = MalMkValue(sequenceType)
   currentToken:MalReader = MalNextToken(reader)
   ierror = 0
 
   while(strcmp(currentToken.peek, endToken) != 0 && ierror == 0) do
     if currentToken.done == 1 then
-      newList = MalMkError(sprintf("expected '%s', got EOF", endToken))
+      newSequence = MalMkError(sprintf("expected '%s', got EOF", endToken))
       ierror = 1
     else
       next:MalReadResult = read_form(currentToken)
       nextValue:MalValue = MalReadResultValue(next)
-      newList = MalAppendValue(newList, nextValue)
+      newSequence = MalAppendValue(newSequence, nextValue)
       currentToken = MalReadResultReader(next)
 
       if next.type == $MAL_ERROR_TYPE then
@@ -307,8 +307,16 @@ opcode read_list(reader:MalReader, endToken:S):MalReadResult
     currentToken = MalNextToken(currentToken)
   endif
 
-  xout MalMkReadResult(newList, currentToken)
+  xout MalMkReadResult(newSequence, currentToken)
 
+endop
+
+opcode read_list(reader:MalReader, endToken:S):MalReadResult
+  xout read_sequence(reader, endToken, $MAL_LIST_TYPE)
+endop
+
+opcode read_vector(reader:MalReader, endToken:S):MalReadResult
+  xout read_sequence(reader, endToken, $MAL_VECTOR_TYPE)
 endop
 
 opcode read_reader_macro(reader:MalReader, macroType:i, macroToken:S):MalReadResult
@@ -360,6 +368,8 @@ opcode read_form(reader:MalReader):MalReadResult
   istrChar  = strchar:i(Stoken, 0)
   if strcmp("(", Stoken) == 0 then
     xout read_list(reader, ")")
+  elseif strcmp("[", Stoken) == 0 then
+    xout read_vector(reader, "]")
   elseif strcmp("'", Stoken) == 0 then
     xout read_reader_macro(reader, $MAL_QUOTE_TYPE, "'")
   elseif strcmp("`", Stoken) == 0 then
