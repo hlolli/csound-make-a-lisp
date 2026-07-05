@@ -50,9 +50,15 @@ endop
 
 opcode MalIsNumericString(token:S):i
   iascii = strchar:i(token, 0)
+  itokenLen = strlen(token)
   ires = 0
   if (iascii >= 48 && iascii < 58) then
     ires = 1
+  elseif (iascii == $MAL_MINUS_TOKEN && itokenLen > 1) then
+    inext = strchar:i(token, 1)
+    if (inext >= 48 && inext < 58) then
+      ires = 1
+    endif
   endif
   xout ires
 endop

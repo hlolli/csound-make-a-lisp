@@ -22,6 +22,7 @@
 #define MAL_NEWLINE_TOKEN #10#
 #define MAL_SPACE_TOKEN #32#
 #define MAL_COMMA_TOKEN #44#
+#define MAL_MINUS_TOKEN #45#
 #define MAL_PERIOD_TOKEN #46#
 #define MAL_TILDE_TOKEN #126#
 #define MAL_AT_TOKEN #64#

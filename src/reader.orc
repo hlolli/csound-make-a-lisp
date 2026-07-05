@@ -49,10 +49,38 @@ opcode nextEndOfLine(input:S, from:i, maxLookahead:i):i
   xout(min:i(indx, maxLookahead))
 endop
 
+opcode nextStringTokenDelimiter(input:S, from:i, maxLookahead:i):i
+  indx = from + 1
+  ifound = 0
+  iescaped = 0
+
+  while (indx < maxLookahead && ifound == 0) do
+    ipeek = strchar:i(input, indx)
+
+    if (iescaped == 1) then
+      iescaped = 0
+      indx += 1
+    elseif (ipeek == $MAL_BACKSLASH_TOKEN) then
+      iescaped = 1
+      indx += 1
+    elseif (ipeek == $MAL_DOUBLE_QUOTE_TOKEN) then
+      ifound = indx + 1
+    else
+      indx += 1
+    endif
+  od
+
+  xout(ifound == 0 ? maxLookahead : ifound)
+endop
+
 opcode findNumberTokenDelimiter(input:S, from:i, maxLookahead:i):i
   indx = from
   ifound = 0
   iperiodCount = 0
+
+  if (indx < maxLookahead && strchar:i(input, indx) == $MAL_MINUS_TOKEN) then
+    indx += 1
+  endif
 
   while (indx < maxLookahead && ifound == 0) do
     ipeek = strchar:i(input, indx)
@@ -108,8 +136,18 @@ opcode tokenize(input:S):MalTokens
       igoto END
     endif
 
-    ;; capture numbers
-    if ipeek >= 48 && ipeek < 58 then
+    ;; capture strings, including escaped quotes and unterminated strings
+    if (ipeek == $MAL_DOUBLE_QUOTE_TOKEN) then
+      inextString = nextStringTokenDelimiter(input, indx, istrLen)
+      STokens[itokenCnt] = strcpy(strsub(input, indx, inextString))
+      itokenCnt += 1
+      indx = inextString
+      igoto END
+    endif
+
+    ;; capture numbers, including a leading minus followed by a digit
+    if ((ipeek >= 48 && ipeek < 58) || \
+        (ipeek == $MAL_MINUS_TOKEN && ipeek2 >= 48 && ipeek2 < 58)) then
       inumberDelim = findNumberTokenDelimiter(input, indx, istrLen)
 
       if inumberDelim > -1 then
@@ -134,8 +172,6 @@ opcode tokenize(input:S):MalTokens
         ipeek == $MAL_SINGLE_QUOTE_TOKEN || \
         ipeek == $MAL_BACKTICK_TOKEN || \
         ipeek == $MAL_AT_TOKEN || \
-        ipeek == $MAL_COLON_TOKEN || \
-        ipeek == $MAL_DOUBLE_QUOTE_TOKEN || \
         ipeek == $MAL_CARET_TOKEN) then
       STokens[itokenCnt] = strcpy(strsub(input, indx, indx + 1))
       itokenCnt += 1
@@ -183,12 +219,52 @@ endop
 ;;     }
 ;; }
 
+opcode MalDecodeStringToken(token:S):S
+  itokenLen = strlen(token)
+  indx = 1
+  Sout = ""
+
+  while (indx < itokenLen - 1) do
+    ichar = strchar:i(token, indx)
+
+    if (ichar == $MAL_BACKSLASH_TOKEN && indx + 1 < itokenLen - 1) then
+      inext = strchar:i(token, indx + 1)
+
+      if (inext == 110) then
+        Schar = sprintf("%c", $MAL_NEWLINE_TOKEN)
+      else
+        Schar = sprintf("%c", inext)
+      endif
+
+      Sout strcat Sout, Schar
+      indx += 2
+    else
+      Schar = sprintf("%c", ichar)
+      Sout strcat Sout, Schar
+      indx += 1
+    endif
+  od
+
+  xout Sout
+endop
+
 
 opcode read_atom(reader:MalReader):MalValue
   Stoken = reader.peek
   v:MalValue = MalMkValue($MAL_NUMBER_TYPE)
+  itokenLen = strlen(Stoken)
+  ifirstChar = strchar:i(Stoken, 0)
+  ilastChar = itokenLen > 0 ? strchar:i(Stoken, itokenLen - 1) : -1
 
-  if MalIsNumericString(Stoken) == 1 then
+  if (ifirstChar == $MAL_DOUBLE_QUOTE_TOKEN && ilastChar != $MAL_DOUBLE_QUOTE_TOKEN) then
+    v = MalMkError("expected '\"', got EOF")
+  elseif (ifirstChar == $MAL_DOUBLE_QUOTE_TOKEN) then
+    v.type = $MAL_STRING_TYPE
+    v.string = MalDecodeStringToken(Stoken)
+  elseif (ifirstChar == $MAL_COLON_TOKEN) then
+    v.type = $MAL_KEYWORD_TYPE
+    v.string = strsub(Stoken, 1, itokenLen)
+  elseif MalIsNumericString(Stoken) == 1 then
     v.type = $MAL_NUMBER_TYPE
     inum = strtod:i(Stoken)
     v.number = inum
@@ -235,24 +311,76 @@ opcode read_list(reader:MalReader, endToken:S):MalReadResult
 
 endop
 
+opcode read_reader_macro(reader:MalReader, macroType:i, macroToken:S):MalReadResult
+  v:MalValue = MalMkValue(macroType)
+  reader = MalNextToken(reader)
 
-opcode read_form(reader:MalReader):MalReadResult
-  Stoken = reader.peek
-  istrChar  = strchar:i(Stoken, 0)
-  if strcmp("(", Stoken) == 0 then
-    xout read_list(reader, ")")
-  elseif strcmp("'", Stoken) == 0 then
-    v:MalValue = MalMkValue($MAL_QUOTE_TYPE)
-    reader = MalNextToken(reader)
+  if reader.done == 1 then
+    v = MalMkError(sprintf("expected form after '%s', got EOF", macroToken))
+    xout MalMkReadResult(v, reader)
+  else
     l:MalValue[] = v.list
     next:MalReadResult = read_form(reader)
     nextValue:MalValue = MalReadResultValue(next)
     l[0] = nextValue
     v.length = 1
     v.list = l
-    ;; car:MalValue = l[0]
-    ;; car = read_form(reader)
     xout MalMkReadResult(v, MalReadResultReader(next))
+  endif
+endop
+
+opcode read_with_meta(reader:MalReader):MalReadResult
+  v:MalValue = MalMkValue($MAL_WITH_META_TYPE)
+  reader = MalNextToken(reader)
+
+  if reader.done == 1 then
+    v = MalMkError("expected metadata after '^', got EOF")
+    xout MalMkReadResult(v, reader)
+  else
+    meta:MalReadResult = read_form(reader)
+    metaValue:MalValue = MalReadResultValue(meta)
+    formReader:MalReader = MalReadResultReader(meta)
+
+    if (meta.type == $MAL_ERROR_TYPE) then
+      xout meta
+    elseif formReader.done == 1 then
+      v = MalMkError("expected form after '^' metadata, got EOF")
+      xout MalMkReadResult(v, formReader)
+    else
+      form:MalReadResult = read_form(formReader)
+      formValue:MalValue = MalReadResultValue(form)
+      l:MalValue[] = v.list
+      l[0] = formValue
+      l[1] = metaValue
+      v.length = 2
+      v.list = l
+      xout MalMkReadResult(v, MalReadResultReader(form))
+    endif
+  endif
+endop
+
+
+opcode read_form(reader:MalReader):MalReadResult
+  Stoken = reader.peek
+  itokenLen = strlen(Stoken)
+  istrChar  = strchar:i(Stoken, 0)
+  if strcmp("(", Stoken) == 0 then
+    xout read_list(reader, ")")
+  elseif strcmp("'", Stoken) == 0 then
+    xout read_reader_macro(reader, $MAL_QUOTE_TYPE, "'")
+  elseif strcmp("`", Stoken) == 0 then
+    xout read_reader_macro(reader, $MAL_QUASI_QUOTE_TYPE, "`")
+  elseif (itokenLen == 2 && istrChar == $MAL_TILDE_TOKEN && \
+          strchar:i(Stoken, 1) == $MAL_AT_TOKEN) then
+    SspliceQuote = sprintf("%c%c", $MAL_TILDE_TOKEN, $MAL_AT_TOKEN)
+    xout read_reader_macro(reader, $MAL_SPLICE_QUOTE_TYPE, SspliceQuote)
+  elseif strcmp("~", Stoken) == 0 then
+    xout read_reader_macro(reader, $MAL_UNQUOTE_TYPE, "~")
+  elseif (itokenLen == 1 && istrChar == $MAL_AT_TOKEN) then
+    Sderef = sprintf("%c", $MAL_AT_TOKEN)
+    xout read_reader_macro(reader, $MAL_DEREF_TYPE, Sderef)
+  elseif strcmp("^", Stoken) == 0 then
+    xout read_with_meta(reader)
   ;; elseif istrChar >= 48 && istrChar < 58 then
   ;;   v:MalValue = mkValue($MAL_NUMBER_TYPE)
   ;;   v.number = strtol(Stoken)
