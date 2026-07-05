@@ -10,7 +10,7 @@ opcode EVAL(ast:MalValue):MalValue
 endop
 
 opcode PRINT(ast:MalValue):S
-  Sprintout = pr_str(ast)
+  Sprintout = pr_str_with_readability(ast, 1)
   xout Sprintout
 endop
 

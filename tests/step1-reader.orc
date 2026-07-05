@@ -10,7 +10,7 @@ opcode EVAL(ast:MalValue):MalValue
 endop
 
 opcode PRINT(ast:MalValue):S
-  Sprintout = pr_str(ast)
+  Sprintout = pr_str_with_readability(ast, 1)
   xout Sprintout
 endop
 
@@ -28,6 +28,16 @@ opcode ASSERT_REP(input:S, expected:S):void
     prints "REPL %s, Assertion success\n", input
   else
     prints "REPL %s, Assertion failed: expected '%s', got '%s'\n", input, expected, actual
+    exitnow(1)
+  endif
+endop
+
+opcode ASSERT_PRINT_UNREADABLY(input:S, expected:S):void
+  actual:S = pr_str_with_readability(READ(input), 0)
+  if (strcmp(actual, expected) == 0) then
+    prints "PRINT unreadably %s, Assertion success\n", input
+  else
+    prints "PRINT unreadably %s, Assertion failed: expected '%s', got '%s'\n", input, expected, actual
     exitnow(1)
   endif
 endop
@@ -306,6 +316,10 @@ instr TEST
   ASSERT_REP("\"hello world\"", "\"hello world\"")
   ASSERT_REP("\"he\\\"llo\"", "\"he\\\"llo\"")
   ASSERT_REP("\"line\\nnext\"", "\"line\\nnext\"")
+  ASSERT_PRINT_UNREADABLY("\"hello world\"", "hello world")
+  ASSERT_PRINT_UNREADABLY("\"he\\\"llo\"", "he\"llo")
+  SlineNext = sprintf("line%cnext", $MAL_NEWLINE_TOKEN)
+  ASSERT_PRINT_UNREADABLY("\"line\\nnext\"", SlineNext)
   ASSERT_REP(":keyword", ":keyword")
   ASSERT_REP("(nil :keyword abc)", "(nil :keyword abc)")
   ASSERT_REP("'abc", "(quote abc)")

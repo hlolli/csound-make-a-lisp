@@ -1,6 +1,7 @@
 ;; struct MalValue type:i, list:MalValue[], number:i, string:S
 
 declare pr_str(ast:S):MalValue
+declare pr_str_unreadably(ast:S):MalValue
 
 opcode MalEscapeStringForPrint(input:S):S
   indx = 0
@@ -62,6 +63,36 @@ opcode MalPrintDelimitedForms(ast:MalValue, left:S, right:S):S
   xout Sout
 endop
 
+opcode MalPrintPrefixedFormsUnreadably(ast:MalValue, prefix:S):S
+  Sout = prefix
+  indx = 0
+
+  while (indx < ast.length) do
+    next:MalValue = ast.list[indx]
+    Snext = pr_str_unreadably(next)
+    Sout strcat Sout, Snext
+    indx += 1
+  od
+
+  xout Sout
+endop
+
+opcode MalPrintDelimitedFormsUnreadably(ast:MalValue, left:S, right:S):S
+  Sout = left
+  indx = 0
+
+  while (indx < ast.length) do
+    if (indx > 0) then
+      Sout strcat Sout, " "
+    endif
+    Sout strcat Sout, pr_str_unreadably(ast.list[indx])
+    indx += 1
+  od
+
+  Sout strcat Sout, right
+  xout Sout
+endop
+
 opcode MalPrintNumber(number:i):S
   iwhole = int(number)
 
@@ -69,6 +100,65 @@ opcode MalPrintNumber(number:i):S
     Sout = sprintf("%d", iwhole)
   else
     Sout = sprintf("%g", number)
+  endif
+
+  xout Sout
+endop
+
+opcode pr_str_unreadably(ast:MalValue):S
+  Sout = ""
+  if ($MAL_NUMBER_TYPE == ast.type) then
+    Snext = MalPrintNumber(ast.number)
+    Sout strcat Sout, Snext
+  elseif ($MAL_NIL_TYPE == ast.type) then
+    Sout strcat Sout, "nil"
+  elseif ($MAL_TRUE_TYPE == ast.type) then
+    Sout strcat Sout, "true"
+  elseif ($MAL_FALSE_TYPE == ast.type) then
+    Sout strcat Sout, "false"
+  elseif ($MAL_SYMBOL_TYPE == ast.type) then
+    Sout strcat Sout, ast.string
+  elseif ($MAL_KEYWORD_TYPE == ast.type) then
+    Sout strcat Sout, ":"
+    Sout strcat Sout, ast.string
+  elseif ($MAL_STRING_TYPE == ast.type) then
+    Sout strcat Sout, ast.string
+  elseif ($MAL_QUOTE_TYPE == ast.type) then
+    Sout = MalPrintPrefixedFormsUnreadably(ast, "'")
+  elseif ($MAL_QUASI_QUOTE_TYPE == ast.type) then
+    Sout = MalPrintPrefixedFormsUnreadably(ast, "`")
+  elseif ($MAL_UNQUOTE_TYPE == ast.type) then
+    Sout = MalPrintPrefixedFormsUnreadably(ast, "~")
+  elseif ($MAL_SPLICE_QUOTE_TYPE == ast.type) then
+    SspliceQuote = sprintf("%c%c", $MAL_TILDE_TOKEN, $MAL_AT_TOKEN)
+    Sout = MalPrintPrefixedFormsUnreadably(ast, SspliceQuote)
+  elseif ($MAL_DEREF_TYPE == ast.type) then
+    Sderef = sprintf("%c", $MAL_AT_TOKEN)
+    Sout = MalPrintPrefixedFormsUnreadably(ast, Sderef)
+  elseif ($MAL_WITH_META_TYPE == ast.type) then
+    Sout strcat Sout, "^"
+    if (ast.length > 1) then
+      Sout strcat Sout, pr_str_unreadably(ast.list[1])
+      Sout strcat Sout, " "
+      Sout strcat Sout, pr_str_unreadably(ast.list[0])
+    endif
+  elseif ($MAL_LIST_TYPE == ast.type) then
+    Sout = MalPrintDelimitedFormsUnreadably(ast, "(", ")")
+  elseif ($MAL_VECTOR_TYPE == ast.type) then
+    Sout = MalPrintDelimitedFormsUnreadably(ast, "[", "]")
+  elseif ($MAL_HASH_MAP_TYPE == ast.type) then
+    Sout = MalPrintDelimitedFormsUnreadably(ast, "{", "}")
+  else
+    Sout = ""
+  endif
+  xout(Sout)
+endop
+
+opcode pr_str_with_readability(ast:MalValue, printReadably:i):S
+  if (printReadably == 0) then
+    Sout = pr_str_unreadably(ast)
+  else
+    Sout = pr_str(ast)
   endif
 
   xout Sout
