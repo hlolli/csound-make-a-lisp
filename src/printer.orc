@@ -1,5 +1,7 @@
 ;; struct MalValue type:i, list:MalValue[], number:i, string:S
 
+declare pr_str(ast:S):MalValue
+
 opcode MalEscapeStringForPrint(input:S):S
   indx = 0
   ilen = strlen(input)
@@ -30,6 +32,36 @@ opcode MalEscapeStringForPrint(input:S):S
   xout Sout
 endop
 
+opcode MalPrintPrefixedForms(ast:MalValue, prefix:S):S
+  Sout = prefix
+  indx = 0
+
+  while (indx < ast.length) do
+    next:MalValue = ast.list[indx]
+    Snext = pr_str(next)
+    Sout strcat Sout, Snext
+    indx += 1
+  od
+
+  xout Sout
+endop
+
+opcode MalPrintDelimitedForms(ast:MalValue, left:S, right:S):S
+  Sout = left
+  indx = 0
+
+  while (indx < ast.length) do
+    if (indx > 0) then
+      Sout strcat Sout, " "
+    endif
+    Sout strcat Sout, pr_str(ast.list[indx])
+    indx += 1
+  od
+
+  Sout strcat Sout, right
+  xout Sout
+endop
+
 opcode pr_str(ast:MalValue):S
   Sout = ""
   if ($MAL_NUMBER_TYPE == ast.type) then
@@ -52,52 +84,17 @@ opcode pr_str(ast:MalValue):S
     Sout strcat Sout, MalEscapeStringForPrint(ast.string)
     Sout strcat Sout, Squote
   elseif ($MAL_QUOTE_TYPE == ast.type) then
-    Sout strcat Sout, "'"
-    indx = 0
-    while (indx < ast.length) do
-      next:MalValue = ast.list[indx]
-      Snext = pr_str(next)
-      Sout strcat Sout, Snext
-      indx += 1
-    od
+    Sout = MalPrintPrefixedForms(ast, "'")
   elseif ($MAL_QUASI_QUOTE_TYPE == ast.type) then
-    Sout strcat Sout, "`"
-    indx = 0
-    while (indx < ast.length) do
-      next:MalValue = ast.list[indx]
-      Snext = pr_str(next)
-      Sout strcat Sout, Snext
-      indx += 1
-    od
+    Sout = MalPrintPrefixedForms(ast, "`")
   elseif ($MAL_UNQUOTE_TYPE == ast.type) then
-    Sout strcat Sout, "~"
-    indx = 0
-    while (indx < ast.length) do
-      next:MalValue = ast.list[indx]
-      Snext = pr_str(next)
-      Sout strcat Sout, Snext
-      indx += 1
-    od
+    Sout = MalPrintPrefixedForms(ast, "~")
   elseif ($MAL_SPLICE_QUOTE_TYPE == ast.type) then
     SspliceQuote = sprintf("%c%c", $MAL_TILDE_TOKEN, $MAL_AT_TOKEN)
-    Sout strcat Sout, SspliceQuote
-    indx = 0
-    while (indx < ast.length) do
-      next:MalValue = ast.list[indx]
-      Snext = pr_str(next)
-      Sout strcat Sout, Snext
-      indx += 1
-    od
+    Sout = MalPrintPrefixedForms(ast, SspliceQuote)
   elseif ($MAL_DEREF_TYPE == ast.type) then
     Sderef = sprintf("%c", $MAL_AT_TOKEN)
-    Sout strcat Sout, Sderef
-    indx = 0
-    while (indx < ast.length) do
-      next:MalValue = ast.list[indx]
-      Snext = pr_str(next)
-      Sout strcat Sout, Snext
-      indx += 1
-    od
+    Sout = MalPrintPrefixedForms(ast, Sderef)
   elseif ($MAL_WITH_META_TYPE == ast.type) then
     Sout strcat Sout, "^"
     if (ast.length > 1) then
@@ -106,16 +103,7 @@ opcode pr_str(ast:MalValue):S
       Sout strcat Sout, pr_str(ast.list[0])
     endif
   elseif ($MAL_LIST_TYPE == ast.type) then
-    indx = 0
-    Sout strcat Sout, "("
-    while (indx < ast.length) do
-      if (indx > 0) then
-        Sout strcat Sout, " "
-      endif
-      Sout strcat Sout, pr_str(ast.list[indx])
-      indx += 1
-    od
-    Sout strcat Sout, ")"
+    Sout = MalPrintDelimitedForms(ast, "(", ")")
   else
     Sout = ""
     ;; prints "MALError: unhandled type %d quote-type %d number %d \n", ast.type, $MAL_QUOTE_TYPE, ast.number

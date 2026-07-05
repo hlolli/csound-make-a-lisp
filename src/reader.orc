@@ -319,12 +319,9 @@ opcode read_reader_macro(reader:MalReader, macroType:i, macroToken:S):MalReadRes
     v = MalMkError(sprintf("expected form after '%s', got EOF", macroToken))
     xout MalMkReadResult(v, reader)
   else
-    l:MalValue[] = v.list
     next:MalReadResult = read_form(reader)
     nextValue:MalValue = MalReadResultValue(next)
-    l[0] = nextValue
-    v.length = 1
-    v.list = l
+    v = MalAppendValue(v, nextValue)
     xout MalMkReadResult(v, MalReadResultReader(next))
   endif
 endop
@@ -349,11 +346,8 @@ opcode read_with_meta(reader:MalReader):MalReadResult
     else
       form:MalReadResult = read_form(formReader)
       formValue:MalValue = MalReadResultValue(form)
-      l:MalValue[] = v.list
-      l[0] = formValue
-      l[1] = metaValue
-      v.length = 2
-      v.list = l
+      v = MalAppendValue(v, formValue)
+      v = MalAppendValue(v, metaValue)
       xout MalMkReadResult(v, MalReadResultReader(form))
     endif
   endif
