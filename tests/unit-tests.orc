@@ -21,9 +21,9 @@ endop
 opcode ASSERT_READ_ERROR(input:S, expected:S):void
   actual:MalValue = READ(input)
 
-  if (actual.type != giERROR_TYPE) then
+  if (actual.type != $MAL_ERROR_TYPE) then
     prints "READ error %s, Assertion failed: expected type=%d, got type=%d\n", \
-      input, giERROR_TYPE, actual.type
+      input, $MAL_ERROR_TYPE, actual.type
     exitnow(1)
   elseif (strcmp(actual.string, expected) != 0) then
     prints "READ error %s, Assertion failed: expected '%s', got '%s'\n", \

@@ -1,19 +1,19 @@
 ;; Csound's declare type order is reversed relative to typed opcode definitions.
-declare read_form(reader:MalValue):MalReader
+declare read_form(reader:MalReadResult):MalReader
 
 opcode isCharWordBoundry(char:i):i
   ires = 0
-  if (char == giNEWLINE_TOKEN || \
-      char == giSPACE_TOKEN || \
-      char == giTAB_TOKEN || \
-      char == giSEMICOLON_TOKEN || \
-      char == giDOUBLE_QUOTE_TOKEN || \
-      char == giPAREN_OPEN_TOKEN || \
-      char == giPAREN_CLOSE_TOKEN || \
-      char == giCURLY_OPEN_TOKEN || \
-      char == giCURLY_CLOSE_TOKEN  || \
-      char == giBRACKET_OPEN_TOKEN  || \
-      char == giBRACKET_CLOSE_TOKEN) \
+  if (char == $MAL_NEWLINE_TOKEN || \
+      char == $MAL_SPACE_TOKEN || \
+      char == $MAL_TAB_TOKEN || \
+      char == $MAL_SEMICOLON_TOKEN || \
+      char == $MAL_DOUBLE_QUOTE_TOKEN || \
+      char == $MAL_PAREN_OPEN_TOKEN || \
+      char == $MAL_PAREN_CLOSE_TOKEN || \
+      char == $MAL_CURLY_OPEN_TOKEN || \
+      char == $MAL_CURLY_CLOSE_TOKEN  || \
+      char == $MAL_BRACKET_OPEN_TOKEN  || \
+      char == $MAL_BRACKET_CLOSE_TOKEN) \
       then
     ires = 1
   endif
@@ -40,7 +40,7 @@ opcode nextEndOfLine(input:S, from:i, maxLookahead:i):i
   ifound = 0
   while (indx < maxLookahead && ifound == 0) do
     ipeek = strchar:i(input, indx)
-    if (ipeek == giNEWLINE_TOKEN) then
+    if (ipeek == $MAL_NEWLINE_TOKEN) then
       ifound = 1
     else
       indx += 1
@@ -59,7 +59,7 @@ opcode findNumberTokenDelimiter(input:S, from:i, maxLookahead:i):i
 
     if (ipeek >= 48 && ipeek < 58) then
       indx += 1
-    elseif (ipeek == giPERIOD_TOKEN && iperiodCount == 0) then
+    elseif (ipeek == $MAL_PERIOD_TOKEN && iperiodCount == 0) then
       indx += 1
       iperiodCount = 1
     elseif isCharWordBoundry(ipeek) == 1 then
@@ -88,20 +88,20 @@ opcode tokenize(input:S):MalTokens
     ;; prints "ipeek %d ipeek2 %d \n", ipeek, ipeek2
 
     ;; ignore whitespaces and commas
-    if (ipeek == giSPACE_TOKEN || ipeek == giCOMMA_TOKEN || ipeek == giNEWLINE_TOKEN) then
+    if (ipeek == $MAL_SPACE_TOKEN || ipeek == $MAL_COMMA_TOKEN || ipeek == $MAL_NEWLINE_TOKEN) then
       indx += 1
       igoto END
     endif
 
     ;; jump over line comments
-    if (ipeek == giSEMICOLON_TOKEN) then
+    if (ipeek == $MAL_SEMICOLON_TOKEN) then
       inextNewline = nextEndOfLine(input, indx, istrLen)
       indx = inextNewline
       igoto END
     endif
 
     ;; test for ~@ token
-    if (ipeek == giTILDA_TOKEN && ipeek2 == giAT_TOKEN) then
+    if (ipeek == $MAL_TILDE_TOKEN && ipeek2 == $MAL_AT_TOKEN) then
       STokens[itokenCnt] = strcpy(strsub(input, indx, indx + 2))
       itokenCnt += 1
       indx += 2
@@ -124,19 +124,19 @@ opcode tokenize(input:S):MalTokens
     endif
 
     ;; test for any single special token [\[\]{}()'`~^@]
-    if (ipeek == giTILDA_TOKEN || \
-        ipeek == giCURLY_OPEN_TOKEN || \
-        ipeek == giCURLY_CLOSE_TOKEN || \
-        ipeek == giBRACKET_OPEN_TOKEN || \
-        ipeek == giBRACKET_CLOSE_TOKEN || \
-        ipeek == giPAREN_OPEN_TOKEN || \
-        ipeek == giPAREN_CLOSE_TOKEN || \
-        ipeek == giSINGLE_QUOTE_TOKEN || \
-        ipeek == giBACKTICK_TOKEN || \
-        ipeek == giAT_TOKEN || \
-        ipeek == giCOLON_TOKEN || \
-        ipeek == giDOUBLE_QUOTE_TOKEN || \
-        ipeek == giCARTOT_TOKEN) then
+    if (ipeek == $MAL_TILDE_TOKEN || \
+        ipeek == $MAL_CURLY_OPEN_TOKEN || \
+        ipeek == $MAL_CURLY_CLOSE_TOKEN || \
+        ipeek == $MAL_BRACKET_OPEN_TOKEN || \
+        ipeek == $MAL_BRACKET_CLOSE_TOKEN || \
+        ipeek == $MAL_PAREN_OPEN_TOKEN || \
+        ipeek == $MAL_PAREN_CLOSE_TOKEN || \
+        ipeek == $MAL_SINGLE_QUOTE_TOKEN || \
+        ipeek == $MAL_BACKTICK_TOKEN || \
+        ipeek == $MAL_AT_TOKEN || \
+        ipeek == $MAL_COLON_TOKEN || \
+        ipeek == $MAL_DOUBLE_QUOTE_TOKEN || \
+        ipeek == $MAL_CARET_TOKEN) then
       STokens[itokenCnt] = strcpy(strsub(input, indx, indx + 1))
       itokenCnt += 1
       indx += 1
@@ -186,28 +186,28 @@ endop
 
 opcode read_atom(reader:MalReader):MalValue
   Stoken = reader.peek
-  v:MalValue = MalMkValue(giNUMBER_TYPE)
+  v:MalValue = MalMkValue($MAL_NUMBER_TYPE)
 
   if MalIsNumericString(Stoken) == 1 then
-    v.type = giNUMBER_TYPE
+    v.type = $MAL_NUMBER_TYPE
     inum = strtod:i(Stoken)
     v.number = inum
   elseif strcmp("nil", Stoken) == 0 then
-    v.type = giNIL_TYPE
+    v.type = $MAL_NIL_TYPE
   elseif strcmp("true", Stoken) == 0 then
-    v.type = giTRUE_TYPE
+    v.type = $MAL_TRUE_TYPE
   elseif strcmp("false", Stoken) == 0 then
-    v.type = giFALSE_TYPE
+    v.type = $MAL_FALSE_TYPE
   else
-    v.type = giSYMBOL_TYPE
+    v.type = $MAL_SYMBOL_TYPE
     v.string = Stoken
   endif
 
   xout v
 endop
 
-opcode read_list(reader:MalReader, endToken:S):MalValue
-  newList:MalValue = MalMkValue(giLIST_TYPE)
+opcode read_list(reader:MalReader, endToken:S):MalReadResult
+  newList:MalValue = MalMkValue($MAL_LIST_TYPE)
   currentToken:MalReader = MalNextToken(reader)
   ierror = 0
 
@@ -216,35 +216,45 @@ opcode read_list(reader:MalReader, endToken:S):MalValue
       newList = MalMkError(sprintf("expected '%s', got EOF", endToken))
       ierror = 1
     else
-      next:MalValue = read_form(currentToken)
-      newList = MalAppendValue(newList, next)
-      currentToken = MalNextToken(currentToken)
+      next:MalReadResult = read_form(currentToken)
+      nextValue:MalValue = MalReadResultValue(next)
+      newList = MalAppendValue(newList, nextValue)
+      currentToken = MalReadResultReader(next)
+
+      if next.type == $MAL_ERROR_TYPE then
+        ierror = 1
+      endif
     endif
   od
 
-  xout newList
+  if ierror == 0 then
+    currentToken = MalNextToken(currentToken)
+  endif
+
+  xout MalMkReadResult(newList, currentToken)
 
 endop
 
 
-opcode read_form(reader:MalReader):MalValue
+opcode read_form(reader:MalReader):MalReadResult
   Stoken = reader.peek
   istrChar  = strchar:i(Stoken, 0)
   if strcmp("(", Stoken) == 0 then
     xout read_list(reader, ")")
   elseif strcmp("'", Stoken) == 0 then
-    v:MalValue = MalMkValue(giQUOTE_TYPE)
+    v:MalValue = MalMkValue($MAL_QUOTE_TYPE)
     reader = MalNextToken(reader)
     l:MalValue[] = v.list
-    next:MalValue = read_form(reader)
-    l[0] = next
+    next:MalReadResult = read_form(reader)
+    nextValue:MalValue = MalReadResultValue(next)
+    l[0] = nextValue
     v.length = 1
     v.list = l
     ;; car:MalValue = l[0]
     ;; car = read_form(reader)
-    xout v
+    xout MalMkReadResult(v, MalReadResultReader(next))
   ;; elseif istrChar >= 48 && istrChar < 58 then
-  ;;   v:MalValue = mkValue(giNUMBER_TYPE)
+  ;;   v:MalValue = mkValue($MAL_NUMBER_TYPE)
   ;;   v.number = strtol(Stoken)
   ;;   reader = nextToken(reader)
   ;;   l:MalValue[] = v.list
@@ -252,7 +262,8 @@ opcode read_form(reader:MalReader):MalValue
   ;;   car = read_form(reader)
   ;;   xout v
   else
-    xout read_atom(reader)
+    v:MalValue = read_atom(reader)
+    xout MalMkReadResult(v, MalNextToken(reader))
     ;; v:MalValue = mkValue(giPLACEHOLDER)
     ;; xout v
   endif
@@ -267,6 +278,6 @@ endop
 opcode read_str(input:S):MalValue
   tstruct:MalTokens = tokenize(input)
   reader:MalReader = MalMkReader(tstruct)
-  val:MalValue = read_form(reader)
-  xout val
+  result:MalReadResult = read_form(reader)
+  xout MalReadResultValue(result)
 endop

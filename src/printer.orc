@@ -2,18 +2,18 @@
 
 opcode pr_str(ast:MalValue):S
   Sout = ""
-  if (giNUMBER_TYPE == ast.type) then
+  if ($MAL_NUMBER_TYPE == ast.type) then
     Snext = sprintf("%.5f", ast.number)
     Sout strcat Sout, Snext
-  elseif (giNIL_TYPE == ast.type) then
+  elseif ($MAL_NIL_TYPE == ast.type) then
     Sout strcat Sout, "nil"
-  elseif (giTRUE_TYPE == ast.type) then
+  elseif ($MAL_TRUE_TYPE == ast.type) then
     Sout strcat Sout, "true"
-  elseif (giFALSE_TYPE == ast.type) then
+  elseif ($MAL_FALSE_TYPE == ast.type) then
     Sout strcat Sout, "false"
-  elseif (giSYMBOL_TYPE == ast.type) then
+  elseif ($MAL_SYMBOL_TYPE == ast.type) then
     Sout strcat Sout, ast.string
-  elseif (giQUOTE_TYPE == ast.type) then
+  elseif ($MAL_QUOTE_TYPE == ast.type) then
     Sout strcat Sout, "'"
     indx = 0
     while (indx < ast.length) do
@@ -22,7 +22,7 @@ opcode pr_str(ast:MalValue):S
       Sout strcat Sout, Snext
       indx += 1
     od
-  elseif (giLIST_TYPE == ast.type) then
+  elseif ($MAL_LIST_TYPE == ast.type) then
     indx = 0
     Sout strcat Sout, "("
     while (indx < ast.length) do
@@ -35,7 +35,7 @@ opcode pr_str(ast:MalValue):S
     Sout strcat Sout, ")"
   else
     Sout = ""
-    ;; prints "MALError: unhandled type %d quote-type %d number %d \n", ast.type, giQUOTE_TYPE, ast.number
+    ;; prints "MALError: unhandled type %d quote-type %d number %d \n", ast.type, $MAL_QUOTE_TYPE, ast.number
   endif
   xout(Sout)
 endop

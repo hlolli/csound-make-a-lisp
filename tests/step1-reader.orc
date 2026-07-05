@@ -35,7 +35,7 @@ endop
 instr TEST
   prints "Testing basic reader functionality\n"
   NumberAst:MalValue = READ("123")
-  if (NumberAst.type == giNUMBER_TYPE && NumberAst.number == 123) then
+  if (NumberAst.type == $MAL_NUMBER_TYPE && NumberAst.number == 123) then
     prints "READ number, Assertion success\n"
   else
     prints "READ number, Assertion failed: type=%d number=%f\n", NumberAst.type, NumberAst.number
@@ -43,36 +43,36 @@ instr TEST
   endif
 
   NilAst:MalValue = READ("nil")
-  if (NilAst.type == giNIL_TYPE) then
+  if (NilAst.type == $MAL_NIL_TYPE) then
     prints "READ nil, Assertion success\n"
   else
     prints "READ nil, Assertion failed: expected type=%d, got type=%d\n", \
-      giNIL_TYPE, NilAst.type
+      $MAL_NIL_TYPE, NilAst.type
     exitnow(1)
   endif
 
   TrueAst:MalValue = READ("true")
-  if (TrueAst.type == giTRUE_TYPE) then
+  if (TrueAst.type == $MAL_TRUE_TYPE) then
     prints "READ true, Assertion success\n"
   else
     prints "READ true, Assertion failed: expected type=%d, got type=%d\n", \
-      giTRUE_TYPE, TrueAst.type
+      $MAL_TRUE_TYPE, TrueAst.type
     exitnow(1)
   endif
 
   FalseAst:MalValue = READ("false")
-  if (FalseAst.type == giFALSE_TYPE) then
+  if (FalseAst.type == $MAL_FALSE_TYPE) then
     prints "READ false, Assertion success\n"
   else
     prints "READ false, Assertion failed: expected type=%d, got type=%d\n", \
-      giFALSE_TYPE, FalseAst.type
+      $MAL_FALSE_TYPE, FalseAst.type
     exitnow(1)
   endif
 
   SymbolAst:MalValue = READ("abc")
-  if (SymbolAst.type != giSYMBOL_TYPE) then
+  if (SymbolAst.type != $MAL_SYMBOL_TYPE) then
     prints "READ symbol type, Assertion failed: expected type=%d, got type=%d\n", \
-      giSYMBOL_TYPE, SymbolAst.type
+      $MAL_SYMBOL_TYPE, SymbolAst.type
     exitnow(1)
   elseif (strcmp(SymbolAst.string, "abc") != 0) then
     prints "READ symbol string, Assertion failed: expected 'abc', got '%s'\n", \
@@ -83,11 +83,11 @@ instr TEST
   endif
 
   QuoteAst:MalValue = READ("'(123 456)")
-  if (QuoteAst.type == giQUOTE_TYPE && QuoteAst.length == 1) then
+  if (QuoteAst.type == $MAL_QUOTE_TYPE && QuoteAst.length == 1) then
     ListAst:MalValue = QuoteAst.list[0]
     FirstAst:MalValue = ListAst.list[0]
     SecondAst:MalValue = ListAst.list[1]
-    if (ListAst.type == giLIST_TYPE && ListAst.length == 2 && \
+    if (ListAst.type == $MAL_LIST_TYPE && ListAst.length == 2 && \
         FirstAst.number == 123 && SecondAst.number == 456) then
       prints "READ quote/list, Assertion success\n"
     else
@@ -109,6 +109,7 @@ instr TEST
   ASSERT_REP("abc", "abc")
   ASSERT_REP("abc", "abc")
   ASSERT_REP("abc ", "abc")
+  ASSERT_REP("(1 (2 3) 4)", "(1.00000 (2.00000 3.00000) 4.00000)")
   REPL("'(123 456)")
   REPL("(nil true false abc)")
   ;; prints "SRES9: %s\n", SRES9

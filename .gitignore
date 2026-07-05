@@ -1,7 +1,10 @@
 *.aif
 *~
 *#
+.DS_Store
 DS_Store
 deleteme*
 /mal
 /csound
+/result
+/paper

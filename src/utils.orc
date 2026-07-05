@@ -29,6 +29,25 @@ opcode MalMkValue(type:i):MalValue
   xout(val)
 endop
 
+opcode MalMkReadResult(value:MalValue, reader:MalReader):MalReadResult
+  result:MalReadResult init value.type, value.number, value.string, value.list, \
+    value.length, reader.peek, reader.position, reader.tokens, reader.length, \
+    reader.done
+  xout result
+endop
+
+opcode MalReadResultValue(result:MalReadResult):MalValue
+  value:MalValue init result.type, result.number, result.string, result.list, \
+    result.length
+  xout value
+endop
+
+opcode MalReadResultReader(result:MalReadResult):MalReader
+  reader:MalReader init result.readerPeek, result.readerPosition, \
+    result.readerTokens, result.readerLength, result.readerDone
+  xout reader
+endop
+
 opcode MalIsNumericString(token:S):i
   iascii = strchar:i(token, 0)
   ires = 0
