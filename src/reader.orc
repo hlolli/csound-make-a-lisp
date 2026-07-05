@@ -304,7 +304,15 @@ opcode read_vector(reader:MalReader, endToken:S):MalReadResult
 endop
 
 opcode read_hash_map(reader:MalReader, endToken:S):MalReadResult
-  xout read_sequence(reader, endToken, $MAL_HASH_MAP_TYPE)
+  result:MalReadResult = read_sequence(reader, endToken, $MAL_HASH_MAP_TYPE)
+  value:MalValue = MalReadResultValue(result)
+
+  if (value.type != $MAL_ERROR_TYPE && value.length % 2 != 0) then
+    value = MalMkError("expected hash-map value, got end of map")
+    result = MalMkReadResult(value, MalReadResultReader(result))
+  endif
+
+  xout result
 endop
 
 opcode read_reader_macro(reader:MalReader, macroSymbol:S, macroToken:S):MalReadResult
