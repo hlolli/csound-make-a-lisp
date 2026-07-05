@@ -62,10 +62,22 @@ opcode MalPrintDelimitedForms(ast:MalValue, left:S, right:S):S
   xout Sout
 endop
 
+opcode MalPrintNumber(number:i):S
+  iwhole = int(number)
+
+  if (number == iwhole) then
+    Sout = sprintf("%d", iwhole)
+  else
+    Sout = sprintf("%g", number)
+  endif
+
+  xout Sout
+endop
+
 opcode pr_str(ast:MalValue):S
   Sout = ""
   if ($MAL_NUMBER_TYPE == ast.type) then
-    Snext = sprintf("%.5f", ast.number)
+    Snext = MalPrintNumber(ast.number)
     Sout strcat Sout, Snext
   elseif ($MAL_NIL_TYPE == ast.type) then
     Sout strcat Sout, "nil"
