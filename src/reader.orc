@@ -116,7 +116,8 @@ opcode tokenize(input:S):MalTokens
     ;; prints "ipeek %d ipeek2 %d \n", ipeek, ipeek2
 
     ;; ignore whitespaces and commas
-    if (ipeek == $MAL_SPACE_TOKEN || ipeek == $MAL_COMMA_TOKEN || ipeek == $MAL_NEWLINE_TOKEN) then
+    if (ipeek == $MAL_SPACE_TOKEN || ipeek == $MAL_TAB_TOKEN || \
+        ipeek == $MAL_COMMA_TOKEN || ipeek == $MAL_NEWLINE_TOKEN) then
       indx += 1
       igoto END
     endif
