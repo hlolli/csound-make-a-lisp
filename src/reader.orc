@@ -297,11 +297,13 @@ opcode read_sequence(reader:MalReader, endToken:S, sequenceType:i):MalReadResult
     else
       next:MalReadResult = read_form(currentToken)
       nextValue:MalValue = MalReadResultValue(next)
-      newSequence = MalAppendValue(newSequence, nextValue)
       currentToken = MalReadResultReader(next)
 
       if next.type == $MAL_ERROR_TYPE then
+        newSequence = nextValue
         ierror = 1
+      else
+        newSequence = MalAppendValue(newSequence, nextValue)
       endif
     endif
   od
@@ -328,43 +330,57 @@ endop
 
 opcode read_reader_macro(reader:MalReader, macroSymbol:S, macroToken:S):MalReadResult
   v:MalValue = MalMkValue($MAL_LIST_TYPE)
+  result:MalReadResult = MalMkReadResult(v, reader)
   reader = MalNextToken(reader)
 
   if reader.done == 1 then
     v = MalMkError(sprintf("expected form after '%s', got EOF", macroToken))
-    xout MalMkReadResult(v, reader)
+    result = MalMkReadResult(v, reader)
   else
     next:MalReadResult = read_form(reader)
     nextValue:MalValue = MalReadResultValue(next)
-    v = MalMkList2(MalMkSymbol(macroSymbol), nextValue)
-    xout MalMkReadResult(v, MalReadResultReader(next))
+    if next.type == $MAL_ERROR_TYPE then
+      result = next
+    else
+      v = MalMkList2(MalMkSymbol(macroSymbol), nextValue)
+      result = MalMkReadResult(v, MalReadResultReader(next))
+    endif
   endif
+
+  xout result
 endop
 
 opcode read_with_meta(reader:MalReader):MalReadResult
   v:MalValue = MalMkValue($MAL_LIST_TYPE)
+  result:MalReadResult = MalMkReadResult(v, reader)
   reader = MalNextToken(reader)
 
   if reader.done == 1 then
     v = MalMkError("expected metadata after '^', got EOF")
-    xout MalMkReadResult(v, reader)
+    result = MalMkReadResult(v, reader)
   else
     meta:MalReadResult = read_form(reader)
     metaValue:MalValue = MalReadResultValue(meta)
     formReader:MalReader = MalReadResultReader(meta)
 
     if (meta.type == $MAL_ERROR_TYPE) then
-      xout meta
+      result = meta
     elseif formReader.done == 1 then
       v = MalMkError("expected form after '^' metadata, got EOF")
-      xout MalMkReadResult(v, formReader)
+      result = MalMkReadResult(v, formReader)
     else
       form:MalReadResult = read_form(formReader)
       formValue:MalValue = MalReadResultValue(form)
-      v = MalMkList3(MalMkSymbol("with-meta"), formValue, metaValue)
-      xout MalMkReadResult(v, MalReadResultReader(form))
+      if form.type == $MAL_ERROR_TYPE then
+        result = form
+      else
+        v = MalMkList3(MalMkSymbol("with-meta"), formValue, metaValue)
+        result = MalMkReadResult(v, MalReadResultReader(form))
+      endif
     endif
   endif
+
+  xout result
 endop
 
 
@@ -378,6 +394,15 @@ opcode read_form(reader:MalReader):MalReadResult
     xout read_vector(reader, "]")
   elseif strcmp("{", Stoken) == 0 then
     xout read_hash_map(reader, "}")
+  elseif strcmp(")", Stoken) == 0 then
+    v:MalValue = MalMkError("unexpected ')'")
+    xout MalMkReadResult(v, MalNextToken(reader))
+  elseif strcmp("]", Stoken) == 0 then
+    v:MalValue = MalMkError("unexpected ']'")
+    xout MalMkReadResult(v, MalNextToken(reader))
+  elseif strcmp("}", Stoken) == 0 then
+    v:MalValue = MalMkError("unexpected '}'")
+    xout MalMkReadResult(v, MalNextToken(reader))
   elseif strcmp("'", Stoken) == 0 then
     xout read_reader_macro(reader, "quote", "'")
   elseif strcmp("`", Stoken) == 0 then
@@ -417,7 +442,13 @@ endop
 
 opcode read_str(input:S):MalValue
   tstruct:MalTokens = tokenize(input)
-  reader:MalReader = MalMkReader(tstruct)
-  result:MalReadResult = read_form(reader)
-  xout MalReadResultValue(result)
+  returnValue:MalValue = MalMkValue($MAL_NIL_TYPE)
+
+  if (tstruct.length > 0) then
+    reader:MalReader = MalMkReader(tstruct)
+    result:MalReadResult = read_form(reader)
+    returnValue = MalReadResultValue(result)
+  endif
+
+  xout returnValue
 endop
