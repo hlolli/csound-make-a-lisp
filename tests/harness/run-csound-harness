@@ -1,0 +1,94 @@
+#!/usr/bin/env python3
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[1]
+CSOUND = os.environ.get("CSOUND", "csound")
+
+CSOUND_NOISE = (
+    re.compile(r"^--Csound version "),
+    re.compile(r"^\[commit: "),
+    re.compile(r"^setting path "),
+    re.compile(r"^scoreless operation$"),
+    re.compile(r"^orchname:"),
+    re.compile(r"^Compiling Csound code"),
+    re.compile(r"^instr .* uses instrument number"),
+    re.compile(r"^\t \.\.\.done$"),
+    re.compile(r"^Elapsed time "),
+    re.compile(r"^using libsndfile-"),
+    re.compile(r"^displays suppressed$"),
+    re.compile(r"^sr = "),
+    re.compile(r"^0dBFS level = "),
+    re.compile(r"^audio buffered in "),
+    re.compile(r"^not writing to sound disk$"),
+    re.compile(r"^SECTION 1:$"),
+    re.compile(r"^inactive allocs returned to freespace$"),
+    re.compile(r"^\t\t   overall amps:"),
+    re.compile(r"^\t   overall samples out of range:"),
+    re.compile(r"^0 errors in performance$"),
+    re.compile(r"^no sound written to disk$"),
+)
+
+
+def is_csound_noise(line):
+    return line == "" or any(pattern.search(line) for pattern in CSOUND_NOISE)
+
+
+def eval_once(step_file, source):
+    proc = subprocess.run(
+        [
+            CSOUND,
+            "-n",
+            "-d",
+            "-m128",
+            f"--strset1={source}",
+            "--orc",
+            str(step_file),
+        ],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+
+    lines = [line for line in proc.stdout.splitlines() if not is_csound_noise(line)]
+    if proc.returncode != 0:
+        if lines:
+            return "\n".join(lines)
+        return f"Error: csound exited with {proc.returncode}"
+    return "\n".join(lines)
+
+
+def prompt():
+    sys.stdout.write("user> ")
+    sys.stdout.flush()
+
+
+def main():
+    if len(sys.argv) != 2:
+        sys.stderr.write("usage: run-csound-harness STEP_ORC\n")
+        return 2
+
+    step_file = HERE / sys.argv[1]
+    if not step_file.exists():
+        sys.stderr.write(f"missing Csound step file: {step_file}\n")
+        return 2
+
+    prompt()
+    for line in sys.stdin:
+        output = eval_once(step_file, line.rstrip("\n"))
+        if output:
+            sys.stdout.write(output)
+            if not output.endswith("\n"):
+                sys.stdout.write("\n")
+        prompt()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

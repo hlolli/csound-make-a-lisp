@@ -23,5 +23,8 @@ unit:
 harness-reader:
     python3 mal/runtest.py --deferrable --optional tests/harness/step1_read_print.mal -- tests/harness/run-step1-reader
 
+harness-eval:
+    python3 mal/runtest.py --deferrable --optional tests/harness/step2_eval.mal -- tests/harness/run-step2-eval
+
 status:
     @git status --short
