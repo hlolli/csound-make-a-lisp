@@ -52,6 +52,38 @@ opcode ASSERT_BUILTIN(value:MalValue, expectedType:i, expectedName:S, expectedPr
   endif
 endop
 
+opcode ASSERT_ENV_VALUE(env:MalEnv, key:S, expectedType:i, expectedName:S):void
+  value:MalValue = MalEnvGet(env, key)
+
+  if (value.type != expectedType) then
+    prints "ENV %s, Assertion failed: expected type=%d, got type=%d\n", \
+      key, expectedType, value.type
+    exitnow(1)
+  elseif (strcmp(value.string, expectedName) != 0) then
+    prints "ENV %s, Assertion failed: expected name='%s', got '%s'\n", \
+      key, expectedName, value.string
+    exitnow(1)
+  else
+    prints "ENV %s, Assertion success\n", key
+  endif
+endop
+
+opcode ASSERT_ENV_ERROR(env:MalEnv, key:S, expected:S):void
+  value:MalValue = MalEnvGet(env, key)
+
+  if (value.type != $MAL_ERROR_TYPE) then
+    prints "ENV missing %s, Assertion failed: expected type=%d, got type=%d\n", \
+      key, $MAL_ERROR_TYPE, value.type
+    exitnow(1)
+  elseif (strcmp(value.string, expected) != 0) then
+    prints "ENV missing %s, Assertion failed: expected '%s', got '%s'\n", \
+      key, expected, value.string
+    exitnow(1)
+  else
+    prints "ENV missing %s, Assertion success\n", key
+  endif
+endop
+
 instr TEST_ERRORS
   prints "Testing error handling\n"
   ASSERT_READ_ERROR("(", "expected ')', got EOF")
@@ -92,6 +124,24 @@ instr TEST_BUILTINS
   ASSERT_BUILTIN(MalMkBuiltinOpcode("oscili"), $MAL_BUILTIN_OPCODE_TYPE, "oscili", "#<builtin-opcode:oscili>")
 endin
 
+instr TEST_ENV
+  prints "Testing environment map\n"
+  env:MalEnv = MalMkEnv()
+  env = MalEnvSet(env, "x", MalMkBuiltin("first"))
+  ASSERT_ENV_VALUE(env, "x", $MAL_BUILTIN_TYPE, "first")
+
+  env = MalEnvSet(env, "x", MalMkBuiltin("second"))
+  ASSERT_ENV_VALUE(env, "x", $MAL_BUILTIN_TYPE, "second")
+  ASSERT_ENV_ERROR(env, "missing", "'missing' not found")
+
+  step2Env:MalEnv = MalMkStep2Env()
+  ASSERT_ENV_VALUE(step2Env, "+", $MAL_BUILTIN_OPERATOR_TYPE, "+")
+  ASSERT_ENV_VALUE(step2Env, "-", $MAL_BUILTIN_OPERATOR_TYPE, "-")
+  ASSERT_ENV_VALUE(step2Env, "*", $MAL_BUILTIN_OPERATOR_TYPE, "*")
+  ASSERT_ENV_VALUE(step2Env, "/", $MAL_BUILTIN_OPERATOR_TYPE, "/")
+endin
+
 schedule("TEST_ERRORS", 0, 0)
 schedule("TEST_BUILTINS", 0, 0)
+schedule("TEST_ENV", 0, 0)
 event_i("e", 0, 0)

@@ -10,10 +10,8 @@ opcode MalNextToken(reader:MalReader):MalReader
 endop
 
 opcode MalAppendValue(destination:MalValue, value:MalValue):MalValue
-  list:MalValue[] = destination.list
-  list[destination.length] = value
+  destination.list[destination.length] = value
   destination.length += 1
-  destination.list = list
   xout destination
 endop
 
