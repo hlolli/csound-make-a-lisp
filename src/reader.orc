@@ -6,6 +6,7 @@ opcode isCharWordBoundry(char:i):i
   if (char == $MAL_NEWLINE_TOKEN || \
       char == $MAL_SPACE_TOKEN || \
       char == $MAL_TAB_TOKEN || \
+      char == $MAL_COMMA_TOKEN || \
       char == $MAL_SEMICOLON_TOKEN || \
       char == $MAL_DOUBLE_QUOTE_TOKEN || \
       char == $MAL_PAREN_OPEN_TOKEN || \
@@ -73,34 +74,6 @@ opcode nextStringTokenDelimiter(input:S, from:i, maxLookahead:i):i
   xout(ifound == 0 ? maxLookahead : ifound)
 endop
 
-opcode findNumberTokenDelimiter(input:S, from:i, maxLookahead:i):i
-  indx = from
-  ifound = 0
-  iperiodCount = 0
-
-  if (indx < maxLookahead && strchar:i(input, indx) == $MAL_MINUS_TOKEN) then
-    indx += 1
-  endif
-
-  while (indx < maxLookahead && ifound == 0) do
-    ipeek = strchar:i(input, indx)
-
-    if (ipeek >= 48 && ipeek < 58) then
-      indx += 1
-    elseif (ipeek == $MAL_PERIOD_TOKEN && iperiodCount == 0) then
-      indx += 1
-      iperiodCount = 1
-    elseif isCharWordBoundry(ipeek) == 1 then
-      ifound = indx
-    else
-      // error
-      ifound = -1
-    endif
-  od
-
-  xout(ifound == 0 ? indx : ifound)
-endop
-
 opcode tokenize(input:S):MalTokens
   istrLen = strlen(input)
   STokens[] init istrLen + 256 // maximum possible token count and more
@@ -143,22 +116,6 @@ opcode tokenize(input:S):MalTokens
       STokens[itokenCnt] = strcpy(strsub(input, indx, inextString))
       itokenCnt += 1
       indx = inextString
-      igoto END
-    endif
-
-    ;; capture numbers, including a leading minus followed by a digit
-    if ((ipeek >= 48 && ipeek < 58) || \
-        (ipeek == $MAL_MINUS_TOKEN && ipeek2 >= 48 && ipeek2 < 58)) then
-      inumberDelim = findNumberTokenDelimiter(input, indx, istrLen)
-
-      if inumberDelim > -1 then
-        ;; prints "number: %s\n", strsub(input, indx, inumberDelim)
-        STokens[itokenCnt] = strcpy(strsub(input, indx, inumberDelim))
-        itokenCnt += 1
-        indx = inumberDelim
-      else
-        ierror = inumberDelim
-      endif
       igoto END
     endif
 

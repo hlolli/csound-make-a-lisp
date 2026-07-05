@@ -76,16 +76,34 @@ opcode MalReadResultReader(result:MalReadResult):MalReader
 endop
 
 opcode MalIsNumericString(token:S):i
-  iascii = strchar:i(token, 0)
   itokenLen = strlen(token)
   ires = 0
-  if (iascii >= 48 && iascii < 58) then
-    ires = 1
-  elseif (iascii == $MAL_MINUS_TOKEN && itokenLen > 1) then
-    inext = strchar:i(token, 1)
-    if (inext >= 48 && inext < 58) then
-      ires = 1
-    endif
+  indx = 0
+  idigitCount = 0
+  iperiodCount = 0
+  iinvalid = 0
+
+  if (itokenLen > 0 && strchar:i(token, 0) == $MAL_MINUS_TOKEN) then
+    indx = 1
   endif
+
+  while (indx < itokenLen && iinvalid == 0) do
+    ichar = strchar:i(token, indx)
+
+    if (ichar >= 48 && ichar < 58) then
+      idigitCount += 1
+    elseif (ichar == $MAL_PERIOD_TOKEN && iperiodCount == 0 && idigitCount > 0) then
+      iperiodCount = 1
+    else
+      iinvalid = 1
+    endif
+
+    indx += 1
+  od
+
+  if (idigitCount > 0 && iinvalid == 0) then
+    ires = 1
+  endif
+
   xout ires
 endop
