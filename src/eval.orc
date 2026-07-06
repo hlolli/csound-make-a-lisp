@@ -1,3 +1,5 @@
+declare EVAL(result:MalValue):(MalValue, MalEnv)
+
 opcode MalApplyBuiltinOperator(fn:MalValue, args:MalValue):MalValue
   result:MalValue = MalMkValue($MAL_NUMBER_TYPE)
 
@@ -43,83 +45,90 @@ opcode MalApply(fn:MalValue, args:MalValue):MalValue
   xout result
 endop
 
-opcode EVAL(ast:MalValue, env:MalEnv):MalValue
+opcode MalEvalSequence(ast:MalValue, env:MalEnv, startIndex:i, resultType:i):MalValue
+  result:MalValue = MalMkValue(resultType)
+  index:i = startIndex
+  done:i = 0
+
+  while (index < ast.length && done == 0) do
+    value:MalValue = ast.list[index]
+    evaluated:MalValue = EVAL(value, env)
+
+    if (evaluated.type == $MAL_ERROR_TYPE) then
+      result = evaluated
+      done = 1
+    else
+      result = MalAppendValue(result, evaluated)
+    endif
+
+    index += 1
+  od
+
+  xout result
+endop
+
+opcode MalEvalHashMap(ast:MalValue, env:MalEnv):MalValue
+  result:MalValue = MalMkValue($MAL_HASH_MAP_TYPE)
+  index:i = 0
+  done:i = 0
+
+  while (index < ast.length && done == 0) do
+    key:MalValue = ast.list[index]
+    value:MalValue = ast.list[index + 1]
+    evaluated:MalValue = EVAL(value, env)
+
+    if (evaluated.type == $MAL_ERROR_TYPE) then
+      result = evaluated
+      done = 1
+    else
+      result = MalAppendValue(result, key)
+      result = MalAppendValue(result, evaluated)
+    endif
+
+    index += 2
+  od
+
+  xout result
+endop
+
+opcode MalEvalAst(ast:MalValue, env:MalEnv):MalValue
   result:MalValue = ast
 
   if (ast.type == $MAL_SYMBOL_TYPE) then
     result = MalEnvGet(env, ast.string)
-
+  elseif (ast.type == $MAL_LIST_TYPE) then
+    result = MalEvalSequence(ast, env, 0, $MAL_LIST_TYPE)
   elseif (ast.type == $MAL_VECTOR_TYPE) then
-    result = MalMkValue($MAL_VECTOR_TYPE)
-    vectorIndex:i = 0
-    vectorError:i = 0
-
-    while (vectorIndex < ast.length && vectorError == 0) do
-      vectorValue:MalValue = ast.list[vectorIndex]
-      vectorEvaluated:MalValue = EVAL(vectorValue, env)
-
-      if (vectorEvaluated.type == $MAL_ERROR_TYPE) then
-        result = vectorEvaluated
-        vectorError = 1
-      else
-        result = MalAppendValue(result, vectorEvaluated)
-      endif
-
-      vectorIndex += 1
-    od
-
+    result = MalEvalSequence(ast, env, 0, $MAL_VECTOR_TYPE)
   elseif (ast.type == $MAL_HASH_MAP_TYPE) then
-    result = MalMkValue($MAL_HASH_MAP_TYPE)
-    hashIndex:i = 0
-    hashError:i = 0
+    result = MalEvalHashMap(ast, env)
+  endif
 
-    while (hashIndex < ast.length && hashError == 0) do
-      hashKey:MalValue = ast.list[hashIndex]
-      hashValue:MalValue = ast.list[hashIndex + 1]
-      hashEvaluated:MalValue = EVAL(hashValue, env)
+  xout result
+endop
 
-      if (hashEvaluated.type == $MAL_ERROR_TYPE) then
-        result = hashEvaluated
-        hashError = 1
-      else
-        result = MalAppendValue(result, hashKey)
-        result = MalAppendValue(result, hashEvaluated)
-      endif
+opcode EVAL(ast:MalValue, env:MalEnv):MalValue
+  result:MalValue = ast
 
-      hashIndex += 2
-    od
+  if (ast.type == $MAL_LIST_TYPE && ast.length > 0) then
+    evaluatedList:MalValue = MalEvalAst(ast, env)
 
-  elseif (ast.type == $MAL_LIST_TYPE && ast.length > 0) then
-    first:MalValue = ast.list[0]
-    fn:MalValue = EVAL(first, env)
-
-    if (fn.type == $MAL_ERROR_TYPE) then
-      result = fn
+    if (evaluatedList.type == $MAL_ERROR_TYPE) then
+      result = evaluatedList
     else
+      fn:MalValue = evaluatedList.list[0]
       args:MalValue = MalMkValue($MAL_LIST_TYPE)
       argIndex:i = 1
-      argError:i = 0
 
-      while (argIndex < ast.length && argError == 0) do
-        argValue:MalValue = ast.list[argIndex]
-        argEvaluated:MalValue = EVAL(argValue, env)
-
-        if (argEvaluated.type == $MAL_ERROR_TYPE) then
-          args = argEvaluated
-          argError = 1
-        else
-          args = MalAppendValue(args, argEvaluated)
-        endif
-
+      while (argIndex < evaluatedList.length) do
+        args = MalAppendValue(args, evaluatedList.list[argIndex])
         argIndex += 1
       od
 
-      if (args.type == $MAL_ERROR_TYPE) then
-        result = args
-      else
-        result = MalApply(fn, args)
-      endif
+      result = MalApply(fn, args)
     endif
+  else
+    result = MalEvalAst(ast, env)
   endif
 
   xout result
