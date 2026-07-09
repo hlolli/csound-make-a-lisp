@@ -45,10 +45,18 @@ instr TEST
   prints "Testing Step 5 tail call optimization\n"
   env:MalEnv = MalMkStep2Env()
 
+  env = ASSERT_REP_ENV("(def! countdown (fn* (n) (if (= n 0) 0 (countdown (- n 1)))))", \
+    "#<function:fn*>", env)
+  env = ASSERT_REP_ENV("(countdown 10)", "0", env)
+
   env = ASSERT_REP_ENV("(def! sum2 (fn* (n acc) (if (= n 0) acc (sum2 (- n 1) (+ n acc)))))", \
     "#<function:fn*>", env)
   env = ASSERT_REP_ENV("(sum2 10 0)", "55", env)
   env = ASSERT_REP_ENV("(sum2 10000 0)", "50005000", env)
+
+  env = ASSERT_REP_ENV("(def! fib (fn* (n) (if (= n 0) 1 (if (= n 1) 1 (+ (fib (- n 1)) (fib (- n 2)))))))", \
+    "#<function:fn*>", env)
+  env = ASSERT_REP_ENV("(fib 6)", "13", env)
 
   env = ASSERT_REP_ENV("(def! foo (fn* (n) (if (= n 0) 0 (bar (- n 1)))))", \
     "#<function:fn*>", env)
