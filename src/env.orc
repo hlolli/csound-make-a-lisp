@@ -1,7 +1,19 @@
 opcode MalMkEnv():MalEnv
-  keys:S[] init 1
-  values:MalValue[] init 1
-  env:MalEnv init keys, values, 0
+  ;; TODO: Once Csound supports zero-argument struct init for UDTs, this
+  ;; constructor can become a cleaner default-initialized MalEnv.
+  keys:S[] init 0
+  values:MalValue[] init 0
+  outer:MalEnv[] init 0
+  env:MalEnv init keys, values, outer, 0
+  xout env
+endop
+
+opcode MalMkEnvWithOuter(parent:MalEnv):MalEnv
+  keys:S[] init 0
+  values:MalValue[] init 0
+  outer:MalEnv[] init 1
+  outer[0] = parent
+  env:MalEnv init keys, values, outer, 0
   xout env
 endop
 
@@ -51,6 +63,8 @@ opcode MalEnvGet(env:MalEnv, key:S):MalValue
 
   if (index >= 0) then
     value:MalValue = env.values[index]
+  elseif (lenarray(env.outer) > 0) then
+    value:MalValue = MalEnvGet(env.outer[0], key)
   else
     value:MalValue = MalMkError(sprintf("'%s' not found", key))
   endif

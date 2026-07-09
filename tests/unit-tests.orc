@@ -134,6 +134,14 @@ instr TEST_ENV
   ASSERT_ENV_VALUE(env, "x", $MAL_BUILTIN_TYPE, "second")
   ASSERT_ENV_ERROR(env, "missing", "'missing' not found")
 
+  child:MalEnv = MalMkEnvWithOuter(env)
+  ASSERT_ENV_VALUE(child, "x", $MAL_BUILTIN_TYPE, "second")
+
+  child = MalEnvSet(child, "x", MalMkBuiltin("child"))
+  ASSERT_ENV_VALUE(child, "x", $MAL_BUILTIN_TYPE, "child")
+  ASSERT_ENV_VALUE(env, "x", $MAL_BUILTIN_TYPE, "second")
+  ASSERT_ENV_ERROR(child, "missing", "'missing' not found")
+
   step2Env:MalEnv = MalMkStep2Env()
   ASSERT_ENV_VALUE(step2Env, "+", $MAL_BUILTIN_OPERATOR_TYPE, "+")
   ASSERT_ENV_VALUE(step2Env, "-", $MAL_BUILTIN_OPERATOR_TYPE, "-")
