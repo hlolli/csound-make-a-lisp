@@ -1,0 +1,160 @@
+#!/usr/bin/env python3
+import os
+import re
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[1]
+CSOUND = os.environ.get("CSOUND", "csound")
+
+CSOUND_NOISE = (
+    re.compile(r"^--Csound version "),
+    re.compile(r"^\[commit: "),
+    re.compile(r"^setting path "),
+    re.compile(r"^scoreless operation$"),
+    re.compile(r"^orchname:"),
+    re.compile(r"^Compiling Csound code"),
+    re.compile(r"^instr .* uses instrument number"),
+    re.compile(r"^\t \.\.\.done$"),
+    re.compile(r"^Elapsed time "),
+    re.compile(r"^using libsndfile-"),
+    re.compile(r"^displays suppressed$"),
+    re.compile(r"^sr = "),
+    re.compile(r"^0dBFS level = "),
+    re.compile(r"^audio buffered in "),
+    re.compile(r"^not writing to sound disk$"),
+    re.compile(r"^SECTION 1:$"),
+    re.compile(r"^inactive allocs returned to freespace$"),
+    re.compile(r"^\t\t   overall amps:"),
+    re.compile(r"^\t   overall samples out of range:"),
+    re.compile(r"^0 errors in performance$"),
+    re.compile(r"^no sound written to disk$"),
+)
+
+
+def is_csound_noise(line):
+    return line == "" or any(pattern.search(line) for pattern in CSOUND_NOISE)
+
+
+def csound_string(value):
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
+def build_orc(history):
+    strsets = []
+    eval_lines = []
+
+    for index, source in enumerate(history, start=1):
+        strsets.append(f"strset {index}, {csound_string(source)}")
+        eval_lines.extend(
+            [
+                f"  Sinput strget {index}",
+                "  Sresult, env = REP_ENV(Sinput, env)",
+            ]
+        )
+
+    return "\n".join(
+        [
+            '#include "src/main.orc"',
+            "",
+            "opcode READ(input:S):MalValue",
+            "  xout read_str(input)",
+            "endop",
+            "",
+            "opcode PRINT(ast:MalValue):S",
+            "  xout pr_str_with_readability(ast, 1)",
+            "endop",
+            "",
+            "opcode REP_ENV(input:S, env:MalEnv):(S, MalEnv)",
+            "  ast:MalValue = READ(input)",
+            "  currentEnv:MalEnv = env",
+            "",
+            "  if (ast.type == $MAL_ERROR_TYPE) then",
+            "    result:S = ast.string",
+            "  else",
+            "    evaluated:MalValue, currentEnv = EVAL_ENV(ast, currentEnv)",
+            "",
+            "    if (evaluated.type == $MAL_ERROR_TYPE) then",
+            "      result = evaluated.string",
+            "    else",
+            "      result = PRINT(evaluated)",
+            "    endif",
+            "  endif",
+            "",
+            "  xout result, currentEnv",
+            "endop",
+            "",
+            *strsets,
+            "",
+            "instr RUN",
+            "  env:MalEnv = MalMkStep2Env()",
+            '  Sinput = ""',
+            '  Sresult = ""',
+            *eval_lines,
+            '  prints "%s\\n", Sresult',
+            "  exitnow(0)",
+            "endin",
+            "",
+            'schedule("RUN", 0, 0)',
+            "",
+        ]
+    )
+
+
+def eval_history(history):
+    with tempfile.NamedTemporaryFile("w", suffix=".orc", dir=ROOT, delete=False) as file:
+        file.write(build_orc(history))
+        step_file = Path(file.name)
+
+    try:
+        proc = subprocess.run(
+            [CSOUND, "-n", "-d", "-m128", "--orc", str(step_file)],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+    finally:
+        try:
+            step_file.unlink()
+        except OSError:
+            pass
+
+    lines = [line for line in proc.stdout.splitlines() if not is_csound_noise(line)]
+    if proc.returncode != 0:
+      if lines:
+        return "\n".join(lines)
+      return f"Error: csound exited with {proc.returncode}"
+    return "\n".join(lines)
+
+
+def prompt():
+    sys.stdout.write("user> ")
+    sys.stdout.flush()
+
+
+def main():
+    history = []
+    prompt()
+
+    for line in sys.stdin:
+        source = line.rstrip("\n")
+        history.append(source)
+        output = eval_history(history)
+
+        if output:
+            sys.stdout.write(output)
+            if not output.endswith("\n"):
+                sys.stdout.write("\n")
+        prompt()
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

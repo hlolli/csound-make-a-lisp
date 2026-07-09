@@ -9,7 +9,7 @@ default:
 version:
     @{{csound}} --version
 
-test: smoke reader eval step3 unit harness-reader harness-eval
+test: smoke reader eval step3 unit harness-reader harness-eval harness-env
 
 smoke:
     {{csound}} {{csound_flags}} tests/step0-repl.orc
@@ -31,6 +31,9 @@ harness-reader:
 
 harness-eval:
     python3 mal/runtest.py --deferrable --optional tests/harness/step2_eval.mal -- tests/harness/run-step2-eval
+
+harness-env:
+    python3 mal/runtest.py --deferrable --no-optional tests/harness/step3_env.mal -- tests/harness/run-step3-env
 
 status:
     @git status --short
