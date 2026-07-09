@@ -58,6 +58,16 @@ opcode MalApply(fn:MalValue, args:MalValue):MalValue
   xout result
 endop
 
+opcode MalIsTruthy(value:MalValue):i
+  result:i = 1
+
+  if (value.type == $MAL_NIL_TYPE || value.type == $MAL_FALSE_TYPE) then
+    result = 0
+  endif
+
+  xout result
+endop
+
 opcode MalEvalSequenceEnv(ast:MalValue, env:MalEnv, startIndex:i, resultType:i):(MalValue, MalEnv)
   result:MalValue = MalMkValue(resultType)
   currentEnv:MalEnv = env
@@ -155,6 +165,31 @@ opcode MalEvalDef(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   xout result, currentEnv
 endop
 
+opcode MalEvalIf(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
+  result:MalValue = MalMkValue($MAL_NIL_TYPE)
+  currentEnv:MalEnv = env
+
+  if (ast.length < 3 || ast.length > 4) then
+    result = MalMkError(sprintf("if: expected 2 or 3 arguments, got %d", \
+      ast.length - 1))
+  else
+    conditionForm:MalValue = ast.list[1]
+    condition:MalValue, currentEnv = EVAL_ENV(conditionForm, currentEnv)
+
+    if (condition.type == $MAL_ERROR_TYPE) then
+      result = condition
+    elseif (MalIsTruthy(condition) == 1) then
+      thenForm:MalValue = ast.list[2]
+      result, currentEnv = EVAL_ENV(thenForm, currentEnv)
+    elseif (ast.length == 4) then
+      elseForm:MalValue = ast.list[3]
+      result, currentEnv = EVAL_ENV(elseForm, currentEnv)
+    endif
+  endif
+
+  xout result, currentEnv
+endop
+
 opcode MalEvalLet(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   result:MalValue = MalMkValue($MAL_NIL_TYPE)
   currentEnv:MalEnv = env
@@ -216,6 +251,8 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
       result, currentEnv = MalEvalDef(ast, currentEnv)
     elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "let*") == 0) then
       result, currentEnv = MalEvalLet(ast, currentEnv)
+    elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "if") == 0) then
+      result, currentEnv = MalEvalIf(ast, currentEnv)
     else
       evaluatedList:MalValue = MalMkValue($MAL_NIL_TYPE)
       evaluatedList, currentEnv = MalEvalAstEnv(ast, currentEnv)
