@@ -31,9 +31,9 @@ opcode ASSERT_REP_ENV(input:S, expected:S, env:MalEnv):MalEnv
   actual:S, updatedEnv:MalEnv = REP_ENV(input, env)
 
   if (strcmp(actual, expected) == 0) then
-    prints "STEP4 if %s, Assertion success\n", input
+    prints "STEP4 %s, Assertion success\n", input
   else
-    prints "STEP4 if %s, Assertion failed: expected '%s', got '%s'\n", \
+    prints "STEP4 %s, Assertion failed: expected '%s', got '%s'\n", \
       input, expected, actual
     exitnow(1)
   endif
@@ -42,7 +42,7 @@ opcode ASSERT_REP_ENV(input:S, expected:S, env:MalEnv):MalEnv
 endop
 
 instr TEST
-  prints "Testing Step 4 if special form\n"
+  prints "Testing Step 4 if and do special forms\n"
   env:MalEnv = MalMkStep2Env()
 
   env = ASSERT_REP_ENV("(if true 7 8)", "7", env)
@@ -74,6 +74,18 @@ instr TEST
   env = ASSERT_REP_ENV("(if true)", "if: expected 2 or 3 arguments, got 1", env)
   env = ASSERT_REP_ENV("(if true 1 2 3)", \
     "if: expected 2 or 3 arguments, got 4", env)
+
+  env = ASSERT_REP_ENV("(do)", "nil", env)
+  env = ASSERT_REP_ENV("(do 7)", "7", env)
+  env = ASSERT_REP_ENV("(do 7 8)", "8", env)
+  env = ASSERT_REP_ENV("(do (+ 1 2) (+ 3 4))", "7", env)
+  env = ASSERT_REP_ENV("(do (def! a 6) 7 (+ a 8))", "14", env)
+  env = ASSERT_REP_ENV("a", "6", env)
+  env = ASSERT_REP_ENV("(do (def! sequenced 1) (def! sequenced (+ sequenced 1)) sequenced)", \
+    "2", env)
+  env = ASSERT_REP_ENV("sequenced", "2", env)
+  env = ASSERT_REP_ENV("(do (abc) (def! should-not-exist 1))", "'abc' not found", env)
+  env = ASSERT_REP_ENV("should-not-exist", "'should-not-exist' not found", env)
 endin
 
 schedule("TEST", 0, 0)

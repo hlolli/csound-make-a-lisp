@@ -190,6 +190,26 @@ opcode MalEvalIf(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   xout result, currentEnv
 endop
 
+opcode MalEvalDo(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
+  result:MalValue = MalMkValue($MAL_NIL_TYPE)
+  currentEnv:MalEnv = env
+  index:i = 1
+  done:i = 0
+
+  while (index < ast.length && done == 0) do
+    form:MalValue = ast.list[index]
+    result, currentEnv = EVAL_ENV(form, currentEnv)
+
+    if (result.type == $MAL_ERROR_TYPE) then
+      done = 1
+    endif
+
+    index += 1
+  od
+
+  xout result, currentEnv
+endop
+
 opcode MalEvalLet(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   result:MalValue = MalMkValue($MAL_NIL_TYPE)
   currentEnv:MalEnv = env
@@ -253,6 +273,8 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
       result, currentEnv = MalEvalLet(ast, currentEnv)
     elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "if") == 0) then
       result, currentEnv = MalEvalIf(ast, currentEnv)
+    elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "do") == 0) then
+      result, currentEnv = MalEvalDo(ast, currentEnv)
     else
       evaluatedList:MalValue = MalMkValue($MAL_NIL_TYPE)
       evaluatedList, currentEnv = MalEvalAstEnv(ast, currentEnv)
