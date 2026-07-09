@@ -150,6 +150,51 @@ opcode MalEvalDef(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   xout result, currentEnv
 endop
 
+opcode MalEvalLet(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
+  result:MalValue = MalMkValue($MAL_NIL_TYPE)
+  currentEnv:MalEnv = env
+  letEnv:MalEnv = MalMkEnvWithOuter(env)
+
+  if (ast.length != 3) then
+    result = MalMkError(sprintf("let*: expected 2 arguments, got %d", \
+      ast.length - 1))
+  elseif (ast.list[1].type != $MAL_LIST_TYPE && \
+          ast.list[1].type != $MAL_VECTOR_TYPE) then
+    result = MalMkError("let*: bindings must be list or vector")
+  elseif (ast.list[1].length % 2 != 0) then
+    result = MalMkError("let*: bindings must contain even number of forms")
+  else
+    bindings:MalValue = ast.list[1]
+    index:i = 0
+    done:i = 0
+
+    while (index < bindings.length && done == 0) do
+      name:MalValue = bindings.list[index]
+
+      if (name.type != $MAL_SYMBOL_TYPE) then
+        result = MalMkError("let*: binding name must be a symbol")
+        done = 1
+      else
+        value:MalValue, letEnv = EVAL_ENV(bindings.list[index + 1], letEnv)
+
+        if (value.type == $MAL_ERROR_TYPE) then
+          result = value
+          done = 1
+        else
+          letEnv = MalEnvSet(letEnv, name.string, value)
+          index += 2
+        endif
+      endif
+    od
+
+    if (done == 0) then
+      result, letEnv = EVAL_ENV(ast.list[2], letEnv)
+    endif
+  endif
+
+  xout result, currentEnv
+endop
+
 opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   result:MalValue = ast
   currentEnv:MalEnv = env
@@ -159,6 +204,8 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
 
     if (first.type == $MAL_SYMBOL_TYPE && strcmp(first.string, "def!") == 0) then
       result, currentEnv = MalEvalDef(ast, currentEnv)
+    elseif (first.type == $MAL_SYMBOL_TYPE && strcmp(first.string, "let*") == 0) then
+      result, currentEnv = MalEvalLet(ast, currentEnv)
     else
       evaluatedList:MalValue = MalMkValue($MAL_NIL_TYPE)
       evaluatedList, currentEnv = MalEvalAstEnv(ast, currentEnv)
