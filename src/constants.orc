@@ -19,6 +19,7 @@
 #define MAL_BUILTIN_TYPE #17#
 #define MAL_BUILTIN_OPERATOR_TYPE #18#
 #define MAL_BUILTIN_OPCODE_TYPE #19#
+#define MAL_FUNCTION_TYPE #20#
 
 // tokens
 #define MAL_TAB_TOKEN #9#

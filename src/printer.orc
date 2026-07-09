@@ -1,5 +1,3 @@
-;; struct MalValue type:i, list:MalValue[], number:i, string:S
-
 declare pr_str(ast:S):MalValue
 declare pr_str_unreadably(ast:S):MalValue
 
@@ -183,6 +181,9 @@ opcode pr_str_unreadably(ast:MalValue):S
 
     case $MAL_BUILTIN_OPCODE_TYPE
       Sout = MalPrintBuiltin("builtin-opcode", ast.string)
+
+    case $MAL_FUNCTION_TYPE
+      Sout = sprintf("%c<function:fn*>", 35)
   endsw
 
   xout(Sout)
@@ -270,6 +271,9 @@ opcode pr_str(ast:MalValue):S
 
     case $MAL_BUILTIN_OPCODE_TYPE
       Sout = MalPrintBuiltin("builtin-opcode", ast.string)
+
+    case $MAL_FUNCTION_TYPE
+      Sout = sprintf("%c<function:fn*>", 35)
   endsw
 
   xout(Sout)

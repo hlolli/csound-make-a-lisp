@@ -134,16 +134,21 @@ opcode MalEvalDef(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   if (ast.length != 3) then
     result = MalMkError(sprintf("def!: expected 2 arguments, got %d", \
       ast.length - 1))
-  elseif (ast.list[1].type != $MAL_SYMBOL_TYPE) then
-    result = MalMkError("def!: first argument must be a symbol")
   else
-    value:MalValue, currentEnv = EVAL_ENV(ast.list[2], currentEnv)
+    symbol:MalValue = ast.list[1]
+    valueForm:MalValue = ast.list[2]
 
-    if (value.type == $MAL_ERROR_TYPE) then
-      result = value
+    if (symbol.type != $MAL_SYMBOL_TYPE) then
+      result = MalMkError("def!: first argument must be a symbol")
     else
-      currentEnv = MalEnvSet(currentEnv, ast.list[1].string, value)
-      result = value
+      value:MalValue, currentEnv = EVAL_ENV(valueForm, currentEnv)
+
+      if (value.type == $MAL_ERROR_TYPE) then
+        result = value
+      else
+        currentEnv = MalEnvSet(currentEnv, symbol.string, value)
+        result = value
+      endif
     endif
   endif
 
@@ -158,37 +163,42 @@ opcode MalEvalLet(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   if (ast.length != 3) then
     result = MalMkError(sprintf("let*: expected 2 arguments, got %d", \
       ast.length - 1))
-  elseif (ast.list[1].type != $MAL_LIST_TYPE && \
-          ast.list[1].type != $MAL_VECTOR_TYPE) then
-    result = MalMkError("let*: bindings must be list or vector")
-  elseif (ast.list[1].length % 2 != 0) then
-    result = MalMkError("let*: bindings must contain even number of forms")
   else
     bindings:MalValue = ast.list[1]
-    index:i = 0
-    done:i = 0
+    body:MalValue = ast.list[2]
 
-    while (index < bindings.length && done == 0) do
-      name:MalValue = bindings.list[index]
+    if (bindings.type != $MAL_LIST_TYPE && \
+        bindings.type != $MAL_VECTOR_TYPE) then
+      result = MalMkError("let*: bindings must be list or vector")
+    elseif (bindings.length % 2 != 0) then
+      result = MalMkError("let*: bindings must contain even number of forms")
+    else
+      index:i = 0
+      done:i = 0
 
-      if (name.type != $MAL_SYMBOL_TYPE) then
-        result = MalMkError("let*: binding name must be a symbol")
-        done = 1
-      else
-        value:MalValue, letEnv = EVAL_ENV(bindings.list[index + 1], letEnv)
+      while (index < bindings.length && done == 0) do
+        name:MalValue = bindings.list[index]
+        valueForm:MalValue = bindings.list[index + 1]
 
-        if (value.type == $MAL_ERROR_TYPE) then
-          result = value
+        if (name.type != $MAL_SYMBOL_TYPE) then
+          result = MalMkError("let*: binding name must be a symbol")
           done = 1
         else
-          letEnv = MalEnvSet(letEnv, name.string, value)
-          index += 2
-        endif
-      endif
-    od
+          value:MalValue, letEnv = EVAL_ENV(valueForm, letEnv)
 
-    if (done == 0) then
-      result, letEnv = EVAL_ENV(ast.list[2], letEnv)
+          if (value.type == $MAL_ERROR_TYPE) then
+            result = value
+            done = 1
+          else
+            letEnv = MalEnvSet(letEnv, name.string, value)
+            index += 2
+          endif
+        endif
+      od
+
+      if (done == 0) then
+        result, letEnv = EVAL_ENV(body, letEnv)
+      endif
     endif
   endif
 
@@ -200,11 +210,11 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   currentEnv:MalEnv = env
 
   if (ast.type == $MAL_LIST_TYPE && ast.length > 0) then
-    first:MalValue = ast.list[0]
+    head:MalValue = ast.list[0]
 
-    if (first.type == $MAL_SYMBOL_TYPE && strcmp(first.string, "def!") == 0) then
+    if (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "def!") == 0) then
       result, currentEnv = MalEvalDef(ast, currentEnv)
-    elseif (first.type == $MAL_SYMBOL_TYPE && strcmp(first.string, "let*") == 0) then
+    elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "let*") == 0) then
       result, currentEnv = MalEvalLet(ast, currentEnv)
     else
       evaluatedList:MalValue = MalMkValue($MAL_NIL_TYPE)
@@ -215,9 +225,11 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
       else
         fn:MalValue = evaluatedList.list[0]
         args:MalValue = MalMkValue($MAL_LIST_TYPE)
+
         if (evaluatedList.length > 1) then
           for argIndex in [1 ... evaluatedList.length - 1] do
-            args = MalAppendValue(args, evaluatedList.list[argIndex])
+            arg:MalValue = evaluatedList.list[argIndex]
+            args = MalAppendValue(args, arg)
           od
         endif
 

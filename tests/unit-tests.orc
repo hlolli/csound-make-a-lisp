@@ -118,10 +118,71 @@ instr TEST_ERRORS
 endin
 
 instr TEST_BUILTINS
-  prints "Testing builtin value representation\n"
+  prints "Testing callable value representation\n"
   ASSERT_BUILTIN(MalMkBuiltin("core"), $MAL_BUILTIN_TYPE, "core", "#<builtin:core>")
   ASSERT_BUILTIN(MalMkBuiltinOperator("+"), $MAL_BUILTIN_OPERATOR_TYPE, "+", "#<builtin-operator:+>")
   ASSERT_BUILTIN(MalMkBuiltinOpcode("oscili"), $MAL_BUILTIN_OPCODE_TYPE, "oscili", "#<builtin-opcode:oscili>")
+
+  env:MalEnv = MalMkEnv()
+  env = MalEnvSet(env, "captured", MalMkSymbol("captured"))
+  params:MalValue = MalMkList1(MalMkSymbol("x"))
+  body:MalValue = MalMkSymbol("x")
+  closure:MalEnv[] init 1
+  closure[0] = env
+  functionValue:MalValue = MalMkFunctionWithEnv(params, body, closure)
+  storedParams:MalValue = functionValue.list[0]
+  storedParam:MalValue = storedParams.list[0]
+  storedBody:MalValue = functionValue.list[1]
+  functionEnv:MalEnv[] = functionValue.env
+  capturedEnv:MalEnv = functionEnv[0]
+  captured:MalValue = MalEnvGet(capturedEnv, "captured")
+  SfunctionPrint = pr_str(functionValue)
+  SexpectedFunctionPrint = sprintf("%c<function:fn*>", 35)
+
+  if (functionValue.type != $MAL_FUNCTION_TYPE) then
+    prints "FUNCTION, Assertion failed: expected type=%d, got type=%d\n", \
+      $MAL_FUNCTION_TYPE, functionValue.type
+    exitnow(1)
+  endif
+
+  if (functionValue.length != 2) then
+    prints "FUNCTION, Assertion failed: expected length=2, got length=%d\n", \
+      functionValue.length
+    exitnow(1)
+  endif
+
+  if (storedParams.type != $MAL_LIST_TYPE || storedParams.length != 1) then
+    prints "FUNCTION, Assertion failed: params not stored correctly\n"
+    exitnow(1)
+  endif
+
+  if (storedParam.type != $MAL_SYMBOL_TYPE || strcmp(storedParam.string, "x") != 0) then
+    prints "FUNCTION, Assertion failed: param symbol not stored correctly\n"
+    exitnow(1)
+  endif
+
+  if (storedBody.type != $MAL_SYMBOL_TYPE || strcmp(storedBody.string, "x") != 0) then
+    prints "FUNCTION, Assertion failed: body not stored correctly\n"
+    exitnow(1)
+  endif
+
+  if (lenarray(functionEnv) != 1) then
+    prints "FUNCTION, Assertion failed: closure env not stored correctly\n"
+    exitnow(1)
+  endif
+
+  if (captured.type != $MAL_SYMBOL_TYPE || strcmp(captured.string, "captured") != 0) then
+    prints "FUNCTION, Assertion failed: captured binding not available\n"
+    exitnow(1)
+  endif
+
+  if (strcmp(SfunctionPrint, SexpectedFunctionPrint) != 0) then
+    prints "FUNCTION, Assertion failed: expected function print, got '%s'\n", \
+      SfunctionPrint
+    exitnow(1)
+  endif
+
+  prints "FUNCTION, Assertion success\n"
 endin
 
 instr TEST_ENV

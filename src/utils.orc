@@ -23,7 +23,8 @@ endop
 
 opcode MalMkValue(type:i):MalValue
   list:MalValue[] init 12
-  val:MalValue init type, 0, "", list, 0
+  env:MalEnv[] init 0
+  val:MalValue init type, 0, "", list, env, 0
   xout(val)
 endop
 
@@ -51,6 +52,19 @@ opcode MalMkBuiltinOpcode(name:S):MalValue
   xout val
 endop
 
+opcode MalMkFunction(params:MalValue, body:MalValue):MalValue
+  val:MalValue = MalMkValue($MAL_FUNCTION_TYPE)
+  val = MalAppendValue(val, params)
+  val = MalAppendValue(val, body)
+  xout val
+endop
+
+opcode MalMkFunctionWithEnv(params:MalValue, body:MalValue, closure:MalEnv[]):MalValue
+  val:MalValue = MalMkFunction(params, body)
+  val.env = closure
+  xout val
+endop
+
 opcode MalMkList1(first:MalValue):MalValue
   val:MalValue = MalMkValue($MAL_LIST_TYPE)
   val = MalAppendValue(val, first)
@@ -74,14 +88,14 @@ endop
 
 opcode MalMkReadResult(value:MalValue, reader:MalReader):MalReadResult
   result:MalReadResult init value.type, value.number, value.string, value.list, \
-    value.length, reader.peek, reader.position, reader.tokens, reader.length, \
-    reader.done
+    value.env, value.length, reader.peek, reader.position, reader.tokens, \
+    reader.length, reader.done
   xout result
 endop
 
 opcode MalReadResultValue(result:MalReadResult):MalValue
   value:MalValue init result.type, result.number, result.string, result.list, \
-    result.length
+    result.env, result.length
   xout value
 endop
 
