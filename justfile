@@ -9,7 +9,7 @@ default:
 version:
     @{{csound}} --version
 
-test: smoke reader eval step3 step4 unit harness-reader harness-eval harness-env harness-step4
+test: smoke reader eval step3 step4 step5 unit harness-reader harness-eval harness-env harness-step4
 
 smoke:
     {{csound}} {{csound_flags}} tests/step0-repl.orc
@@ -28,6 +28,9 @@ step4:
 
 step4-if:
     @just step4
+
+step5:
+    {{csound}} {{csound_flags}} tests/step5-tco.orc
 
 unit:
     {{csound}} {{csound_flags}} tests/unit-tests.orc

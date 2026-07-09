@@ -439,6 +439,26 @@ opcode MalFunctionCaptureEnv(fn:MalValue, env:MalEnv):MalValue
   xout fn
 endop
 
+opcode MalRefreshTopLevelFunctionClosures(env:MalEnv):MalEnv
+  if (env.length > 0) then
+    for index in [0 ... env.length - 1] do
+      value:MalValue = env.values[index]
+
+      if (value.type == $MAL_FUNCTION_TYPE && lenarray(value.env) > 0) then
+        closure:MalEnv[] = value.env
+        capturedEnv:MalEnv = closure[0]
+
+        if (lenarray(capturedEnv.outer) == 0) then
+          value = MalFunctionCaptureEnv(value, env)
+          env = MalEnvSet(env, env.keys[index], value)
+        endif
+      endif
+    od
+  endif
+
+  xout env
+endop
+
 opcode MalEvalDef(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   result:MalValue = MalMkValue($MAL_NIL_TYPE)
   currentEnv:MalEnv = env
@@ -465,6 +485,8 @@ opcode MalEvalDef(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
           currentEnv = MalEnvSet(currentEnv, symbol.string, value)
         endif
 
+        currentEnv = MalRefreshTopLevelFunctionClosures(currentEnv)
+        value = MalEnvGet(currentEnv, symbol.string)
         result = value
       endif
     endif
@@ -639,46 +661,206 @@ endop
 
 opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   result:MalValue = ast
-  currentEnv:MalEnv = env
+  workAst:MalValue = ast
+  evalEnv:MalEnv = env
+  returnEnv:MalEnv = env
+  done:i = 0
+  preserveReturnEnv:i = 0
 
-  if (ast.type == $MAL_LIST_TYPE && ast.length > 0) then
-    head:MalValue = ast.list[0]
+  while (done == 0) do
+    if (workAst.type == $MAL_LIST_TYPE && workAst.length > 0) then
+      head:MalValue = workAst.list[0]
 
-    if (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "def!") == 0) then
-      result, currentEnv = MalEvalDef(ast, currentEnv)
-    elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "let*") == 0) then
-      result, currentEnv = MalEvalLet(ast, currentEnv)
-    elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "if") == 0) then
-      result, currentEnv = MalEvalIf(ast, currentEnv)
-    elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "do") == 0) then
-      result, currentEnv = MalEvalDo(ast, currentEnv)
-    elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "fn*") == 0) then
-      result, currentEnv = MalEvalFn(ast, currentEnv)
-    else
-      evaluatedList:MalValue = MalMkValue($MAL_NIL_TYPE)
-      evaluatedList, currentEnv = MalEvalAstEnv(ast, currentEnv)
+      if (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "def!") == 0) then
+        result, evalEnv = MalEvalDef(workAst, evalEnv)
+        if (preserveReturnEnv == 0) then
+          returnEnv = evalEnv
+        endif
+        done = 1
 
-      if (evaluatedList.type == $MAL_ERROR_TYPE) then
-        result = evaluatedList
-      else
-        fn:MalValue = evaluatedList.list[0]
-        args:MalValue = MalMkValue($MAL_LIST_TYPE)
+      elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "fn*") == 0) then
+        result, evalEnv = MalEvalFn(workAst, evalEnv)
+        if (preserveReturnEnv == 0) then
+          returnEnv = evalEnv
+        endif
+        done = 1
 
-        if (evaluatedList.length > 1) then
-          for argIndex in [1 ... evaluatedList.length - 1] do
-            arg:MalValue = evaluatedList.list[argIndex]
-            args = MalAppendValue(args, arg)
-          od
+      elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "if") == 0) then
+        if (workAst.length < 3 || workAst.length > 4) then
+          result = MalMkError(sprintf("if: expected 2 or 3 arguments, got %d", \
+            workAst.length - 1))
+          done = 1
+        else
+          ifConditionForm:MalValue = workAst.list[1]
+          ifCondition:MalValue, evalEnv = EVAL_ENV(ifConditionForm, evalEnv)
+
+          if (preserveReturnEnv == 0) then
+            returnEnv = evalEnv
+          endif
+
+          if (ifCondition.type == $MAL_ERROR_TYPE) then
+            result = ifCondition
+            done = 1
+          elseif (MalIsTruthy(ifCondition) == 1) then
+            workAst = workAst.list[2]
+          elseif (workAst.length == 4) then
+            workAst = workAst.list[3]
+          else
+            result = MalMkValue($MAL_NIL_TYPE)
+            done = 1
+          endif
         endif
 
-        result = MalApply(fn, args)
-      endif
-    endif
-  else
-    result, currentEnv = MalEvalAstEnv(ast, currentEnv)
-  endif
+      elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "do") == 0) then
+        if (workAst.length == 1) then
+          result = MalMkValue($MAL_NIL_TYPE)
+          done = 1
+        else
+          doIndex:i = 1
+          doError:i = 0
+          doLastIndex:i = workAst.length - 1
 
-  xout result, currentEnv
+          while (doIndex < doLastIndex && doError == 0) do
+            doForm:MalValue = workAst.list[doIndex]
+            result, evalEnv = EVAL_ENV(doForm, evalEnv)
+
+            if (preserveReturnEnv == 0) then
+              returnEnv = evalEnv
+            endif
+
+            if (result.type == $MAL_ERROR_TYPE) then
+              doError = 1
+              done = 1
+            endif
+
+            doIndex += 1
+          od
+
+          if (doError == 0) then
+            workAst = workAst.list[doLastIndex]
+          endif
+        endif
+
+      elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "let*") == 0) then
+        letEnv:MalEnv = MalMkEnvWithOuter(evalEnv)
+        letDirectFnNames:S[] init 0
+        letDirectFnCount:i = 0
+
+        if (workAst.length != 3) then
+          result = MalMkError(sprintf("let*: expected 2 arguments, got %d", \
+            workAst.length - 1))
+          done = 1
+        else
+          letBindings:MalValue = workAst.list[1]
+          letBody:MalValue = workAst.list[2]
+
+          if (letBindings.type != $MAL_LIST_TYPE && \
+              letBindings.type != $MAL_VECTOR_TYPE) then
+            result = MalMkError("let*: bindings must be list or vector")
+            done = 1
+          elseif (letBindings.length % 2 != 0) then
+            result = MalMkError("let*: bindings must contain even number of forms")
+            done = 1
+          else
+            letIndex:i = 0
+            letError:i = 0
+
+            while (letIndex < letBindings.length && letError == 0) do
+              letName:MalValue = letBindings.list[letIndex]
+              letValueForm:MalValue = letBindings.list[letIndex + 1]
+
+              if (letName.type != $MAL_SYMBOL_TYPE) then
+                result = MalMkError("let*: binding name must be a symbol")
+                letError = 1
+                done = 1
+              else
+                letValue:MalValue, letEnv = EVAL_ENV(letValueForm, letEnv)
+
+                if (letValue.type == $MAL_ERROR_TYPE) then
+                  result = letValue
+                  letError = 1
+                  done = 1
+                else
+                  letEnv = MalEnvSet(letEnv, letName.string, letValue)
+
+                  if (MalIsFnForm(letValueForm) == 1) then
+                    letDirectFnNames[letDirectFnCount] = letName.string
+                    letDirectFnCount += 1
+                  endif
+
+                  if (letDirectFnCount > 0) then
+                    for letFnIndex in [0 ... letDirectFnCount - 1] do
+                      letFnName:S = letDirectFnNames[letFnIndex]
+                      letFnValue:MalValue = MalEnvGet(letEnv, letFnName)
+                      letFnValue = MalFunctionCaptureEnv(letFnValue, letEnv)
+                      letEnv = MalEnvSet(letEnv, letFnName, letFnValue)
+                    od
+                  endif
+
+                  letIndex += 2
+                endif
+              endif
+            od
+
+            if (letError == 0) then
+              workAst = letBody
+              evalEnv = letEnv
+              preserveReturnEnv = 1
+            endif
+          endif
+        endif
+
+      else
+        evaluatedList:MalValue = MalMkValue($MAL_NIL_TYPE)
+        evaluatedList, evalEnv = MalEvalAstEnv(workAst, evalEnv)
+
+        if (preserveReturnEnv == 0) then
+          returnEnv = evalEnv
+        endif
+
+        if (evaluatedList.type == $MAL_ERROR_TYPE) then
+          result = evaluatedList
+          done = 1
+        else
+          fn:MalValue = evaluatedList.list[0]
+          args:MalValue = MalMkValue($MAL_LIST_TYPE)
+
+          if (evaluatedList.length > 1) then
+            for argIndex in [1 ... evaluatedList.length - 1] do
+              arg:MalValue = evaluatedList.list[argIndex]
+              args = MalAppendValue(args, arg)
+            od
+          endif
+
+          if (fn.type == $MAL_FUNCTION_TYPE) then
+            bindStatus:MalValue, callEnv:MalEnv = MalBindFunctionEnv(fn, args)
+
+            if (bindStatus.type == $MAL_ERROR_TYPE) then
+              result = bindStatus
+              done = 1
+            else
+              workAst = fn.list[1]
+              evalEnv = callEnv
+              preserveReturnEnv = 1
+            endif
+          else
+            result = MalApply(fn, args)
+            done = 1
+          endif
+        endif
+      endif
+    else
+      result, evalEnv = MalEvalAstEnv(workAst, evalEnv)
+
+      if (preserveReturnEnv == 0) then
+        returnEnv = evalEnv
+      endif
+
+      done = 1
+    endif
+  od
+
+  xout result, returnEnv
 endop
 
 opcode EVAL(ast:MalValue, env:MalEnv):MalValue
