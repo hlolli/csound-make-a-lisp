@@ -275,10 +275,10 @@ opcode MalRestParamIndex(params:MalValue):i
   xout result
 endop
 
-opcode MalApplyFunction(fn:MalValue, args:MalValue):MalValue
+opcode MalBindFunctionEnv(fn:MalValue, args:MalValue):(MalValue, MalEnv)
   result:MalValue = MalMkValue($MAL_NIL_TYPE)
+  callEnv:MalEnv = MalMkEnv()
   params:MalValue = fn.list[0]
-  body:MalValue = fn.list[1]
   restIndex:i = MalRestParamIndex(params)
   requiredCount:i = restIndex >= 0 ? restIndex : params.length
 
@@ -293,7 +293,7 @@ opcode MalApplyFunction(fn:MalValue, args:MalValue):MalValue
   else
     closure:MalEnv[] = fn.env
     capturedEnv:MalEnv = closure[0]
-    callEnv:MalEnv = MalMkEnvWithOuter(capturedEnv)
+    callEnv = MalMkEnvWithOuter(capturedEnv)
 
     if (requiredCount > 0) then
       for index in [0 ... requiredCount - 1] do
@@ -316,9 +316,17 @@ opcode MalApplyFunction(fn:MalValue, args:MalValue):MalValue
 
       callEnv = MalEnvSet(callEnv, restName.string, restValues)
     endif
+  endif
 
-    updatedCallEnv:MalEnv = callEnv
-    result, updatedCallEnv = EVAL_ENV(body, updatedCallEnv)
+  xout result, callEnv
+endop
+
+opcode MalApplyFunction(fn:MalValue, args:MalValue):MalValue
+  result:MalValue, callEnv:MalEnv = MalBindFunctionEnv(fn, args)
+
+  if (result.type != $MAL_ERROR_TYPE) then
+    body:MalValue = fn.list[1]
+    result, callEnv = EVAL_ENV(body, callEnv)
   endif
 
   xout result
