@@ -80,5 +80,16 @@ opcode MalMkStep2Env():MalEnv
   env = MalEnvSet(env, "-", MalMkBuiltinOperator("-"))
   env = MalEnvSet(env, "*", MalMkBuiltinOperator("*"))
   env = MalEnvSet(env, "/", MalMkBuiltinOperator("/"))
+  env = MalEnvSet(env, "list", MalMkBuiltin("list"))
+  env = MalEnvSet(env, "list?", MalMkBuiltin("list?"))
+  env = MalEnvSet(env, "empty?", MalMkBuiltin("empty?"))
+  env = MalEnvSet(env, "count", MalMkBuiltin("count"))
+  env = MalEnvSet(env, "=", MalMkBuiltin("="))
+  env = MalEnvSet(env, ">", MalMkBuiltin(">"))
+  env = MalEnvSet(env, ">=", MalMkBuiltin(">="))
+  env = MalEnvSet(env, "<", MalMkBuiltin("<"))
+  env = MalEnvSet(env, "<=", MalMkBuiltin("<="))
+  env = MalEnvSet(env, "not", MalMkBuiltin("not"))
+  env = MalEnvSet(env, "prn", MalMkBuiltin("prn"))
   xout env
 endop
