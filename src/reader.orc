@@ -375,56 +375,58 @@ opcode read_form(reader:MalReader):MalReadResult
   Stoken = reader.peek
   itokenLen = strlen(Stoken)
   istrChar  = strchar:i(Stoken, 0)
-  if strcmp("(", Stoken) == 0 then
-    xout read_list(reader, ")")
-  elseif strcmp("[", Stoken) == 0 then
-    xout read_vector(reader, "]")
-  elseif strcmp("{", Stoken) == 0 then
-    xout read_hash_map(reader, "}")
-  elseif strcmp(")", Stoken) == 0 then
-    v:MalValue = MalMkError("unexpected ')'")
-    xout MalMkReadResult(v, MalNextToken(reader))
-  elseif strcmp("]", Stoken) == 0 then
-    v:MalValue = MalMkError("unexpected ']'")
-    xout MalMkReadResult(v, MalNextToken(reader))
-  elseif strcmp("}", Stoken) == 0 then
-    v:MalValue = MalMkError("unexpected '}'")
-    xout MalMkReadResult(v, MalNextToken(reader))
-  elseif strcmp("'", Stoken) == 0 then
-    xout read_reader_macro(reader, "quote", "'")
-  elseif strcmp("`", Stoken) == 0 then
-    xout read_reader_macro(reader, "quasiquote", "`")
-  elseif (itokenLen == 2 && istrChar == $MAL_TILDE_TOKEN && \
-          strchar:i(Stoken, 1) == $MAL_AT_TOKEN) then
-    SspliceQuote = sprintf("%c%c", $MAL_TILDE_TOKEN, $MAL_AT_TOKEN)
-    xout read_reader_macro(reader, "splice-unquote", SspliceQuote)
-  elseif strcmp("~", Stoken) == 0 then
-    xout read_reader_macro(reader, "unquote", "~")
-  elseif (itokenLen == 1 && istrChar == $MAL_AT_TOKEN) then
-    Sderef = sprintf("%c", $MAL_AT_TOKEN)
-    xout read_reader_macro(reader, "deref", Sderef)
-  elseif strcmp("^", Stoken) == 0 then
-    xout read_with_meta(reader)
-  ;; elseif istrChar >= 48 && istrChar < 58 then
-  ;;   v:MalValue = mkValue($MAL_NUMBER_TYPE)
-  ;;   v.number = strtol(Stoken)
-  ;;   reader = nextToken(reader)
-  ;;   l:MalValue[] = v.list
-  ;;   car:MalValue = l[0]
-  ;;   car = read_form(reader)
-  ;;   xout v
-  else
-    v:MalValue = read_atom(reader)
-    xout MalMkReadResult(v, MalNextToken(reader))
-    ;; v:MalValue = mkValue(giPLACEHOLDER)
-    ;; xout v
-  endif
+  v:MalValue = MalMkError("internal read_form dispatch error")
+  result:MalReadResult = MalMkReadResult(v, reader)
 
-  ;; reader = nextToken(reader)
-  ;; if reader.done != 1 then
-  ;;   read_form(reader)
-  ;; endif
-  ;; xout(ast)
+  switch istrChar
+    case $MAL_PAREN_OPEN_TOKEN
+      result = read_list(reader, ")")
+
+    case $MAL_BRACKET_OPEN_TOKEN
+      result = read_vector(reader, "]")
+
+    case $MAL_CURLY_OPEN_TOKEN
+      result = read_hash_map(reader, "}")
+
+    case $MAL_PAREN_CLOSE_TOKEN
+      v = MalMkError("unexpected ')'")
+      result = MalMkReadResult(v, MalNextToken(reader))
+
+    case $MAL_BRACKET_CLOSE_TOKEN
+      v = MalMkError("unexpected ']'")
+      result = MalMkReadResult(v, MalNextToken(reader))
+
+    case $MAL_CURLY_CLOSE_TOKEN
+      v = MalMkError("unexpected '}'")
+      result = MalMkReadResult(v, MalNextToken(reader))
+
+    case $MAL_SINGLE_QUOTE_TOKEN
+      result = read_reader_macro(reader, "quote", "'")
+
+    case $MAL_BACKTICK_TOKEN
+      result = read_reader_macro(reader, "quasiquote", "`")
+
+    case $MAL_TILDE_TOKEN
+      if (itokenLen == 2 && strchar:i(Stoken, 1) == $MAL_AT_TOKEN) then
+        SspliceQuote = sprintf("%c%c", $MAL_TILDE_TOKEN, $MAL_AT_TOKEN)
+        result = read_reader_macro(reader, "splice-unquote", SspliceQuote)
+      else
+        result = read_reader_macro(reader, "unquote", "~")
+      endif
+
+    case $MAL_AT_TOKEN
+      Sderef = sprintf("%c", $MAL_AT_TOKEN)
+      result = read_reader_macro(reader, "deref", Sderef)
+
+    case $MAL_CARET_TOKEN
+      result = read_with_meta(reader)
+
+    default
+      v = read_atom(reader)
+      result = MalMkReadResult(v, MalNextToken(reader))
+  endsw
+
+  xout result
 endop
 
 opcode read_str(input:S):MalValue

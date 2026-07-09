@@ -21,12 +21,14 @@ opcode MalEnvFind(env:MalEnv, key:S):i
   indx = 0
   ifound = -1
 
-  while (indx < env.length && ifound == -1) do
-    if (strcmp(env.keys[indx], key) == 0) then
-      ifound = indx
-    endif
-    indx += 1
-  od
+  if (env.length > 0) then
+    for indx in [0 ... env.length - 1] do
+      if (strcmp(env.keys[indx], key) == 0) then
+        ifound = indx
+        break
+      endif
+    od
+  endif
 
   xout ifound
 endop
@@ -41,12 +43,12 @@ opcode MalEnvSet(env:MalEnv, key:S, value:MalValue):MalEnv
     keys:S[] init newLength
     values:MalValue[] init newLength
 
-    indx = 0
-    while (indx < env.length) do
-      keys[indx] = env.keys[indx]
-      values[indx] = env.values[indx]
-      indx += 1
-    od
+    if (env.length > 0) then
+      for indx in [0 ... env.length - 1] do
+        keys[indx] = env.keys[indx]
+        values[indx] = env.values[indx]
+      od
+    endif
 
     keys[env.length] = key
     values[env.length] = value

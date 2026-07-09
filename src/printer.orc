@@ -9,55 +9,57 @@ opcode MalEscapeStringForPrint(input:S):S
   Sout = ""
   Sbackslash = sprintf("%c", $MAL_BACKSLASH_TOKEN)
 
-  while (indx < ilen) do
-    ichar = strchar:i(input, indx)
+  if (ilen > 0) then
+    for indx in [0 ... ilen - 1] do
+      ichar = strchar:i(input, indx)
 
-    if (ichar == $MAL_DOUBLE_QUOTE_TOKEN) then
-      Sout strcat Sout, Sbackslash
-      Schar = sprintf("%c", $MAL_DOUBLE_QUOTE_TOKEN)
-      Sout strcat Sout, Schar
-    elseif (ichar == $MAL_NEWLINE_TOKEN) then
-      Sout strcat Sout, Sbackslash
-      Sout strcat Sout, "n"
-    elseif (ichar == $MAL_BACKSLASH_TOKEN) then
-      Sout strcat Sout, Sbackslash
-      Sout strcat Sout, Sbackslash
-    else
-      Schar = sprintf("%c", ichar)
-      Sout strcat Sout, Schar
-    endif
+      switch ichar
+        case $MAL_DOUBLE_QUOTE_TOKEN
+          Sout strcat Sout, Sbackslash
+          Schar = sprintf("%c", $MAL_DOUBLE_QUOTE_TOKEN)
+          Sout strcat Sout, Schar
 
-    indx += 1
-  od
+        case $MAL_NEWLINE_TOKEN
+          Sout strcat Sout, Sbackslash
+          Sout strcat Sout, "n"
+
+        case $MAL_BACKSLASH_TOKEN
+          Sout strcat Sout, Sbackslash
+          Sout strcat Sout, Sbackslash
+
+        default
+          Schar = sprintf("%c", ichar)
+          Sout strcat Sout, Schar
+      endsw
+    od
+  endif
 
   xout Sout
 endop
 
 opcode MalPrintPrefixedForms(ast:MalValue, prefix:S):S
   Sout = prefix
-  indx = 0
-
-  while (indx < ast.length) do
-    next:MalValue = ast.list[indx]
-    Snext = pr_str(next)
-    Sout strcat Sout, Snext
-    indx += 1
-  od
+  if (ast.length > 0) then
+    for indx in [0 ... ast.length - 1] do
+      next:MalValue = ast.list[indx]
+      Snext = pr_str(next)
+      Sout strcat Sout, Snext
+    od
+  endif
 
   xout Sout
 endop
 
 opcode MalPrintDelimitedForms(ast:MalValue, left:S, right:S):S
   Sout = left
-  indx = 0
-
-  while (indx < ast.length) do
-    if (indx > 0) then
-      Sout strcat Sout, " "
-    endif
-    Sout strcat Sout, pr_str(ast.list[indx])
-    indx += 1
-  od
+  if (ast.length > 0) then
+    for indx in [0 ... ast.length - 1] do
+      if (indx > 0) then
+        Sout strcat Sout, " "
+      endif
+      Sout strcat Sout, pr_str(ast.list[indx])
+    od
+  endif
 
   Sout strcat Sout, right
   xout Sout
@@ -65,29 +67,27 @@ endop
 
 opcode MalPrintPrefixedFormsUnreadably(ast:MalValue, prefix:S):S
   Sout = prefix
-  indx = 0
-
-  while (indx < ast.length) do
-    next:MalValue = ast.list[indx]
-    Snext = pr_str_unreadably(next)
-    Sout strcat Sout, Snext
-    indx += 1
-  od
+  if (ast.length > 0) then
+    for indx in [0 ... ast.length - 1] do
+      next:MalValue = ast.list[indx]
+      Snext = pr_str_unreadably(next)
+      Sout strcat Sout, Snext
+    od
+  endif
 
   xout Sout
 endop
 
 opcode MalPrintDelimitedFormsUnreadably(ast:MalValue, left:S, right:S):S
   Sout = left
-  indx = 0
-
-  while (indx < ast.length) do
-    if (indx > 0) then
-      Sout strcat Sout, " "
-    endif
-    Sout strcat Sout, pr_str_unreadably(ast.list[indx])
-    indx += 1
-  od
+  if (ast.length > 0) then
+    for indx in [0 ... ast.length - 1] do
+      if (indx > 0) then
+        Sout strcat Sout, " "
+      endif
+      Sout strcat Sout, pr_str_unreadably(ast.list[indx])
+    od
+  endif
 
   Sout strcat Sout, right
   xout Sout
@@ -116,56 +116,75 @@ endop
 
 opcode pr_str_unreadably(ast:MalValue):S
   Sout = ""
-  if ($MAL_NUMBER_TYPE == ast.type) then
-    Snext = MalPrintNumber(ast.number)
-    Sout strcat Sout, Snext
-  elseif ($MAL_NIL_TYPE == ast.type) then
-    Sout strcat Sout, "nil"
-  elseif ($MAL_TRUE_TYPE == ast.type) then
-    Sout strcat Sout, "true"
-  elseif ($MAL_FALSE_TYPE == ast.type) then
-    Sout strcat Sout, "false"
-  elseif ($MAL_SYMBOL_TYPE == ast.type) then
-    Sout strcat Sout, ast.string
-  elseif ($MAL_KEYWORD_TYPE == ast.type) then
-    Sout strcat Sout, ":"
-    Sout strcat Sout, ast.string
-  elseif ($MAL_STRING_TYPE == ast.type) then
-    Sout strcat Sout, ast.string
-  elseif ($MAL_QUOTE_TYPE == ast.type) then
-    Sout = MalPrintPrefixedFormsUnreadably(ast, "'")
-  elseif ($MAL_QUASI_QUOTE_TYPE == ast.type) then
-    Sout = MalPrintPrefixedFormsUnreadably(ast, "`")
-  elseif ($MAL_UNQUOTE_TYPE == ast.type) then
-    Sout = MalPrintPrefixedFormsUnreadably(ast, "~")
-  elseif ($MAL_SPLICE_QUOTE_TYPE == ast.type) then
-    SspliceQuote = sprintf("%c%c", $MAL_TILDE_TOKEN, $MAL_AT_TOKEN)
-    Sout = MalPrintPrefixedFormsUnreadably(ast, SspliceQuote)
-  elseif ($MAL_DEREF_TYPE == ast.type) then
-    Sderef = sprintf("%c", $MAL_AT_TOKEN)
-    Sout = MalPrintPrefixedFormsUnreadably(ast, Sderef)
-  elseif ($MAL_WITH_META_TYPE == ast.type) then
-    Sout strcat Sout, "^"
-    if (ast.length > 1) then
-      Sout strcat Sout, pr_str_unreadably(ast.list[1])
-      Sout strcat Sout, " "
-      Sout strcat Sout, pr_str_unreadably(ast.list[0])
-    endif
-  elseif ($MAL_LIST_TYPE == ast.type) then
-    Sout = MalPrintDelimitedFormsUnreadably(ast, "(", ")")
-  elseif ($MAL_VECTOR_TYPE == ast.type) then
-    Sout = MalPrintDelimitedFormsUnreadably(ast, "[", "]")
-  elseif ($MAL_HASH_MAP_TYPE == ast.type) then
-    Sout = MalPrintDelimitedFormsUnreadably(ast, "{", "}")
-  elseif ($MAL_BUILTIN_TYPE == ast.type) then
-    Sout = MalPrintBuiltin("builtin", ast.string)
-  elseif ($MAL_BUILTIN_OPERATOR_TYPE == ast.type) then
-    Sout = MalPrintBuiltin("builtin-operator", ast.string)
-  elseif ($MAL_BUILTIN_OPCODE_TYPE == ast.type) then
-    Sout = MalPrintBuiltin("builtin-opcode", ast.string)
-  else
-    Sout = ""
-  endif
+
+  switch ast.type
+    case $MAL_NUMBER_TYPE
+      Snext = MalPrintNumber(ast.number)
+      Sout strcat Sout, Snext
+
+    case $MAL_NIL_TYPE
+      Sout strcat Sout, "nil"
+
+    case $MAL_TRUE_TYPE
+      Sout strcat Sout, "true"
+
+    case $MAL_FALSE_TYPE
+      Sout strcat Sout, "false"
+
+    case $MAL_SYMBOL_TYPE
+      Sout strcat Sout, ast.string
+
+    case $MAL_KEYWORD_TYPE
+      Sout strcat Sout, ":"
+      Sout strcat Sout, ast.string
+
+    case $MAL_STRING_TYPE
+      Sout strcat Sout, ast.string
+
+    case $MAL_QUOTE_TYPE
+      Sout = MalPrintPrefixedFormsUnreadably(ast, "'")
+
+    case $MAL_QUASI_QUOTE_TYPE
+      Sout = MalPrintPrefixedFormsUnreadably(ast, "`")
+
+    case $MAL_UNQUOTE_TYPE
+      Sout = MalPrintPrefixedFormsUnreadably(ast, "~")
+
+    case $MAL_SPLICE_QUOTE_TYPE
+      SspliceQuote = sprintf("%c%c", $MAL_TILDE_TOKEN, $MAL_AT_TOKEN)
+      Sout = MalPrintPrefixedFormsUnreadably(ast, SspliceQuote)
+
+    case $MAL_DEREF_TYPE
+      Sderef = sprintf("%c", $MAL_AT_TOKEN)
+      Sout = MalPrintPrefixedFormsUnreadably(ast, Sderef)
+
+    case $MAL_WITH_META_TYPE
+      Sout strcat Sout, "^"
+      if (ast.length > 1) then
+        Sout strcat Sout, pr_str_unreadably(ast.list[1])
+        Sout strcat Sout, " "
+        Sout strcat Sout, pr_str_unreadably(ast.list[0])
+      endif
+
+    case $MAL_LIST_TYPE
+      Sout = MalPrintDelimitedFormsUnreadably(ast, "(", ")")
+
+    case $MAL_VECTOR_TYPE
+      Sout = MalPrintDelimitedFormsUnreadably(ast, "[", "]")
+
+    case $MAL_HASH_MAP_TYPE
+      Sout = MalPrintDelimitedFormsUnreadably(ast, "{", "}")
+
+    case $MAL_BUILTIN_TYPE
+      Sout = MalPrintBuiltin("builtin", ast.string)
+
+    case $MAL_BUILTIN_OPERATOR_TYPE
+      Sout = MalPrintBuiltin("builtin-operator", ast.string)
+
+    case $MAL_BUILTIN_OPCODE_TYPE
+      Sout = MalPrintBuiltin("builtin-opcode", ast.string)
+  endsw
+
   xout(Sout)
 endop
 
@@ -181,127 +200,77 @@ endop
 
 opcode pr_str(ast:MalValue):S
   Sout = ""
-  if ($MAL_NUMBER_TYPE == ast.type) then
-    Snext = MalPrintNumber(ast.number)
-    Sout strcat Sout, Snext
-  elseif ($MAL_NIL_TYPE == ast.type) then
-    Sout strcat Sout, "nil"
-  elseif ($MAL_TRUE_TYPE == ast.type) then
-    Sout strcat Sout, "true"
-  elseif ($MAL_FALSE_TYPE == ast.type) then
-    Sout strcat Sout, "false"
-  elseif ($MAL_SYMBOL_TYPE == ast.type) then
-    Sout strcat Sout, ast.string
-  elseif ($MAL_KEYWORD_TYPE == ast.type) then
-    Sout strcat Sout, ":"
-    Sout strcat Sout, ast.string
-  elseif ($MAL_STRING_TYPE == ast.type) then
-    Squote = sprintf("%c", $MAL_DOUBLE_QUOTE_TOKEN)
-    Sout strcat Sout, Squote
-    Sout strcat Sout, MalEscapeStringForPrint(ast.string)
-    Sout strcat Sout, Squote
-  elseif ($MAL_QUOTE_TYPE == ast.type) then
-    Sout = MalPrintPrefixedForms(ast, "'")
-  elseif ($MAL_QUASI_QUOTE_TYPE == ast.type) then
-    Sout = MalPrintPrefixedForms(ast, "`")
-  elseif ($MAL_UNQUOTE_TYPE == ast.type) then
-    Sout = MalPrintPrefixedForms(ast, "~")
-  elseif ($MAL_SPLICE_QUOTE_TYPE == ast.type) then
-    SspliceQuote = sprintf("%c%c", $MAL_TILDE_TOKEN, $MAL_AT_TOKEN)
-    Sout = MalPrintPrefixedForms(ast, SspliceQuote)
-  elseif ($MAL_DEREF_TYPE == ast.type) then
-    Sderef = sprintf("%c", $MAL_AT_TOKEN)
-    Sout = MalPrintPrefixedForms(ast, Sderef)
-  elseif ($MAL_WITH_META_TYPE == ast.type) then
-    Sout strcat Sout, "^"
-    if (ast.length > 1) then
-      Sout strcat Sout, pr_str(ast.list[1])
-      Sout strcat Sout, " "
-      Sout strcat Sout, pr_str(ast.list[0])
-    endif
-  elseif ($MAL_LIST_TYPE == ast.type) then
-    Sout = MalPrintDelimitedForms(ast, "(", ")")
-  elseif ($MAL_VECTOR_TYPE == ast.type) then
-    Sout = MalPrintDelimitedForms(ast, "[", "]")
-  elseif ($MAL_HASH_MAP_TYPE == ast.type) then
-    Sout = MalPrintDelimitedForms(ast, "{", "}")
-  elseif ($MAL_BUILTIN_TYPE == ast.type) then
-    Sout = MalPrintBuiltin("builtin", ast.string)
-  elseif ($MAL_BUILTIN_OPERATOR_TYPE == ast.type) then
-    Sout = MalPrintBuiltin("builtin-operator", ast.string)
-  elseif ($MAL_BUILTIN_OPCODE_TYPE == ast.type) then
-    Sout = MalPrintBuiltin("builtin-opcode", ast.string)
-  else
-    Sout = ""
-    ;; prints "MALError: unhandled type %d quote-type %d number %d \n", ast.type, $MAL_QUOTE_TYPE, ast.number
-  endif
+
+  switch ast.type
+    case $MAL_NUMBER_TYPE
+      Snext = MalPrintNumber(ast.number)
+      Sout strcat Sout, Snext
+
+    case $MAL_NIL_TYPE
+      Sout strcat Sout, "nil"
+
+    case $MAL_TRUE_TYPE
+      Sout strcat Sout, "true"
+
+    case $MAL_FALSE_TYPE
+      Sout strcat Sout, "false"
+
+    case $MAL_SYMBOL_TYPE
+      Sout strcat Sout, ast.string
+
+    case $MAL_KEYWORD_TYPE
+      Sout strcat Sout, ":"
+      Sout strcat Sout, ast.string
+
+    case $MAL_STRING_TYPE
+      Squote = sprintf("%c", $MAL_DOUBLE_QUOTE_TOKEN)
+      Sout strcat Sout, Squote
+      Sout strcat Sout, MalEscapeStringForPrint(ast.string)
+      Sout strcat Sout, Squote
+
+    case $MAL_QUOTE_TYPE
+      Sout = MalPrintPrefixedForms(ast, "'")
+
+    case $MAL_QUASI_QUOTE_TYPE
+      Sout = MalPrintPrefixedForms(ast, "`")
+
+    case $MAL_UNQUOTE_TYPE
+      Sout = MalPrintPrefixedForms(ast, "~")
+
+    case $MAL_SPLICE_QUOTE_TYPE
+      SspliceQuote = sprintf("%c%c", $MAL_TILDE_TOKEN, $MAL_AT_TOKEN)
+      Sout = MalPrintPrefixedForms(ast, SspliceQuote)
+
+    case $MAL_DEREF_TYPE
+      Sderef = sprintf("%c", $MAL_AT_TOKEN)
+      Sout = MalPrintPrefixedForms(ast, Sderef)
+
+    case $MAL_WITH_META_TYPE
+      Sout strcat Sout, "^"
+      if (ast.length > 1) then
+        Sout strcat Sout, pr_str(ast.list[1])
+        Sout strcat Sout, " "
+        Sout strcat Sout, pr_str(ast.list[0])
+      endif
+
+    case $MAL_LIST_TYPE
+      Sout = MalPrintDelimitedForms(ast, "(", ")")
+
+    case $MAL_VECTOR_TYPE
+      Sout = MalPrintDelimitedForms(ast, "[", "]")
+
+    case $MAL_HASH_MAP_TYPE
+      Sout = MalPrintDelimitedForms(ast, "{", "}")
+
+    case $MAL_BUILTIN_TYPE
+      Sout = MalPrintBuiltin("builtin", ast.string)
+
+    case $MAL_BUILTIN_OPERATOR_TYPE
+      Sout = MalPrintBuiltin("builtin-operator", ast.string)
+
+    case $MAL_BUILTIN_OPCODE_TYPE
+      Sout = MalPrintBuiltin("builtin-opcode", ast.string)
+  endsw
+
   xout(Sout)
 endop
-
-  ;; indx = 0
-  ;; Sout = ""
-  ;; while (indx < ast.length) do
-  ;;   Stokens[] = tstruct.tokens
-  ;;   Stok = Stokens[indx]
-  ;;   Sout = strcat(Sout, strcat(" ", Stok))
-  ;;   indx += 1
-  ;; od
-  ;; xout Sout
-
-;; opcode pr_str_old, S, i
-;;   iast xin
-;;   if (iast > 0) then
-;;     Sout = ""
-;;     itype = tab_i(0, iast)
-;;     if (itype == giNumberType) then
-;;       Sout = sprintf("%d", tab_i(2, iast))
-;;     elseif (itype == giStringType) then
-;;       ilen = tab_i(1, iast)
-;;       idx = 0
-;;       SfromAscii = ""
-;;       while idx < ilen do
-;;         SfromAscii = strcat(SfromAscii, sprintf("%c", tab_i(2 + idx, iast)))
-;;         idx += 1
-;;       od
-;;       Sout = sprintf("\"%s\"", SfromAscii)
-;;     elseif (itype == giKeywordType) then
-;;       ilen = tab_i(1, iast)
-;;       idx = 0
-;;       SfromAscii = ""
-;;       while idx < ilen do
-;;         SfromAscii = strcat(SfromAscii, sprintf("%c", tab_i(2 + idx, iast)))
-;;         idx += 1
-;;       od
-;;       Sout = sprintf(":%s", SfromAscii)
-;;     elseif (itype == giListType) then
-;;       ilen = tab_i(1, iast)
-;;       print ilen
-;;       idx = 0
-;;       while idx < ilen do
-;;         Snext = pr_str_old(tab_i(2 + idx, iast))
-;;         ;; join " "
-;;         if idx > 0 then
-;;           Sout = strcat(" ", Snext)
-;;         else
-;;           Sout = Snext
-;;         endif
-;;       od
-;;     elseif (itype == giNilType) then
-;;       Sout = "nil"
-;;     elseif (itype == giTrueType) then
-;;       Sout = "true"
-;;     elseif (itype == giFalseType) then
-;;       Sout = "false"
-;;     else
-;;       ilen = tab_i(1, iast)
-;;       idx = 0
-;;       SfromAscii = ""
-;;       while idx < ilen do
-;;         SfromAscii = strcat(SfromAscii, sprintf("%c", tab_i(2 + idx, iast)))
-;;         idx += 1
-;;       od
-;;       Sout = SfromAscii
-;;     endif
-;;   endif
-;;   xout Sout
-;; endop

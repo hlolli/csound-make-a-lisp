@@ -103,19 +103,21 @@ opcode MalIsNumericString(token:S):i
     indx = 1
   endif
 
-  while (indx < itokenLen && iinvalid == 0) do
-    ichar = strchar:i(token, indx)
+  if (indx < itokenLen) then
+    for indx in [indx ... itokenLen - 1] do
+      ichar = strchar:i(token, indx)
 
-    if (ichar >= 48 && ichar < 58) then
-      idigitCount += 1
-    elseif (ichar == $MAL_PERIOD_TOKEN && iperiodCount == 0 && idigitCount > 0) then
-      iperiodCount = 1
-    else
-      iinvalid = 1
-    endif
-
-    indx += 1
-  od
+      if (ichar >= 48 && ichar < 58) then
+        idigitCount += 1
+      elseif (ichar == $MAL_PERIOD_TOKEN && \
+              iperiodCount == 0 && idigitCount > 0) then
+        iperiodCount = 1
+      else
+        iinvalid = 1
+        break
+      endif
+    od
+  endif
 
   if (idigitCount > 0 && iinvalid == 0) then
     ires = 1
