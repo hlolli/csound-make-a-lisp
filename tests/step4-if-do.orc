@@ -42,7 +42,7 @@ opcode ASSERT_REP_ENV(input:S, expected:S, env:MalEnv):MalEnv
 endop
 
 instr TEST
-  prints "Testing Step 4 if and do special forms\n"
+  prints "Testing Step 4 if, do, and fn* special forms\n"
   env:MalEnv = MalMkStep2Env()
 
   env = ASSERT_REP_ENV("(if true 7 8)", "7", env)
@@ -86,6 +86,34 @@ instr TEST
   env = ASSERT_REP_ENV("sequenced", "2", env)
   env = ASSERT_REP_ENV("(do (abc) (def! should-not-exist 1))", "'abc' not found", env)
   env = ASSERT_REP_ENV("should-not-exist", "'should-not-exist' not found", env)
+
+  env = ASSERT_REP_ENV("((fn* (a b) (+ b a)) 3 4)", "7", env)
+  env = ASSERT_REP_ENV("((fn* () 4))", "4", env)
+  env = ASSERT_REP_ENV("((fn* () ()))", "()", env)
+  env = ASSERT_REP_ENV("((fn* (f x) (f x)) (fn* (a) (+ 1 a)) 7)", "8", env)
+
+  env = ASSERT_REP_ENV("(((fn* (a) (fn* (b) (+ a b))) 5) 7)", "12", env)
+  env = ASSERT_REP_ENV("(def! gen-plus5 (fn* () (fn* (b) (+ 5 b))))", \
+    "#<function:fn*>", env)
+  env = ASSERT_REP_ENV("(def! plus5 (gen-plus5))", "#<function:fn*>", env)
+  env = ASSERT_REP_ENV("(plus5 7)", "12", env)
+  env = ASSERT_REP_ENV("(def! gen-plusX (fn* (x) (fn* (b) (+ x b))))", \
+    "#<function:fn*>", env)
+  env = ASSERT_REP_ENV("(def! plus7 (gen-plusX 7))", "#<function:fn*>", env)
+  env = ASSERT_REP_ENV("(plus7 8)", "15", env)
+  env = ASSERT_REP_ENV("(let* [b 0 f (fn* [] b)] (let* [b 1] (f)))", \
+    "0", env)
+  env = ASSERT_REP_ENV("((let* [b 0] (fn* [] b)))", "0", env)
+
+  env = ASSERT_REP_ENV("(def! DO (fn* (a) 7))", "#<function:fn*>", env)
+  env = ASSERT_REP_ENV("(DO 3)", "7", env)
+
+  env = ASSERT_REP_ENV("(fn*)", "fn*: expected 2 arguments, got 0", env)
+  env = ASSERT_REP_ENV("(fn* (a))", "fn*: expected 2 arguments, got 1", env)
+  env = ASSERT_REP_ENV("(fn* 1 2)", "fn*: params must be list or vector", env)
+  env = ASSERT_REP_ENV("(fn* (1) 2)", "fn*: params must be symbols", env)
+  env = ASSERT_REP_ENV("((fn* (a) a))", "fn*: expected 1 arguments, got 0", env)
+  env = ASSERT_REP_ENV("((fn* () 1) 2)", "fn*: expected 0 arguments, got 1", env)
 endin
 
 schedule("TEST", 0, 0)

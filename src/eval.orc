@@ -48,9 +48,41 @@ opcode MalApplyBuiltinOperator(fn:MalValue, args:MalValue):MalValue
   xout result
 endop
 
+opcode MalApplyFunction(fn:MalValue, args:MalValue):MalValue
+  result:MalValue = MalMkValue($MAL_NIL_TYPE)
+  params:MalValue = fn.list[0]
+  body:MalValue = fn.list[1]
+
+  if (args.length != params.length) then
+    result = MalMkError(sprintf("fn*: expected %d arguments, got %d", \
+      params.length, args.length))
+  elseif (lenarray(fn.env) == 0) then
+    result = MalMkError("fn*: missing closure environment")
+  else
+    closure:MalEnv[] = fn.env
+    capturedEnv:MalEnv = closure[0]
+    callEnv:MalEnv = MalMkEnvWithOuter(capturedEnv)
+
+    if (params.length > 0) then
+      for index in [0 ... params.length - 1] do
+        param:MalValue = params.list[index]
+        arg:MalValue = args.list[index]
+        callEnv = MalEnvSet(callEnv, param.string, arg)
+      od
+    endif
+
+    updatedCallEnv:MalEnv = callEnv
+    result, updatedCallEnv = EVAL_ENV(body, updatedCallEnv)
+  endif
+
+  xout result
+endop
+
 opcode MalApply(fn:MalValue, args:MalValue):MalValue
   if (fn.type == $MAL_BUILTIN_OPERATOR_TYPE) then
     result:MalValue = MalApplyBuiltinOperator(fn, args)
+  elseif (fn.type == $MAL_FUNCTION_TYPE) then
+    result:MalValue = MalApplyFunction(fn, args)
   else
     result:MalValue = MalMkError(sprintf("cannot apply %s", pr_str(fn)))
   endif
@@ -159,6 +191,50 @@ opcode MalEvalDef(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
         currentEnv = MalEnvSet(currentEnv, symbol.string, value)
         result = value
       endif
+    endif
+  endif
+
+  xout result, currentEnv
+endop
+
+opcode MalParamsAreValid(params:MalValue):i
+  valid:i = 1
+
+  if (params.type != $MAL_LIST_TYPE && params.type != $MAL_VECTOR_TYPE) then
+    valid = 0
+  elseif (params.length > 0) then
+    for index in [0 ... params.length - 1] do
+      param:MalValue = params.list[index]
+
+      if (param.type != $MAL_SYMBOL_TYPE) then
+        valid = 0
+        break
+      endif
+    od
+  endif
+
+  xout valid
+endop
+
+opcode MalEvalFn(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
+  result:MalValue = MalMkValue($MAL_NIL_TYPE)
+  currentEnv:MalEnv = env
+
+  if (ast.length != 3) then
+    result = MalMkError(sprintf("fn*: expected 2 arguments, got %d", \
+      ast.length - 1))
+  else
+    params:MalValue = ast.list[1]
+    body:MalValue = ast.list[2]
+
+    if (params.type != $MAL_LIST_TYPE && params.type != $MAL_VECTOR_TYPE) then
+      result = MalMkError("fn*: params must be list or vector")
+    elseif (MalParamsAreValid(params) == 0) then
+      result = MalMkError("fn*: params must be symbols")
+    else
+      closure:MalEnv[] init 1
+      closure[0] = currentEnv
+      result = MalMkFunctionWithEnv(params, body, closure)
     endif
   endif
 
@@ -275,6 +351,8 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
       result, currentEnv = MalEvalIf(ast, currentEnv)
     elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "do") == 0) then
       result, currentEnv = MalEvalDo(ast, currentEnv)
+    elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "fn*") == 0) then
+      result, currentEnv = MalEvalFn(ast, currentEnv)
     else
       evaluatedList:MalValue = MalMkValue($MAL_NIL_TYPE)
       evaluatedList, currentEnv = MalEvalAstEnv(ast, currentEnv)
