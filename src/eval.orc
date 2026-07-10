@@ -161,6 +161,50 @@ opcode MalMapSequence(fn:MalValue, sequence:MalValue):MalValue
   xout result
 endop
 
+opcode MalAssocPairs(mapValue:MalValue, args:MalValue, startIndex:i):MalValue
+  result:MalValue = mapValue
+  pairCount:i = int((args.length - startIndex) / 2)
+
+  if (pairCount > 0) then
+    for pairIndex in [0 ... pairCount - 1] do
+      keyIndex:i = startIndex + pairIndex * 2
+      result = MalMapAssoc( \
+        result, args.list[keyIndex], args.list[keyIndex + 1])
+    od
+  endif
+
+  xout result
+endop
+
+opcode MalDissocKeys(mapValue:MalValue, args:MalValue):MalValue
+  result:MalValue = mapValue
+
+  if (args.length > 1) then
+    for index in [1 ... args.length - 1] do
+      result = MalMapDissoc(result, args.list[index])
+    od
+  endif
+
+  xout result
+endop
+
+opcode MalJoinPrintedArgs(args:MalValue, printReadably:i, separator:S):S
+  output:S = ""
+
+  if (args.length > 0) then
+    for index in [0 ... args.length - 1] do
+      if (index > 0) then
+        output strcat output, separator
+      endif
+
+      output strcat output, \
+        pr_str_with_readability(args.list[index], printReadably)
+    od
+  endif
+
+  xout output
+endop
+
 opcode MalArityError(name:S, expected:i, actual:i):MalValue
   result:MalValue = MalMkError(sprintf("%s: expected %d arguments, got %d", \
     name, expected, actual))
@@ -373,8 +417,150 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
   elseif (strcmp(fn.string, "symbol?") == 0) then
     result = MalApplyTypePredicate(fn, args, $MAL_SYMBOL_TYPE)
 
+  elseif (strcmp(fn.string, "symbol") == 0) then
+    if (args.length != 1) then
+      result = MalArityError(fn.string, 1, args.length)
+    else
+      value:MalValue = args.list[0]
+
+      if (value.type != $MAL_STRING_TYPE) then
+        result = MalMkError("symbol: expected string argument")
+      else
+        result = MalMkSymbol(value.string)
+      endif
+    endif
+
+  elseif (strcmp(fn.string, "keyword") == 0) then
+    if (args.length != 1) then
+      result = MalArityError(fn.string, 1, args.length)
+    else
+      value:MalValue = args.list[0]
+
+      if (value.type == $MAL_KEYWORD_TYPE) then
+        result = value
+      elseif (value.type == $MAL_STRING_TYPE) then
+        result = MalMkKeyword(value.string)
+      else
+        result = MalMkError("keyword: expected string or keyword argument")
+      endif
+    endif
+
+  elseif (strcmp(fn.string, "keyword?") == 0) then
+    result = MalApplyTypePredicate(fn, args, $MAL_KEYWORD_TYPE)
+
   elseif (strcmp(fn.string, "list") == 0) then
     result = args
+
+  elseif (strcmp(fn.string, "vector") == 0) then
+    result = MalCopySequenceAs(args, $MAL_VECTOR_TYPE)
+
+  elseif (strcmp(fn.string, "vector?") == 0) then
+    result = MalApplyTypePredicate(fn, args, $MAL_VECTOR_TYPE)
+
+  elseif (strcmp(fn.string, "sequential?") == 0) then
+    if (args.length != 1) then
+      result = MalArityError(fn.string, 1, args.length)
+    else
+      value:MalValue = args.list[0]
+      isSequential:i = MalIsSequential(value)
+      result = MalMkBool(isSequential)
+    endif
+
+  elseif (strcmp(fn.string, "hash-map") == 0) then
+    if (args.length % 2 != 0) then
+      result = MalMkError("hash-map: expected even number of arguments")
+    else
+      emptyMap:MalValue = MalMkValue($MAL_HASH_MAP_TYPE)
+      result = MalAssocPairs(emptyMap, args, 0)
+    endif
+
+  elseif (strcmp(fn.string, "map?") == 0) then
+    result = MalApplyTypePredicate(fn, args, $MAL_HASH_MAP_TYPE)
+
+  elseif (strcmp(fn.string, "assoc") == 0) then
+    if (args.length < 1) then
+      result = MalMkError("assoc: expected at least 1 argument, got 0")
+    else
+      mapValue:MalValue = args.list[0]
+
+      if (mapValue.type != $MAL_HASH_MAP_TYPE) then
+        result = MalMkError("assoc: first argument must be a hash map")
+      elseif ((args.length - 1) % 2 != 0) then
+        result = MalMkError("assoc: expected key/value pairs")
+      else
+        result = MalAssocPairs(mapValue, args, 1)
+      endif
+    endif
+
+  elseif (strcmp(fn.string, "dissoc") == 0) then
+    if (args.length < 1) then
+      result = MalMkError("dissoc: expected at least 1 argument, got 0")
+    else
+      mapValue:MalValue = args.list[0]
+
+      if (mapValue.type != $MAL_HASH_MAP_TYPE) then
+        result = MalMkError("dissoc: first argument must be a hash map")
+      else
+        result = MalDissocKeys(mapValue, args)
+      endif
+    endif
+
+  elseif (strcmp(fn.string, "get") == 0) then
+    if (args.length != 2) then
+      result = MalArityError(fn.string, 2, args.length)
+    else
+      mapValue:MalValue = args.list[0]
+      key:MalValue = args.list[1]
+
+      if (mapValue.type == $MAL_NIL_TYPE) then
+        result = MalMkValue($MAL_NIL_TYPE)
+      elseif (mapValue.type != $MAL_HASH_MAP_TYPE) then
+        result = MalMkError("get: first argument must be a hash map or nil")
+      else
+        result = MalMapGet(mapValue, key)
+      endif
+    endif
+
+  elseif (strcmp(fn.string, "contains?") == 0) then
+    if (args.length != 2) then
+      result = MalArityError(fn.string, 2, args.length)
+    else
+      mapValue:MalValue = args.list[0]
+      key:MalValue = args.list[1]
+
+      if (mapValue.type != $MAL_HASH_MAP_TYPE) then
+        result = MalMkError("contains?: first argument must be a hash map")
+      else
+        found:i = MalMapFindKey(mapValue, key) >= 0
+        result = MalMkBool(found)
+      endif
+    endif
+
+  elseif (strcmp(fn.string, "keys") == 0) then
+    if (args.length != 1) then
+      result = MalArityError(fn.string, 1, args.length)
+    else
+      mapValue:MalValue = args.list[0]
+
+      if (mapValue.type != $MAL_HASH_MAP_TYPE) then
+        result = MalMkError("keys: expected hash map argument")
+      else
+        result = MalMapKeys(mapValue)
+      endif
+    endif
+
+  elseif (strcmp(fn.string, "vals") == 0) then
+    if (args.length != 1) then
+      result = MalArityError(fn.string, 1, args.length)
+    else
+      mapValue:MalValue = args.list[0]
+
+      if (mapValue.type != $MAL_HASH_MAP_TYPE) then
+        result = MalMkError("vals: expected hash map argument")
+      else
+        result = MalMapValues(mapValue)
+      endif
+    endif
 
   elseif (strcmp(fn.string, "cons") == 0) then
     if (args.length != 2) then
@@ -548,24 +734,20 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
       if (value.type == $MAL_NIL_TYPE) then
         result.number = 0
       elseif (value.type == $MAL_LIST_TYPE || \
-              value.type == $MAL_VECTOR_TYPE || \
-              value.type == $MAL_HASH_MAP_TYPE) then
+              value.type == $MAL_VECTOR_TYPE) then
         result.number = value.length
+      elseif (value.type == $MAL_HASH_MAP_TYPE) then
+        result.number = int(value.length / 2)
       else
         result = MalMkError("count: expected sequence or nil")
       endif
     endif
 
   elseif (strcmp(fn.string, "str") == 0) then
-    output:S = ""
+    result = MalMkString(MalJoinPrintedArgs(args, 0, ""))
 
-    if (args.length > 0) then
-      for index in [0 ... args.length - 1] do
-        output strcat output, pr_str_with_readability(args.list[index], 0)
-      od
-    endif
-
-    result = MalMkString(output)
+  elseif (strcmp(fn.string, "pr-str") == 0) then
+    result = MalMkString(MalJoinPrintedArgs(args, 1, " "))
 
   elseif (strcmp(fn.string, "read-string") == 0) then
     if (args.length != 1) then
@@ -693,18 +875,7 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
     endif
 
   elseif (strcmp(fn.string, "prn") == 0) then
-    output:S = ""
-
-    if (args.length > 0) then
-      for index in [0 ... args.length - 1] do
-        if (index > 0) then
-          output strcat output, " "
-        endif
-
-        output strcat output, pr_str(args.list[index])
-      od
-    endif
-
+    output:S = MalJoinPrintedArgs(args, 1, " ")
     prints "%s\n", output
     result = MalMkValue($MAL_NIL_TYPE)
 
@@ -1601,7 +1772,22 @@ opcode MalMkStep9Env():MalEnv
   env = MalEnvSet(env, "nil?", MalMkBuiltin("nil?"))
   env = MalEnvSet(env, "true?", MalMkBuiltin("true?"))
   env = MalEnvSet(env, "false?", MalMkBuiltin("false?"))
+  env = MalEnvSet(env, "symbol", MalMkBuiltin("symbol"))
   env = MalEnvSet(env, "symbol?", MalMkBuiltin("symbol?"))
+  env = MalEnvSet(env, "keyword", MalMkBuiltin("keyword"))
+  env = MalEnvSet(env, "keyword?", MalMkBuiltin("keyword?"))
+  env = MalEnvSet(env, "vector", MalMkBuiltin("vector"))
+  env = MalEnvSet(env, "vector?", MalMkBuiltin("vector?"))
+  env = MalEnvSet(env, "sequential?", MalMkBuiltin("sequential?"))
+  env = MalEnvSet(env, "hash-map", MalMkBuiltin("hash-map"))
+  env = MalEnvSet(env, "map?", MalMkBuiltin("map?"))
+  env = MalEnvSet(env, "assoc", MalMkBuiltin("assoc"))
+  env = MalEnvSet(env, "dissoc", MalMkBuiltin("dissoc"))
+  env = MalEnvSet(env, "get", MalMkBuiltin("get"))
+  env = MalEnvSet(env, "contains?", MalMkBuiltin("contains?"))
+  env = MalEnvSet(env, "keys", MalMkBuiltin("keys"))
+  env = MalEnvSet(env, "vals", MalMkBuiltin("vals"))
+  env = MalEnvSet(env, "pr-str", MalMkBuiltin("pr-str"))
   env = MalRefreshTopLevelFunctionClosures(env)
   xout env
 endop
