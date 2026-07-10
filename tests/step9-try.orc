@@ -50,7 +50,7 @@ opcode ASSERT_THROW(input:S, expectedMessage:S, expectedPayload:S, \
 endop
 
 instr TEST
-  prints "Testing Step 9 throw, try/catch, and apply\n"
+  prints "Testing Step 9 throw, try/catch, apply, and map\n"
   env:MalEnv = MalMkStep9Env()
 
   env = ASSERT_REP_ENV("(throw \"uncaught\")", \
@@ -176,6 +176,47 @@ instr TEST
     "apply: final argument must be list or vector", env)
   env = ASSERT_REP_ENV("(apply 1 (list 2))", \
     "cannot apply 1", env)
+
+  env = ASSERT_REP_ENV("(map str (list 1 true :a))", \
+    "(\"1\" \"true\" \":a\")", env)
+  env = ASSERT_REP_ENV("(map str [])", "()", env)
+  env = ASSERT_REP_ENV("(def! map-source [1 2 3])", \
+    "[1 2 3]", env)
+  env = ASSERT_REP_ENV( \
+    "(map (fn* (x) (* 2 x)) map-source)", "(2 4 6)", env)
+  env = ASSERT_REP_ENV("map-source", "[1 2 3]", env)
+  env = ASSERT_REP_ENV( \
+    "(map (fn* (& values) (list? values)) [1 2])", \
+    "(true true)", env)
+
+  env = ASSERT_REP_ENV( \
+    "(defmacro! map-ast (fn* (x) (list '+ x 1)))", \
+    "#<function:fn*>", env)
+  env = ASSERT_REP_ENV("(map map-ast [1 2])", \
+    "((+ 1 1) (+ 2 1))", env)
+
+  env = ASSERT_REP_ENV("(def! map-calls (atom 0))", \
+    "(atom 0)", env)
+  env = ASSERT_REP_ENV( \
+    "(def! stop-map (fn* (x) (do (swap! map-calls + 1) (if (= x 2) (throw \"stop\") x))))", \
+    "#<function:fn*>", env)
+  env = ASSERT_REP_ENV( \
+    "(try* (map stop-map [1 2 3]) (catch* e e))", \
+    "\"stop\"", env)
+  env = ASSERT_REP_ENV("(deref map-calls)", "2", env)
+  env = ASSERT_REP_ENV( \
+    "(try* (map throw (list \"mapped error\")) (catch* e e))", \
+    "\"mapped error\"", env)
+
+  env = ASSERT_REP_ENV("(map)", \
+    "map: expected 2 arguments, got 0", env)
+  env = ASSERT_REP_ENV("(map str)", \
+    "map: expected 2 arguments, got 1", env)
+  env = ASSERT_REP_ENV("(map str [] [])", \
+    "map: expected 2 arguments, got 3", env)
+  env = ASSERT_REP_ENV("(map str 1)", \
+    "map: second argument must be list or vector", env)
+  env = ASSERT_REP_ENV("(map 1 [2])", "cannot apply 1", env)
 endin
 
 schedule("TEST", 0, 0)

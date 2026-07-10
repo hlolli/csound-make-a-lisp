@@ -133,6 +133,34 @@ opcode MalFlattenApplyArgs(args:MalValue):MalValue
   xout result
 endop
 
+opcode MalMapSequence(fn:MalValue, sequence:MalValue):MalValue
+  values:MalValue[] init sequence.length
+  result:MalValue = MalMkValue($MAL_LIST_TYPE)
+  failed:i = 0
+
+  if (sequence.length > 0) then
+    for index in [0 ... sequence.length - 1] do
+      callArgs:MalValue = MalMkList1(sequence.list[index])
+      mapped:MalValue = MalApply(fn, callArgs)
+
+      if (mapped.type == $MAL_ERROR_TYPE) then
+        result = mapped
+        failed = 1
+        break
+      endif
+
+      values[index] = mapped
+    od
+  endif
+
+  if (failed == 0) then
+    result.list = values
+    result.length = sequence.length
+  endif
+
+  xout result
+endop
+
 opcode MalArityError(name:S, expected:i, actual:i):MalValue
   result:MalValue = MalMkError(sprintf("%s: expected %d arguments, got %d", \
     name, expected, actual))
@@ -277,6 +305,20 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
       else
         flattenedArgs:MalValue = MalFlattenApplyArgs(args)
         result = MalApply(targetFn, flattenedArgs)
+      endif
+    endif
+
+  elseif (strcmp(fn.string, "map") == 0) then
+    if (args.length != 2) then
+      result = MalArityError(fn.string, 2, args.length)
+    else
+      targetFn:MalValue = args.list[0]
+      sequence:MalValue = args.list[1]
+
+      if (MalIsSequential(sequence) == 0) then
+        result = MalMkError("map: second argument must be list or vector")
+      else
+        result = MalMapSequence(targetFn, sequence)
       endif
     endif
 
@@ -1505,6 +1547,7 @@ opcode MalMkStep9Env():MalEnv
   env:MalEnv = MalMkStep8Env()
   env = MalEnvSet(env, "throw", MalMkBuiltin("throw"))
   env = MalEnvSet(env, "apply", MalMkBuiltin("apply"))
+  env = MalEnvSet(env, "map", MalMkBuiltin("map"))
   env = MalRefreshTopLevelFunctionClosures(env)
   xout env
 endop
