@@ -220,7 +220,7 @@ opcode MalStringTokenHasClosingQuote(token:S):i
       indx -= 1
     od
 
-    ires = (ibackslashCount % 2 == 0 ? 1 : 0)
+    ires = ibackslashCount % 2 == 0
   endif
 
   xout ires

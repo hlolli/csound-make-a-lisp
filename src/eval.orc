@@ -73,7 +73,7 @@ endop
 
 opcode MalIsSymbolNamed(value:MalValue, name:S):i
   result:i = (value.type == $MAL_SYMBOL_TYPE && \
-    strcmp(value.string, name) == 0) ? 1 : 0
+    strcmp(value.string, name) == 0)
   xout result
 endop
 
@@ -90,7 +90,7 @@ endop
 
 opcode MalIsSequential(value:MalValue):i
   result:i = (value.type == $MAL_LIST_TYPE || \
-    value.type == $MAL_VECTOR_TYPE) ? 1 : 0
+    value.type == $MAL_VECTOR_TYPE)
   xout result
 endop
 
@@ -119,13 +119,13 @@ opcode MalNumberComparison(name:S, left:i, right:i):i
   result:i = 0
 
   if (strcmp(name, ">") == 0) then
-    result = left > right ? 1 : 0
+    result = left > right
   elseif (strcmp(name, ">=") == 0) then
-    result = left >= right ? 1 : 0
+    result = left >= right
   elseif (strcmp(name, "<") == 0) then
-    result = left < right ? 1 : 0
+    result = left < right
   elseif (strcmp(name, "<=") == 0) then
-    result = left <= right ? 1 : 0
+    result = left <= right
   endif
 
   xout result
@@ -201,16 +201,16 @@ opcode MalEquals(left:MalValue, right:MalValue):i
   elseif (left.type == right.type) then
     switch left.type
       case $MAL_NUMBER_TYPE
-        result = left.number == right.number ? 1 : 0
+        result = left.number == right.number
 
       case $MAL_STRING_TYPE
-        result = strcmp(left.string, right.string) == 0 ? 1 : 0
+        result = strcmp(left.string, right.string) == 0
 
       case $MAL_KEYWORD_TYPE
-        result = strcmp(left.string, right.string) == 0 ? 1 : 0
+        result = strcmp(left.string, right.string) == 0
 
       case $MAL_SYMBOL_TYPE
-        result = strcmp(left.string, right.string) == 0 ? 1 : 0
+        result = strcmp(left.string, right.string) == 0
 
       case $MAL_NIL_TYPE
         result = 1
@@ -222,7 +222,7 @@ opcode MalEquals(left:MalValue, right:MalValue):i
         result = 1
 
       case $MAL_ATOM_TYPE
-        result = left.number == right.number ? 1 : 0
+        result = left.number == right.number
     endsw
   endif
 

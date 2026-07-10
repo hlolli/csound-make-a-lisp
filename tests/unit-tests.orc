@@ -130,6 +130,7 @@ instr TEST_BUILTINS
   closure:MalEnv[] init 1
   closure[0] = env
   functionValue:MalValue = MalMkFunctionWithEnv(params, body, closure)
+  macroValue:MalValue = MalFunctionAsMacro(functionValue)
   storedParams:MalValue = functionValue.list[0]
   storedParam:MalValue = storedParams.list[0]
   storedBody:MalValue = functionValue.list[1]
@@ -142,6 +143,29 @@ instr TEST_BUILTINS
   if (functionValue.type != $MAL_FUNCTION_TYPE) then
     prints "FUNCTION, Assertion failed: expected type=%d, got type=%d\n", \
       $MAL_FUNCTION_TYPE, functionValue.type
+    exitnow(1)
+  endif
+
+  if (functionValue.isMacro != 0 || MalIsMacro(functionValue) != 0) then
+    prints "FUNCTION, Assertion failed: normal function marked as macro\n"
+    exitnow(1)
+  endif
+
+  if (macroValue.type != $MAL_FUNCTION_TYPE || macroValue.isMacro != 1 || \
+      MalIsMacro(macroValue) != 1) then
+    prints "FUNCTION, Assertion failed: macro type=%d flag=%d predicate=%d\n", \
+      macroValue.type, macroValue.isMacro, MalIsMacro(macroValue)
+    exitnow(1)
+  endif
+
+  if (macroValue.length != functionValue.length || \
+      lenarray(macroValue.env) != lenarray(functionValue.env)) then
+    prints "FUNCTION, Assertion failed: macro marking changed function data\n"
+    exitnow(1)
+  endif
+
+  if (MalIsMacro(MalMkBuiltin("not-a-macro")) != 0) then
+    prints "FUNCTION, Assertion failed: builtin reported as macro\n"
     exitnow(1)
   endif
 

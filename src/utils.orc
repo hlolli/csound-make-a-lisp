@@ -24,7 +24,7 @@ endop
 opcode MalMkValue(type:i):MalValue
   list:MalValue[] init 12
   env:MalEnv[] init 0
-  val:MalValue init type, 0, "", list, env, 0
+  val:MalValue init type, 0, "", list, env, 0, 0
   xout(val)
 endop
 
@@ -111,6 +111,21 @@ opcode MalMkFunctionWithEnv(params:MalValue, body:MalValue, closure:MalEnv[]):Ma
   xout val
 endop
 
+opcode MalFunctionAsMacro(fn:MalValue):MalValue
+  result:MalValue = fn
+
+  if (fn.type == $MAL_FUNCTION_TYPE) then
+    result.isMacro = 1
+  endif
+
+  xout result
+endop
+
+opcode MalIsMacro(fn:MalValue):i
+  result:i = fn.type == $MAL_FUNCTION_TYPE && fn.isMacro == 1
+  xout result
+endop
+
 opcode MalMkList1(first:MalValue):MalValue
   val:MalValue = MalMkValue($MAL_LIST_TYPE)
   val = MalAppendValue(val, first)
@@ -134,14 +149,14 @@ endop
 
 opcode MalMkReadResult(value:MalValue, reader:MalReader):MalReadResult
   result:MalReadResult init value.type, value.number, value.string, value.list, \
-    value.env, value.length, reader.peek, reader.position, reader.tokens, \
-    reader.length, reader.done
+    value.env, value.length, value.isMacro, reader.peek, reader.position, \
+    reader.tokens, reader.length, reader.done
   xout result
 endop
 
 opcode MalReadResultValue(result:MalReadResult):MalValue
   value:MalValue init result.type, result.number, result.string, result.list, \
-    result.env, result.length
+    result.env, result.length, result.isMacro
   xout value
 endop
 
