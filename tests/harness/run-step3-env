@@ -41,17 +41,10 @@ def is_csound_noise(line):
     return line == "" or any(pattern.search(line) for pattern in CSOUND_NOISE)
 
 
-def csound_string(value):
-    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
-    return f'"{escaped}"'
-
-
 def build_orc(history):
-    strsets = []
     eval_lines = []
 
-    for index, source in enumerate(history, start=1):
-        strsets.append(f"strset {index}, {csound_string(source)}")
+    for index in range(1, len(history) + 1):
         eval_lines.extend(
             [
                 f"  Sinput strget {index}",
@@ -90,8 +83,6 @@ def build_orc(history):
             "  xout result, currentEnv",
             "endop",
             "",
-            *strsets,
-            "",
             "instr RUN",
             f"  env:MalEnv = {ENV_CONSTRUCTOR}()",
             '  Sinput = ""',
@@ -113,8 +104,12 @@ def eval_history(history):
         step_file = Path(file.name)
 
     try:
+        strset_args = [
+            f"--strset{index}={source}"
+            for index, source in enumerate(history, start=1)
+        ]
         proc = subprocess.run(
-            [CSOUND, "-n", "-d", "-m128", "--orc", str(step_file)],
+            [CSOUND, "-n", "-d", "-m128", *strset_args, "--orc", str(step_file)],
             cwd=ROOT,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,

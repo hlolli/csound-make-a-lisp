@@ -60,6 +60,19 @@ opcode MalEnvSet(env:MalEnv, key:S, value:MalValue):MalEnv
   xout env
 endop
 
+opcode MalEnvHas(env:MalEnv, key:S):i
+  index = MalEnvFind(env, key)
+  result:i = 0
+
+  if (index >= 0) then
+    result = 1
+  elseif (lenarray(env.outer) > 0) then
+    result = MalEnvHas(env.outer[0], key)
+  endif
+
+  xout result
+endop
+
 opcode MalEnvGet(env:MalEnv, key:S):MalValue
   index = MalEnvFind(env, key)
 

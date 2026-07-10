@@ -990,12 +990,36 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   preserveReturnEnv:i = 0
 
   while (done == 0) do
+    hasDebug:i = MalEnvHas(evalEnv, "DEBUG-EVAL")
+
+    if (hasDebug == 1) then
+      debugValue:MalValue = MalEnvGet(evalEnv, "DEBUG-EVAL")
+
+      if (MalIsTruthy(debugValue) == 1) then
+        SdebugAst:S = pr_str(workAst)
+        prints "EVAL: %s\n", SdebugAst
+      endif
+    endif
+
     if (workAst.type == $MAL_LIST_TYPE && workAst.length > 0) then
       head:MalValue = workAst.list[0]
 
       if (MalIsSymbolNamed(head, "quote") == 1) then
         result = MalEvalQuote(workAst)
         done = 1
+
+      elseif (MalIsSymbolNamed(head, "quasiquote") == 1) then
+        if (workAst.length != 2) then
+          result = MalArityError("quasiquote", 1, workAst.length - 1)
+          done = 1
+        else
+          workAst = MalQuasiquote(workAst.list[1])
+
+          if (workAst.type == $MAL_ERROR_TYPE) then
+            result = workAst
+            done = 1
+          endif
+        endif
 
       elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "def!") == 0) then
         result, evalEnv = MalEvalDef(workAst, evalEnv)

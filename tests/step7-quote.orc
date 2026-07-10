@@ -134,6 +134,30 @@ instr TEST
   env = ASSERT_REP_ENV("(quote 1 2)", \
     "quote: expected 1 arguments, got 2", env)
 
+  env = ASSERT_REP_ENV("(quasiquote nil)", "nil", env)
+  env = ASSERT_REP_ENV("(quasiquote undefined)", "undefined", env)
+  env = ASSERT_REP_ENV("(quasiquote (1 2 (3 4)))", "(1 2 (3 4))", env)
+  env = ASSERT_REP_ENV("(def! unquoted 8)", "8", env)
+  env = ASSERT_REP_ENV("(quasiquote (1 (unquote unquoted) 3))", \
+    "(1 8 3)", env)
+  env = ASSERT_REP_ENV("(let* (local 9) (quasiquote (unquote local)))", \
+    "9", env)
+  env = ASSERT_REP_ENV("(def! spliced (quote (2 3)))", "(2 3)", env)
+  env = ASSERT_REP_ENV("(quasiquote (1 (splice-unquote spliced) 4))", \
+    "(1 2 3 4)", env)
+  SlistShorthand:S = sprintf("%c(1 %cunquoted %c%cspliced 4)", \
+    $MAL_BACKTICK_TOKEN, $MAL_TILDE_TOKEN, $MAL_TILDE_TOKEN, $MAL_AT_TOKEN)
+  SvectorShorthand:S = sprintf("%c[1 %cunquoted %c%cspliced 4]", \
+    $MAL_BACKTICK_TOKEN, $MAL_TILDE_TOKEN, $MAL_TILDE_TOKEN, $MAL_AT_TOKEN)
+  env = ASSERT_REP_ENV(SlistShorthand, "(1 8 2 3 4)", env)
+  env = ASSERT_REP_ENV(SvectorShorthand, "[1 8 2 3 4]", env)
+  env = ASSERT_REP_ENV("(quasiquote)", \
+    "quasiquote: expected 1 arguments, got 0", env)
+  env = ASSERT_REP_ENV("(quasiquote 1 2)", \
+    "quasiquote: expected 1 arguments, got 2", env)
+  env = ASSERT_REP_ENV("(quasiquote ((splice-unquote)))", \
+    "splice-unquote: expected 1 arguments, got 0", env)
+
   transformCheck:i = ASSERT_QUASIQUOTE("nil", "nil")
   transformCheck = ASSERT_QUASIQUOTE("7", "7")
   transformCheck = ASSERT_QUASIQUOTE("a", "(quote a)")
