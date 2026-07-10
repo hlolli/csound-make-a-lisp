@@ -262,6 +262,33 @@ opcode MalEquals(left:MalValue, right:MalValue):i
         od
       endif
     endif
+  elseif (left.type == $MAL_HASH_MAP_TYPE && \
+          right.type == $MAL_HASH_MAP_TYPE) then
+    if (left.length == right.length) then
+      result = 1
+      entryCount:i = int(left.length / 2)
+
+      if (entryCount > 0) then
+        for entryIndex in [0 ... entryCount - 1] do
+          leftKeyIndex:i = entryIndex * 2
+          rightKeyIndex:i = MalMapFindKey( \
+            right, left.list[leftKeyIndex])
+
+          if (rightKeyIndex < 0) then
+            result = 0
+            break
+          else
+            leftValue:MalValue = left.list[leftKeyIndex + 1]
+            rightValue:MalValue = right.list[rightKeyIndex + 1]
+
+            if (MalEquals(leftValue, rightValue) == 0) then
+              result = 0
+              break
+            endif
+          endif
+        od
+      endif
+    endif
   elseif (left.type == right.type) then
     switch left.type
       case $MAL_NUMBER_TYPE
@@ -826,8 +853,7 @@ opcode MalEvalHashMapEnv(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
       result = evaluated
       done = 1
     else
-      result = MalAppendValue(result, key)
-      result = MalAppendValue(result, evaluated)
+      result = MalMapAssoc(result, key, evaluated)
     endif
 
     index += 2

@@ -309,6 +309,9 @@ opcode read_hash_map(reader:MalReader, endToken:S):MalReadResult
   if (value.type != $MAL_ERROR_TYPE && value.length % 2 != 0) then
     value = MalMkError("expected hash-map value, got end of map")
     result = MalMkReadResult(value, MalReadResultReader(result))
+  elseif (value.type != $MAL_ERROR_TYPE) then
+    value = MalNormalizeMap(value)
+    result = MalMkReadResult(value, MalReadResultReader(result))
   endif
 
   xout result
