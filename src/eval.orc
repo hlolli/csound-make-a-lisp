@@ -1148,6 +1148,58 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
         endif
         done = 1
 
+      elseif (MalIsSymbolNamed(head, "try*") == 1) then
+        tryArgCount:i = workAst.length - 1
+
+        if (tryArgCount < 1 || tryArgCount > 2) then
+          result = MalMkError(sprintf( \
+            "try*: expected 1 or 2 arguments, got %d", tryArgCount))
+          done = 1
+        elseif (tryArgCount == 1) then
+          workAst = workAst.list[1]
+        else
+          catchClause:MalValue = workAst.list[2]
+
+          if (MalIsForm(catchClause, "catch*") == 0 || \
+              catchClause.length != 3) then
+            result = MalMkError( \
+              "try*: second argument must be (catch* symbol handler)")
+            done = 1
+          else
+            catchBinding:MalValue = catchClause.list[1]
+
+            if (catchBinding.type != $MAL_SYMBOL_TYPE) then
+              result = MalMkError("catch*: binding must be a symbol")
+              done = 1
+            else
+              tryForm:MalValue = workAst.list[1]
+              tryResult:MalValue, evalEnv = EVAL_ENV(tryForm, evalEnv)
+
+              if (preserveReturnEnv == 0) then
+                returnEnv = evalEnv
+              elseif (preserveReturnEnv == 1) then
+                returnEnv = MalEnvRoot(evalEnv)
+              endif
+
+              if (tryResult.type == $MAL_ERROR_TYPE) then
+                catchEnv:MalEnv = MalMkEnvWithOuter(evalEnv)
+                catchValue:MalValue = MalErrorPayload(tryResult)
+                catchEnv = MalEnvSet( \
+                  catchEnv, catchBinding.string, catchValue)
+                workAst = catchClause.list[2]
+                evalEnv = catchEnv
+
+                if (preserveReturnEnv == 0) then
+                  preserveReturnEnv = 1
+                endif
+              else
+                result = tryResult
+                done = 1
+              endif
+            endif
+          endif
+        endif
+
       elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "if") == 0) then
         if (workAst.length < 3 || workAst.length > 4) then
           result = MalMkError(sprintf("if: expected 2 or 3 arguments, got %d", \

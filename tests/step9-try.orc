@@ -50,7 +50,7 @@ opcode ASSERT_THROW(input:S, expectedMessage:S, expectedPayload:S, \
 endop
 
 instr TEST
-  prints "Testing Step 9 throw builtin\n"
+  prints "Testing Step 9 throw and try/catch\n"
   env:MalEnv = MalMkStep9Env()
 
   env = ASSERT_REP_ENV("(throw \"uncaught\")", \
@@ -70,6 +70,68 @@ instr TEST
     "throw: expected 1 arguments, got 0", env)
   env = ASSERT_REP_ENV("(throw 1 2)", \
     "throw: expected 1 arguments, got 2", env)
+
+  env = ASSERT_REP_ENV("(try* 123)", "123", env)
+  env = ASSERT_REP_ENV("(try* missing)", "'missing' not found", env)
+  env = ASSERT_REP_ENV("(try* 123 (catch* e 456))", "123", env)
+  env = ASSERT_REP_ENV("(try* missing (catch* e e))", \
+    "\"'missing' not found\"", env)
+  env = ASSERT_REP_ENV("(try* (nth () 1) (catch* e e))", \
+    "\"nth: index out of range\"", env)
+  env = ASSERT_REP_ENV( \
+    "(try* (throw \"my exception\") (catch* e e))", \
+    "\"my exception\"", env)
+  env = ASSERT_REP_ENV( \
+    "(try* (throw (list 1 2 3)) (catch* e e))", \
+    "(1 2 3)", env)
+  env = ASSERT_REP_ENV( \
+    "(try* (throw {:msg \"err2\"}) (catch* e e))", \
+    "{:msg \"err2\"}", env)
+  env = ASSERT_REP_ENV( \
+    "(try* (throw 7) (catch* e (+ e 1)))", "8", env)
+  env = ASSERT_REP_ENV( \
+    "((fn* (x) (try* (throw 2) (catch* e (+ x e)))) 3)", \
+    "5", env)
+  env = ASSERT_REP_ENV( \
+    "(try* (do (def! before-catch 9) (throw \"failed\")) (catch* e before-catch))", \
+    "9", env)
+  env = ASSERT_REP_ENV("before-catch", "9", env)
+
+  env = ASSERT_REP_ENV("(def! attempts (atom 0))", "(atom 0)", env)
+  env = ASSERT_REP_ENV( \
+    "(try* (do (swap! attempts + 1) (list 1)) (catch* e 0))", \
+    "(1)", env)
+  env = ASSERT_REP_ENV("(deref attempts)", "1", env)
+  env = ASSERT_REP_ENV("(reset! attempts 0)", "0", env)
+  env = ASSERT_REP_ENV( \
+    "(try* (do (swap! attempts + 1) (throw \"once\")) (catch* e (deref attempts)))", \
+    "1", env)
+
+  env = ASSERT_REP_ENV( \
+    "(try* (try* (throw \"e1\") (catch* e (throw \"e2\"))) (catch* e e))", \
+    "\"e2\"", env)
+  env = ASSERT_REP_ENV( \
+    "(try* (do (try* \"t1\" (catch* e \"c1\")) (throw \"e1\")) (catch* e \"c2\"))", \
+    "\"c2\"", env)
+  env = ASSERT_REP_ENV( \
+    "(try* (throw 7) (catch* caught caught))", "7", env)
+  env = ASSERT_REP_ENV("caught", "'caught' not found", env)
+
+  env = ASSERT_REP_ENV( \
+    "(def! try-countdown (fn* (n) (if (= n 0) 0 (try* (try-countdown (- n 1))))))", \
+    "#<function:fn*>", env)
+  env = ASSERT_REP_ENV("(try-countdown 2000)", "0", env)
+
+  env = ASSERT_REP_ENV("(try*)", \
+    "try*: expected 1 or 2 arguments, got 0", env)
+  env = ASSERT_REP_ENV("(try* 1 2 3)", \
+    "try*: expected 1 or 2 arguments, got 3", env)
+  env = ASSERT_REP_ENV("(try* missing nil)", \
+    "try*: second argument must be (catch* symbol handler)", env)
+  env = ASSERT_REP_ENV("(try* 1 (catch* e))", \
+    "try*: second argument must be (catch* symbol handler)", env)
+  env = ASSERT_REP_ENV("(try* 1 (catch* 2 3))", \
+    "catch*: binding must be a symbol", env)
 endin
 
 schedule("TEST", 0, 0)
