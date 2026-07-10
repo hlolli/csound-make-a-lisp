@@ -50,7 +50,7 @@ opcode ASSERT_THROW(input:S, expectedMessage:S, expectedPayload:S, \
 endop
 
 instr TEST
-  prints "Testing Step 9 throw, try/catch, apply, and map\n"
+  prints "Testing Step 9 core behavior\n"
   env:MalEnv = MalMkStep9Env()
 
   env = ASSERT_REP_ENV("(throw \"uncaught\")", \
@@ -217,6 +217,45 @@ instr TEST
   env = ASSERT_REP_ENV("(map str 1)", \
     "map: second argument must be list or vector", env)
   env = ASSERT_REP_ENV("(map 1 [2])", "cannot apply 1", env)
+
+  env = ASSERT_REP_ENV("(nil? nil)", "true", env)
+  env = ASSERT_REP_ENV("(nil? false)", "false", env)
+  env = ASSERT_REP_ENV("(nil? true)", "false", env)
+  env = ASSERT_REP_ENV("(nil? (list))", "false", env)
+  env = ASSERT_REP_ENV("(nil? 0)", "false", env)
+
+  env = ASSERT_REP_ENV("(true? true)", "true", env)
+  env = ASSERT_REP_ENV("(true? false)", "false", env)
+  env = ASSERT_REP_ENV("(true? nil)", "false", env)
+  env = ASSERT_REP_ENV("(true? 1)", "false", env)
+  env = ASSERT_REP_ENV("(true? true?)", "false", env)
+
+  env = ASSERT_REP_ENV("(false? false)", "true", env)
+  env = ASSERT_REP_ENV("(false? true)", "false", env)
+  env = ASSERT_REP_ENV("(false? nil)", "false", env)
+  env = ASSERT_REP_ENV("(false? \"\")", "false", env)
+  env = ASSERT_REP_ENV("(false? 0)", "false", env)
+  env = ASSERT_REP_ENV("(false? [])", "false", env)
+  env = ASSERT_REP_ENV("(false? {})", "false", env)
+
+  env = ASSERT_REP_ENV("(symbol? 'abc)", "true", env)
+  env = ASSERT_REP_ENV("(symbol? \"abc\")", "false", env)
+  env = ASSERT_REP_ENV("(symbol? :abc)", "false", env)
+  env = ASSERT_REP_ENV("(symbol? 1)", "false", env)
+
+  env = ASSERT_REP_ENV("(apply nil? (list nil))", "true", env)
+  env = ASSERT_REP_ENV( \
+    "(map symbol? (list 'abc 1 \"abc\"))", \
+    "(true false false)", env)
+
+  env = ASSERT_REP_ENV("(nil?)", \
+    "nil?: expected 1 arguments, got 0", env)
+  env = ASSERT_REP_ENV("(true? true false)", \
+    "true?: expected 1 arguments, got 2", env)
+  env = ASSERT_REP_ENV("(false?)", \
+    "false?: expected 1 arguments, got 0", env)
+  env = ASSERT_REP_ENV("(symbol? 'a 'b)", \
+    "symbol?: expected 1 arguments, got 2", env)
 endin
 
 schedule("TEST", 0, 0)

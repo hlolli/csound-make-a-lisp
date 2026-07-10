@@ -167,6 +167,18 @@ opcode MalArityError(name:S, expected:i, actual:i):MalValue
   xout result
 endop
 
+opcode MalApplyTypePredicate(fn:MalValue, args:MalValue, expectedType:i):MalValue
+  if (args.length != 1) then
+    result:MalValue = MalArityError(fn.string, 1, args.length)
+  else
+    value:MalValue = args.list[0]
+    matches:i = value.type == expectedType
+    result:MalValue = MalMkBool(matches)
+  endif
+
+  xout result
+endop
+
 opcode MalNumberComparison(name:S, left:i, right:i):i
   result:i = 0
 
@@ -321,6 +333,18 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
         result = MalMapSequence(targetFn, sequence)
       endif
     endif
+
+  elseif (strcmp(fn.string, "nil?") == 0) then
+    result = MalApplyTypePredicate(fn, args, $MAL_NIL_TYPE)
+
+  elseif (strcmp(fn.string, "true?") == 0) then
+    result = MalApplyTypePredicate(fn, args, $MAL_TRUE_TYPE)
+
+  elseif (strcmp(fn.string, "false?") == 0) then
+    result = MalApplyTypePredicate(fn, args, $MAL_FALSE_TYPE)
+
+  elseif (strcmp(fn.string, "symbol?") == 0) then
+    result = MalApplyTypePredicate(fn, args, $MAL_SYMBOL_TYPE)
 
   elseif (strcmp(fn.string, "list") == 0) then
     result = args
@@ -1548,6 +1572,10 @@ opcode MalMkStep9Env():MalEnv
   env = MalEnvSet(env, "throw", MalMkBuiltin("throw"))
   env = MalEnvSet(env, "apply", MalMkBuiltin("apply"))
   env = MalEnvSet(env, "map", MalMkBuiltin("map"))
+  env = MalEnvSet(env, "nil?", MalMkBuiltin("nil?"))
+  env = MalEnvSet(env, "true?", MalMkBuiltin("true?"))
+  env = MalEnvSet(env, "false?", MalMkBuiltin("false?"))
+  env = MalEnvSet(env, "symbol?", MalMkBuiltin("symbol?"))
   env = MalRefreshTopLevelFunctionClosures(env)
   xout env
 endop
