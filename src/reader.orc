@@ -1,5 +1,4 @@
-;; Csound's declare type order is reversed relative to typed opcode definitions.
-declare read_form(reader:MalReadResult):MalReader
+declare read_form(reader:MalReader):(MalReadResult)
 
 opcode isCharWordBoundry(char:i):i
   ires = 0

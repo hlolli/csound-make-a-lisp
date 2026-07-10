@@ -66,6 +66,24 @@ instr TEST
   env = ASSERT_REP_ENV("(inc1 7)", "8", env)
   env = ASSERT_REP_ENV("(inc2 7)", "9", env)
   env = ASSERT_REP_ENV("(inc3 9)", "12", env)
+  env = ASSERT_REP_ENV("(def! a (atom 2))", "(atom 2)", env)
+  env = ASSERT_REP_ENV("(atom? a)", "true", env)
+  env = ASSERT_REP_ENV("(atom? 1)", "false", env)
+  env = ASSERT_REP_ENV("(deref a)", "2", env)
+  env = ASSERT_REP_ENV("(reset! a 3)", "3", env)
+  env = ASSERT_REP_ENV("(deref a)", "3", env)
+  env = ASSERT_REP_ENV("(swap! a + 4)", "7", env)
+  env = ASSERT_REP_ENV("(deref a)", "7", env)
+  env = ASSERT_REP_ENV("(def! inc-it (fn* (n) (+ n 1)))", \
+    "#<function:fn*>", env)
+  env = ASSERT_REP_ENV("(def! bump (fn* () (swap! a inc-it)))", \
+    "#<function:fn*>", env)
+  env = ASSERT_REP_ENV("(bump)", "8", env)
+  env = ASSERT_REP_ENV("(bump)", "9", env)
+  env = ASSERT_REP_ENV("(def! retained (let* (cell (atom 0)) (fn* () (deref cell))))", \
+    "#<function:fn*>", env)
+  env = ASSERT_REP_ENV("(def! cell (atom 1))", "(atom 1)", env)
+  env = ASSERT_REP_ENV("(retained)", "0", env)
 
   atomValue:MalValue = MalMkString("first")
   atom:MalValue = MalMkAtom(atomValue)

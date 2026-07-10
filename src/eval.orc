@@ -1,5 +1,6 @@
 declare EVAL_ENV(result:MalValue, nextEnv:MalEnv):(MalValue, MalEnv)
-declare MalEquals(left:MalValue, right:MalValue):i
+declare MalEquals(left:MalValue, right:MalValue):(i)
+declare MalApply(fn:MalValue, args:MalValue):(MalValue)
 
 opcode MalApplyBuiltinOperator(fn:MalValue, args:MalValue):MalValue
   result:MalValue = MalMkValue($MAL_NUMBER_TYPE)
@@ -66,6 +67,27 @@ opcode MalIsTruthy(value:MalValue):i
     result = 0
   endif
 
+  xout result
+endop
+
+opcode MalIsSequential(value:MalValue):i
+  result:i = (value.type == $MAL_LIST_TYPE || \
+    value.type == $MAL_VECTOR_TYPE) ? 1 : 0
+  xout result
+endop
+
+opcode MalCopySequenceAs(value:MalValue, resultType:i):MalValue
+  values:MalValue[] init value.length
+
+  if (value.length > 0) then
+    for index in [0 ... value.length - 1] do
+      values[index] = value.list[index]
+    od
+  endif
+
+  result:MalValue = MalMkValue(resultType)
+  result.list = values
+  result.length = value.length
   xout result
 endop
 
@@ -195,6 +217,86 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
   if (strcmp(fn.string, "list") == 0) then
     result = args
 
+  elseif (strcmp(fn.string, "cons") == 0) then
+    if (args.length != 2) then
+      result = MalArityError(fn.string, 2, args.length)
+    else
+      first:MalValue = args.list[0]
+      sequence:MalValue = args.list[1]
+
+      if (MalIsSequential(sequence) == 0) then
+        result = MalMkError("cons: second argument must be list or vector")
+      else
+        resultLength:i = sequence.length + 1
+        values:MalValue[] init resultLength
+        values[0] = first
+
+        if (sequence.length > 0) then
+          for index in [0 ... sequence.length - 1] do
+            values[index + 1] = sequence.list[index]
+          od
+        endif
+
+        result = MalMkValue($MAL_LIST_TYPE)
+        result.list = values
+        result.length = resultLength
+      endif
+    endif
+
+  elseif (strcmp(fn.string, "concat") == 0) then
+    totalLength:i = 0
+    valid:i = 1
+
+    if (args.length > 0) then
+      for index in [0 ... args.length - 1] do
+        sequence:MalValue = args.list[index]
+
+        if (MalIsSequential(sequence) == 0) then
+          valid = 0
+          break
+        endif
+
+        totalLength += sequence.length
+      od
+    endif
+
+    if (valid == 0) then
+      result = MalMkError("concat: expected list or vector arguments")
+    else
+      values:MalValue[] init totalLength
+      destinationIndex:i = 0
+
+      if (args.length > 0) then
+        for sequenceIndex in [0 ... args.length - 1] do
+          sequence:MalValue = args.list[sequenceIndex]
+
+          if (sequence.length > 0) then
+            for valueIndex in [0 ... sequence.length - 1] do
+              values[destinationIndex] = sequence.list[valueIndex]
+              destinationIndex += 1
+            od
+          endif
+        od
+      endif
+
+      result = MalMkValue($MAL_LIST_TYPE)
+      result.list = values
+      result.length = totalLength
+    endif
+
+  elseif (strcmp(fn.string, "vec") == 0) then
+    if (args.length != 1) then
+      result = MalArityError(fn.string, 1, args.length)
+    else
+      sequence:MalValue = args.list[0]
+
+      if (MalIsSequential(sequence) == 0) then
+        result = MalMkError("vec: expected list or vector argument")
+      else
+        result = MalCopySequenceAs(sequence, $MAL_VECTOR_TYPE)
+      endif
+    endif
+
   elseif (strcmp(fn.string, "list?") == 0) then
     if (args.length != 1) then
       result = MalArityError(fn.string, 1, args.length)
@@ -267,6 +369,75 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
         result = MalMkError("slurp: expected string argument")
       else
         result = MalSlurpFile(value.string)
+      endif
+    endif
+
+  elseif (strcmp(fn.string, "atom") == 0) then
+    if (args.length != 1) then
+      result = MalArityError(fn.string, 1, args.length)
+    else
+      result = MalMkAtom(args.list[0])
+    endif
+
+  elseif (strcmp(fn.string, "atom?") == 0) then
+    if (args.length != 1) then
+      result = MalArityError(fn.string, 1, args.length)
+    else
+      value:MalValue = args.list[0]
+      result = MalMkBool(value.type == $MAL_ATOM_TYPE ? 1 : 0)
+    endif
+
+  elseif (strcmp(fn.string, "deref") == 0) then
+    if (args.length != 1) then
+      result = MalArityError(fn.string, 1, args.length)
+    else
+      atom:MalValue = args.list[0]
+
+      if (atom.type != $MAL_ATOM_TYPE) then
+        result = MalMkError("deref: expected atom argument")
+      else
+        result = MalAtomValue(atom)
+      endif
+    endif
+
+  elseif (strcmp(fn.string, "reset!") == 0) then
+    if (args.length != 2) then
+      result = MalArityError(fn.string, 2, args.length)
+    else
+      atom:MalValue = args.list[0]
+
+      if (atom.type != $MAL_ATOM_TYPE) then
+        result = MalMkError("reset!: first argument must be an atom")
+      else
+        value:MalValue = args.list[1]
+        result = MalAtomSetValue(atom, value)
+      endif
+    endif
+
+  elseif (strcmp(fn.string, "swap!") == 0) then
+    if (args.length < 2) then
+      result = MalMkError(sprintf("swap!: expected at least 2 arguments, got %d", \
+        args.length))
+    else
+      atom:MalValue = args.list[0]
+
+      if (atom.type != $MAL_ATOM_TYPE) then
+        result = MalMkError("swap!: first argument must be an atom")
+      else
+        applyFn:MalValue = args.list[1]
+        applyArgs:MalValue = MalMkValue($MAL_LIST_TYPE)
+        applyArgs = MalAppendValue(applyArgs, MalAtomValue(atom))
+
+        if (args.length > 2) then
+          for index in [2 ... args.length - 1] do
+            applyArgs = MalAppendValue(applyArgs, args.list[index])
+          od
+        endif
+
+        result = MalApply(applyFn, applyArgs)
+        if (result.type != $MAL_ERROR_TYPE) then
+          result = MalAtomSetValue(atom, result)
+        endif
       endif
     endif
 

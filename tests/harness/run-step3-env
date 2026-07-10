@@ -10,6 +10,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 CSOUND = os.environ.get("CSOUND", "csound")
+ENV_CONSTRUCTOR = os.environ.get("MAL_ENV_CONSTRUCTOR", "MalMkStep2Env")
 
 CSOUND_NOISE = (
     re.compile(r"^--Csound version "),
@@ -92,7 +93,7 @@ def build_orc(history):
             *strsets,
             "",
             "instr RUN",
-            "  env:MalEnv = MalMkStep2Env()",
+            f"  env:MalEnv = {ENV_CONSTRUCTOR}()",
             '  Sinput = ""',
             '  Sresult = ""',
             *eval_lines,
