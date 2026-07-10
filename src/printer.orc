@@ -184,6 +184,11 @@ opcode pr_str_unreadably(ast:MalValue):S
 
     case $MAL_FUNCTION_TYPE
       Sout = sprintf("%c<function:fn*>", 35)
+
+    case $MAL_ATOM_TYPE
+      Sout strcat Sout, "(atom "
+      Sout strcat Sout, pr_str_unreadably(MalAtomValue(ast))
+      Sout strcat Sout, ")"
   endsw
 
   xout(Sout)
@@ -274,6 +279,11 @@ opcode pr_str(ast:MalValue):S
 
     case $MAL_FUNCTION_TYPE
       Sout = sprintf("%c<function:fn*>", 35)
+
+    case $MAL_ATOM_TYPE
+      Sout strcat Sout, "(atom "
+      Sout strcat Sout, pr_str(MalAtomValue(ast))
+      Sout strcat Sout, ")"
   endsw
 
   xout(Sout)

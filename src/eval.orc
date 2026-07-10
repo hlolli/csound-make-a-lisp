@@ -180,6 +180,9 @@ opcode MalEquals(left:MalValue, right:MalValue):i
 
       case $MAL_FALSE_TYPE
         result = 1
+
+      case $MAL_ATOM_TYPE
+        result = left.number == right.number ? 1 : 0
     endsw
   endif
 

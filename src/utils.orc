@@ -40,6 +40,46 @@ opcode MalMkString(value:S):MalValue
   xout val
 endop
 
+opcode MalMkAtom(value:MalValue):MalValue
+  capacity:i = lenarray(malAtomValues)
+
+  if (malAtomCount >= capacity) then
+    preserved:MalValue[] init capacity
+
+    if (malAtomCount > 0) then
+      for index in [0 ... malAtomCount - 1] do
+        preserved[index] = malAtomValues[index]
+      od
+    endif
+
+    newCapacity:i = capacity == 0 ? 8 : capacity * 2
+    malAtomValues init newCapacity
+
+    if (malAtomCount > 0) then
+      for index in [0 ... malAtomCount - 1] do
+        malAtomValues[index] = preserved[index]
+      od
+    endif
+  endif
+
+  atomId:i = malAtomCount
+  malAtomCount += 1
+  malAtomValues[atomId] = value
+
+  val:MalValue = MalMkValue($MAL_ATOM_TYPE)
+  val.number = atomId
+  xout val
+endop
+
+opcode MalAtomValue(atom:MalValue):MalValue
+  xout malAtomValues[atom.number]
+endop
+
+opcode MalAtomSetValue(atom:MalValue, value:MalValue):MalValue
+  malAtomValues[atom.number] = value
+  xout value
+endop
+
 opcode MalMkBuiltin(name:S):MalValue
   val:MalValue = MalMkValue($MAL_BUILTIN_TYPE)
   val.string = name

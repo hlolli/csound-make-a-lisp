@@ -66,6 +66,30 @@ instr TEST
   env = ASSERT_REP_ENV("(inc1 7)", "8", env)
   env = ASSERT_REP_ENV("(inc2 7)", "9", env)
   env = ASSERT_REP_ENV("(inc3 9)", "12", env)
+
+  atomValue:MalValue = MalMkString("first")
+  atom:MalValue = MalMkAtom(atomValue)
+  atomAlias:MalValue = atom
+  updatedValue:MalValue = MalMkString("second")
+  ignored:MalValue = MalAtomSetValue(atomAlias, updatedValue)
+  otherAtom:MalValue = MalMkAtom(updatedValue)
+
+  for index in [0 ... 7] do
+    extraValue:MalValue = MalMkValue($MAL_NUMBER_TYPE)
+    extraValue.number = index
+    extraAtom:MalValue = MalMkAtom(extraValue)
+  od
+
+  if (atom.type != $MAL_ATOM_TYPE || MalEquals(atom, atomAlias) == 0 || \
+      MalEquals(atom, otherAtom) == 1 || \
+      strcmp(pr_str(atom), "(atom \"second\")") != 0 || \
+      strcmp(pr_str_unreadably(atom), "(atom second)") != 0) then
+    prints "STEP6 atom representation, Assertion failed: got '%s'\n", \
+      pr_str(atom)
+    exitnow(1)
+  else
+    prints "STEP6 atom representation, Assertion success\n"
+  endif
 endin
 
 schedule("TEST", 0, 0)
