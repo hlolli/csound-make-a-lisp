@@ -37,6 +37,10 @@ instr TEST
   prints "Testing Step 8 macro definition and expansion\n"
   env:MalEnv = MalMkStep8Env()
 
+  env = ASSERT_REP_ENV("(defmacro! one (fn* () 1))", \
+    "#<function:fn*>", env)
+  env = ASSERT_REP_ENV("(one)", "1", env)
+
   env = ASSERT_REP_ENV("(macro? cond)", "true", env)
   env = ASSERT_REP_ENV("(cond)", "nil", env)
   env = ASSERT_REP_ENV("(cond true 7)", "7", env)
@@ -75,10 +79,26 @@ instr TEST
     "#<function:fn*>", env)
   env = ASSERT_REP_ENV("(quote-argument (+ 1 2))", "(+ 1 2)", env)
 
+  env = ASSERT_REP_ENV("(nth (list 1 2 nil) 2)", "nil", env)
+  env = ASSERT_REP_ENV("(nth [1 2] 1)", "2", env)
+  env = ASSERT_REP_ENV("(first nil)", "nil", env)
+  env = ASSERT_REP_ENV("(first (list 6 7))", "6", env)
+  env = ASSERT_REP_ENV("(rest (list))", "()", env)
+  env = ASSERT_REP_ENV("(rest [10 11 12])", "(11 12)", env)
+
   env = ASSERT_REP_ENV( \
     "(defmacro! expand-countdown (fn* (n) (if (= n 0) 0 (list 'expand-countdown (- n 1)))))", \
     "#<function:fn*>", env)
   env = ASSERT_REP_ENV("(expand-countdown 2000)", "0", env)
+
+  env = ASSERT_REP_ENV( \
+    "(let* (m (defmacro! returned-macro (fn* () 1))) (macro? m))", \
+    "true", env)
+
+  env = ASSERT_REP_ENV("(def! debug-condition true)", "true", env)
+  env = ASSERT_REP_ENV( \
+    "(let* (DEBUG-EVAL true) (unless debug-condition missing (- 4 3)))", \
+    "1", env)
 
   env = ASSERT_REP_ENV("(defmacro!)", \
     "defmacro!: expected 2 arguments, got 0", env)
