@@ -232,7 +232,14 @@ endop
 opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
   result:MalValue = MalMkValue($MAL_NIL_TYPE)
 
-  if (strcmp(fn.string, "list") == 0) then
+  if (strcmp(fn.string, "throw") == 0) then
+    if (args.length != 1) then
+      result = MalArityError(fn.string, 1, args.length)
+    else
+      result = MalMkThrown(args.list[0])
+    endif
+
+  elseif (strcmp(fn.string, "list") == 0) then
     result = args
 
   elseif (strcmp(fn.string, "cons") == 0) then
@@ -1398,5 +1405,12 @@ opcode MalMkStep8Env():MalEnv
     prints "cond bootstrap failed: %s\n", result.string
   endif
 
+  xout env
+endop
+
+opcode MalMkStep9Env():MalEnv
+  env:MalEnv = MalMkStep8Env()
+  env = MalEnvSet(env, "throw", MalMkBuiltin("throw"))
+  env = MalRefreshTopLevelFunctionClosures(env)
   xout env
 endop

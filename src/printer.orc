@@ -1,4 +1,3 @@
-declare pr_str(ast:MalValue):(S)
 declare pr_str_unreadably(ast:MalValue):(S)
 
 opcode MalEscapeStringForPrint(input:S):S
