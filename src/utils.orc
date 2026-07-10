@@ -34,6 +34,12 @@ opcode MalMkSymbol(name:S):MalValue
   xout val
 endop
 
+opcode MalMkString(value:S):MalValue
+  val:MalValue = MalMkValue($MAL_STRING_TYPE)
+  val.string = value
+  xout val
+endop
+
 opcode MalMkBuiltin(name:S):MalValue
   val:MalValue = MalMkValue($MAL_BUILTIN_TYPE)
   val.string = name

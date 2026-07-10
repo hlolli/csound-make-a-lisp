@@ -111,6 +111,24 @@ opcode MalApplyNumericComparison(fn:MalValue, args:MalValue):MalValue
   xout result
 endop
 
+opcode MalSlurpFile(filename:S):MalValue
+  result:MalValue = MalMkString("")
+  content:S = ""
+  line:S = ""
+  lineNumber:i = 0
+
+read_line:
+  line, lineNumber readfi filename
+
+  if (lineNumber != -1) then
+    content strcat content, line
+    igoto read_line
+  endif
+
+  result.string = content
+  xout result
+endop
+
 opcode MalEquals(left:MalValue, right:MalValue):i
   result:i = 0
   leftIsSequence:i = 0
@@ -209,6 +227,43 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
         result.number = value.length
       else
         result = MalMkError("count: expected sequence or nil")
+      endif
+    endif
+
+  elseif (strcmp(fn.string, "str") == 0) then
+    output:S = ""
+
+    if (args.length > 0) then
+      for index in [0 ... args.length - 1] do
+        output strcat output, pr_str_with_readability(args.list[index], 0)
+      od
+    endif
+
+    result = MalMkString(output)
+
+  elseif (strcmp(fn.string, "read-string") == 0) then
+    if (args.length != 1) then
+      result = MalArityError(fn.string, 1, args.length)
+    else
+      value:MalValue = args.list[0]
+
+      if (value.type != $MAL_STRING_TYPE) then
+        result = MalMkError("read-string: expected string argument")
+      else
+        result = read_str(value.string)
+      endif
+    endif
+
+  elseif (strcmp(fn.string, "slurp") == 0) then
+    if (args.length != 1) then
+      result = MalArityError(fn.string, 1, args.length)
+    else
+      value:MalValue = args.list[0]
+
+      if (value.type != $MAL_STRING_TYPE) then
+        result = MalMkError("slurp: expected string argument")
+      else
+        result = MalSlurpFile(value.string)
       endif
     endif
 
