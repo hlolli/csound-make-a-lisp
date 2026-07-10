@@ -34,13 +34,15 @@ opcode ASSERT_REP_ENV(input:S, expected:S, env:MalEnv):MalEnv
 endop
 
 instr TEST
-  prints "Testing Step 8 defmacro! special form\n"
+  prints "Testing Step 8 macro definition and expansion\n"
   env:MalEnv = MalMkStep6Env()
 
   env = ASSERT_REP_ENV( \
     "(defmacro! unless (fn* (pred a b) `(if ~pred ~b ~a)))", \
     "#<function:fn*>", env)
   env = ASSERT_REP_ENV("(macro? unless)", "true", env)
+  env = ASSERT_REP_ENV("(unless false 7 missing)", "7", env)
+  env = ASSERT_REP_ENV("(unless true missing 8)", "8", env)
 
   env = ASSERT_REP_ENV("(def! identity (fn* (x) x))", \
     "#<function:fn*>", env)
@@ -48,6 +50,13 @@ instr TEST
     "#<function:fn*>", env)
   env = ASSERT_REP_ENV("(macro? identity-macro)", "true", env)
   env = ASSERT_REP_ENV("(macro? identity)", "false", env)
+  env = ASSERT_REP_ENV("(identity (+ 2 3))", "5", env)
+  env = ASSERT_REP_ENV("(let* (a 123) (identity-macro a))", "123", env)
+
+  env = ASSERT_REP_ENV( \
+    "(defmacro! quote-argument (fn* (x) (list 'quote x)))", \
+    "#<function:fn*>", env)
+  env = ASSERT_REP_ENV("(quote-argument (+ 1 2))", "(+ 1 2)", env)
 
   env = ASSERT_REP_ENV("(defmacro!)", \
     "defmacro!: expected 2 arguments, got 0", env)

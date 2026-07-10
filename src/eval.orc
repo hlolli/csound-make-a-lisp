@@ -685,6 +685,18 @@ opcode MalEvalSequenceEnv(ast:MalValue, env:MalEnv, startIndex:i, resultType:i):
   xout result, currentEnv
 endop
 
+opcode MalUnevaluatedArgs(ast:MalValue):MalValue
+  result:MalValue = MalMkValue($MAL_LIST_TYPE)
+
+  if (ast.length > 1) then
+    for index in [1 ... ast.length - 1] do
+      result = MalAppendValue(result, ast.list[index])
+    od
+  endif
+
+  xout result
+endop
+
 opcode MalEvalHashMapEnv(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   result:MalValue = MalMkValue($MAL_HASH_MAP_TYPE)
   currentEnv:MalEnv = env
@@ -1259,8 +1271,7 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
         endif
 
       else
-        evaluatedList:MalValue = MalMkValue($MAL_NIL_TYPE)
-        evaluatedList, evalEnv = MalEvalAstEnv(workAst, evalEnv)
+        fn:MalValue, evalEnv = EVAL_ENV(head, evalEnv)
 
         if (preserveReturnEnv == 0) then
           returnEnv = evalEnv
@@ -1268,21 +1279,33 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
           returnEnv = MalEnvRoot(evalEnv)
         endif
 
-        if (evaluatedList.type == $MAL_ERROR_TYPE) then
-          result = evaluatedList
+        if (fn.type == $MAL_ERROR_TYPE) then
+          result = fn
           done = 1
-        else
-          fn:MalValue = evaluatedList.list[0]
-          args:MalValue = MalMkValue($MAL_LIST_TYPE)
+        elseif (MalIsMacro(fn) == 1) then
+          rawArgs:MalValue = MalUnevaluatedArgs(workAst)
+          expansion:MalValue = MalApply(fn, rawArgs)
 
-          if (evaluatedList.length > 1) then
-            for argIndex in [1 ... evaluatedList.length - 1] do
-              arg:MalValue = evaluatedList.list[argIndex]
-              args = MalAppendValue(args, arg)
-            od
+          if (expansion.type == $MAL_ERROR_TYPE) then
+            result = expansion
+            done = 1
+          else
+            workAst = expansion
+          endif
+        else
+          args:MalValue, evalEnv = MalEvalSequenceEnv( \
+            workAst, evalEnv, 1, $MAL_LIST_TYPE)
+
+          if (preserveReturnEnv == 0) then
+            returnEnv = evalEnv
+          elseif (preserveReturnEnv == 1) then
+            returnEnv = MalEnvRoot(evalEnv)
           endif
 
-          if (fn.type == $MAL_BUILTIN_TYPE && strcmp(fn.string, "eval") == 0) then
+          if (args.type == $MAL_ERROR_TYPE) then
+            result = args
+            done = 1
+          elseif (fn.type == $MAL_BUILTIN_TYPE && strcmp(fn.string, "eval") == 0) then
             if (args.length != 1) then
               result = MalArityError(fn.string, 1, args.length)
               done = 1
