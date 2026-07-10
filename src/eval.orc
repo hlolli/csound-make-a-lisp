@@ -850,25 +850,31 @@ opcode MalRefreshTopLevelFunctionClosures(env:MalEnv):MalEnv
   xout env
 endop
 
-opcode MalEvalDef(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
+opcode MalEvalDefinition(ast:MalValue, env:MalEnv, name:S, asMacro:i):(MalValue, MalEnv)
   result:MalValue = MalMkValue($MAL_NIL_TYPE)
   currentEnv:MalEnv = env
 
   if (ast.length != 3) then
-    result = MalMkError(sprintf("def!: expected 2 arguments, got %d", \
-      ast.length - 1))
+    result = MalMkError(sprintf("%s: expected 2 arguments, got %d", \
+      name, ast.length - 1))
   else
     symbol:MalValue = ast.list[1]
     valueForm:MalValue = ast.list[2]
 
     if (symbol.type != $MAL_SYMBOL_TYPE) then
-      result = MalMkError("def!: first argument must be a symbol")
+      result = MalMkError(sprintf("%s: first argument must be a symbol", name))
     else
       value:MalValue, currentEnv = EVAL_ENV(valueForm, currentEnv)
 
       if (value.type == $MAL_ERROR_TYPE) then
         result = value
+      elseif (asMacro == 1 && value.type != $MAL_FUNCTION_TYPE) then
+        result = MalMkError(sprintf("%s: value must be a function", name))
       else
+        if (asMacro == 1) then
+          value = MalFunctionAsMacro(value)
+        endif
+
         currentEnv = MalEnvSet(currentEnv, symbol.string, value)
 
         if (MalIsFnForm(valueForm) == 1) then
@@ -883,6 +889,18 @@ opcode MalEvalDef(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
     endif
   endif
 
+  xout result, currentEnv
+endop
+
+opcode MalEvalDef(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
+  result:MalValue, currentEnv:MalEnv = \
+    MalEvalDefinition(ast, env, "def!", 0)
+  xout result, currentEnv
+endop
+
+opcode MalEvalDefMacro(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
+  result:MalValue, currentEnv:MalEnv = \
+    MalEvalDefinition(ast, env, "defmacro!", 1)
   xout result, currentEnv
 endop
 
@@ -1092,6 +1110,13 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
 
       elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "def!") == 0) then
         result, evalEnv = MalEvalDef(workAst, evalEnv)
+        if (preserveReturnEnv == 0) then
+          returnEnv = evalEnv
+        endif
+        done = 1
+
+      elseif (MalIsSymbolNamed(head, "defmacro!") == 1) then
+        result, evalEnv = MalEvalDefMacro(workAst, evalEnv)
         if (preserveReturnEnv == 0) then
           returnEnv = evalEnv
         endif
