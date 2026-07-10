@@ -1,0 +1,2 @@
+#!/usr/bin/env sh
+MAL_ENV_CONSTRUCTOR=MalMkStep9Env exec "$(dirname "$0")/run-step3-env"

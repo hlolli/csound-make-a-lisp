@@ -256,6 +256,78 @@ instr TEST
     "false?: expected 1 arguments, got 0", env)
   env = ASSERT_REP_ENV("(symbol? 'a 'b)", \
     "symbol?: expected 1 arguments, got 2", env)
+
+  prints "Testing Step 9 collection core functions\n"
+
+  env = ASSERT_REP_ENV("(symbol \"abc\")", "abc", env)
+  env = ASSERT_REP_ENV("(keyword \"abc\")", ":abc", env)
+  env = ASSERT_REP_ENV("(keyword :abc)", ":abc", env)
+  env = ASSERT_REP_ENV("(keyword? :abc)", "true", env)
+  env = ASSERT_REP_ENV("(keyword? \"abc\")", "false", env)
+
+  env = ASSERT_REP_ENV("(vector 1 2 3)", "[1 2 3]", env)
+  env = ASSERT_REP_ENV("(vector? [])", "true", env)
+  env = ASSERT_REP_ENV("(vector? '(1 2))", "false", env)
+  env = ASSERT_REP_ENV("(sequential? [1])", "true", env)
+  env = ASSERT_REP_ENV("(sequential? (list 1))", "true", env)
+  env = ASSERT_REP_ENV("(sequential? {})", "false", env)
+
+  env = ASSERT_REP_ENV("(hash-map :a 1 :a 2)", "{:a 2}", env)
+  env = ASSERT_REP_ENV("(map? {})", "true", env)
+  env = ASSERT_REP_ENV("(map? [])", "false", env)
+  env = ASSERT_REP_ENV("(count {:a 1 :b 2})", "2", env)
+
+  env = ASSERT_REP_ENV("(def! source-map {:a 1 :b 2})", \
+    "{:a 1 :b 2}", env)
+  env = ASSERT_REP_ENV("(assoc source-map :a 3 :c 4)", \
+    "{:a 3 :b 2 :c 4}", env)
+  env = ASSERT_REP_ENV("source-map", "{:a 1 :b 2}", env)
+  env = ASSERT_REP_ENV("(dissoc source-map :a :missing)", \
+    "{:b 2}", env)
+  env = ASSERT_REP_ENV("source-map", "{:a 1 :b 2}", env)
+
+  env = ASSERT_REP_ENV("(get source-map :a)", "1", env)
+  env = ASSERT_REP_ENV("(get source-map :missing)", "nil", env)
+  env = ASSERT_REP_ENV("(get nil :missing)", "nil", env)
+  env = ASSERT_REP_ENV("(contains? source-map :b)", "true", env)
+  env = ASSERT_REP_ENV("(contains? source-map :missing)", "false", env)
+  env = ASSERT_REP_ENV("(keys source-map)", "(:a :b)", env)
+  env = ASSERT_REP_ENV("(vals source-map)", "(1 2)", env)
+  env = ASSERT_REP_ENV("(keys {})", "()", env)
+  env = ASSERT_REP_ENV("(vals {})", "()", env)
+
+  env = ASSERT_REP_ENV("(= {:a 1 :b [2 3]} {:b (list 2 3) :a 1})", \
+    "true", env)
+  env = ASSERT_REP_ENV("(= {:a {:b 2}} {:a {:b 2}})", \
+    "true", env)
+  env = ASSERT_REP_ENV("(= {:a 1} {:a 2})", "false", env)
+  env = ASSERT_REP_ENV("(= {:a 1} {:a 1 :b 2})", "false", env)
+  env = ASSERT_REP_ENV("(get {\"abc\" 1 :abc 2} \"abc\")", "1", env)
+  env = ASSERT_REP_ENV("(get {\"abc\" 1 :abc 2} :abc)", "2", env)
+  env = ASSERT_REP_ENV("(keys {:a 1 :a 2})", "(:a)", env)
+  env = ASSERT_REP_ENV("(pr-str true false nil :key 'sym)", \
+    "\"true false nil :key sym\"", env)
+
+  env = ASSERT_REP_ENV("(symbol 1)", \
+    "symbol: expected string argument", env)
+  env = ASSERT_REP_ENV("(keyword 1)", \
+    "keyword: expected string or keyword argument", env)
+  env = ASSERT_REP_ENV("(hash-map :a)", \
+    "hash-map: expected even number of arguments", env)
+  env = ASSERT_REP_ENV("(assoc {} :a)", \
+    "assoc: expected key/value pairs", env)
+  env = ASSERT_REP_ENV("(assoc [] :a 1)", \
+    "assoc: first argument must be a hash map", env)
+  env = ASSERT_REP_ENV("(dissoc [])", \
+    "dissoc: first argument must be a hash map", env)
+  env = ASSERT_REP_ENV("(get [] :a)", \
+    "get: first argument must be a hash map or nil", env)
+  env = ASSERT_REP_ENV("(contains? [] :a)", \
+    "contains?: first argument must be a hash map", env)
+  env = ASSERT_REP_ENV("(keys [])", \
+    "keys: expected hash map argument", env)
+  env = ASSERT_REP_ENV("(vals [])", \
+    "vals: expected hash map argument", env)
 endin
 
 schedule("TEST", 0, 0)
