@@ -40,6 +40,173 @@ opcode MalMkString(value:S):MalValue
   xout val
 endop
 
+opcode MalMkKeyword(name:S):MalValue
+  val:MalValue = MalMkValue($MAL_KEYWORD_TYPE)
+  val.string = name
+  xout val
+endop
+
+opcode MalMapKeysEqual(left:MalValue, right:MalValue):i
+  result:i = 0
+
+  if (left.type == right.type) then
+    switch left.type
+      case $MAL_STRING_TYPE
+        result = strcmp(left.string, right.string) == 0
+
+      case $MAL_KEYWORD_TYPE
+        result = strcmp(left.string, right.string) == 0
+
+      case $MAL_SYMBOL_TYPE
+        result = strcmp(left.string, right.string) == 0
+
+      case $MAL_NUMBER_TYPE
+        result = left.number == right.number
+
+      case $MAL_NIL_TYPE
+        result = 1
+
+      case $MAL_TRUE_TYPE
+        result = 1
+
+      case $MAL_FALSE_TYPE
+        result = 1
+
+      case $MAL_ATOM_TYPE
+        result = left.number == right.number
+    endsw
+  endif
+
+  xout result
+endop
+
+opcode MalMapFindKey(mapValue:MalValue, key:MalValue):i
+  result:i = -1
+  entryCount:i = int(mapValue.length / 2)
+
+  if (entryCount > 0) then
+    for entryIndex in [0 ... entryCount - 1] do
+      keyIndex:i = entryIndex * 2
+
+      if (MalMapKeysEqual(mapValue.list[keyIndex], key) == 1) then
+        result = keyIndex
+        break
+      endif
+    od
+  endif
+
+  xout result
+endop
+
+opcode MalMapAssoc(mapValue:MalValue, key:MalValue, value:MalValue):MalValue
+  keyIndex:i = MalMapFindKey(mapValue, key)
+  newLength:i = mapValue.length + (keyIndex < 0 ? 2 : 0)
+  entries:MalValue[] init newLength
+
+  if (mapValue.length > 0) then
+    for index in [0 ... mapValue.length - 1] do
+      entries[index] = mapValue.list[index]
+    od
+  endif
+
+  if (keyIndex < 0) then
+    entries[mapValue.length] = key
+    entries[mapValue.length + 1] = value
+  else
+    entries[keyIndex + 1] = value
+  endif
+
+  result:MalValue = MalMkValue($MAL_HASH_MAP_TYPE)
+  result.list = entries
+  result.length = newLength
+  xout result
+endop
+
+opcode MalMapDissoc(mapValue:MalValue, key:MalValue):MalValue
+  keyIndex:i = MalMapFindKey(mapValue, key)
+
+  if (keyIndex < 0) then
+    result:MalValue = mapValue
+  else
+    newLength:i = mapValue.length - 2
+    entries:MalValue[] init newLength
+    destination:i = 0
+
+    if (mapValue.length > 2) then
+      for index in [0 ... mapValue.length - 1] do
+        if (index != keyIndex && index != keyIndex + 1) then
+          entries[destination] = mapValue.list[index]
+          destination += 1
+        endif
+      od
+    endif
+
+    result:MalValue = MalMkValue($MAL_HASH_MAP_TYPE)
+    result.list = entries
+    result.length = newLength
+  endif
+
+  xout result
+endop
+
+opcode MalMapGet(mapValue:MalValue, key:MalValue):MalValue
+  keyIndex:i = MalMapFindKey(mapValue, key)
+
+  if (keyIndex < 0) then
+    result:MalValue = MalMkValue($MAL_NIL_TYPE)
+  else
+    result:MalValue = mapValue.list[keyIndex + 1]
+  endif
+
+  xout result
+endop
+
+opcode MalMapKeys(mapValue:MalValue):MalValue
+  entryCount:i = int(mapValue.length / 2)
+  values:MalValue[] init entryCount
+
+  if (entryCount > 0) then
+    for index in [0 ... entryCount - 1] do
+      values[index] = mapValue.list[index * 2]
+    od
+  endif
+
+  result:MalValue = MalMkValue($MAL_LIST_TYPE)
+  result.list = values
+  result.length = entryCount
+  xout result
+endop
+
+opcode MalMapValues(mapValue:MalValue):MalValue
+  entryCount:i = int(mapValue.length / 2)
+  values:MalValue[] init entryCount
+
+  if (entryCount > 0) then
+    for index in [0 ... entryCount - 1] do
+      values[index] = mapValue.list[index * 2 + 1]
+    od
+  endif
+
+  result:MalValue = MalMkValue($MAL_LIST_TYPE)
+  result.list = values
+  result.length = entryCount
+  xout result
+endop
+
+opcode MalNormalizeMap(mapValue:MalValue):MalValue
+  result:MalValue = MalMkValue($MAL_HASH_MAP_TYPE)
+
+  if (mapValue.length > 0) then
+    for index in [0 ... int(mapValue.length / 2) - 1] do
+      keyIndex:i = index * 2
+      result = MalMapAssoc( \
+        result, mapValue.list[keyIndex], mapValue.list[keyIndex + 1])
+    od
+  endif
+
+  xout result
+endop
+
 opcode MalMkAtom(value:MalValue):MalValue
   capacity:i = lenarray(malAtomValues)
 
