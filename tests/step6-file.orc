@@ -43,7 +43,7 @@ endop
 
 instr TEST
   prints "Testing Step 6 file and reader builtins\n"
-  env:MalEnv = MalMkStep2Env()
+  env:MalEnv = MalMkStep6Env()
 
   env = ASSERT_REP_ENV("(read-string \"(+ 2 3)\")", "(+ 2 3)", env)
   env = ASSERT_REP_ENV("(read-string \"(1 2 (3 4) nil)\")", \
@@ -62,6 +62,10 @@ instr TEST
   env = ASSERT_REP_ENV("aa", "7", env)
   env = ASSERT_REP_ENV("(def! a 1)", "1", env)
   env = ASSERT_REP_ENV("(let* (a 2) (eval (read-string \"a\")))", "1", env)
+  env = ASSERT_REP_ENV("(load-file \"mal/tests/inc.mal\")", "nil", env)
+  env = ASSERT_REP_ENV("(inc1 7)", "8", env)
+  env = ASSERT_REP_ENV("(inc2 7)", "9", env)
+  env = ASSERT_REP_ENV("(inc3 9)", "12", env)
 endin
 
 schedule("TEST", 0, 0)

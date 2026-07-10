@@ -947,3 +947,28 @@ opcode EVAL(ast:MalValue, env:MalEnv):MalValue
   result:MalValue, updatedEnv:MalEnv = EVAL_ENV(ast, env)
   xout result
 endop
+
+opcode MalEvalSourceEnv(source:S, env:MalEnv):(MalValue, MalEnv)
+  ast:MalValue = read_str(source)
+  currentEnv:MalEnv = env
+
+  if (ast.type == $MAL_ERROR_TYPE) then
+    result:MalValue = ast
+  else
+    result, currentEnv = EVAL_ENV(ast, currentEnv)
+  endif
+
+  xout result, currentEnv
+endop
+
+opcode MalMkStep6Env():MalEnv
+  env:MalEnv = MalMkStep2Env()
+  source:S = "(def! load-file (fn* (f) (eval (read-string (str \"(do \" (slurp f) \"\\nnil)\")))))"
+  result:MalValue, env = MalEvalSourceEnv(source, env)
+
+  if (result.type == $MAL_ERROR_TYPE) then
+    prints "load-file bootstrap failed: %s\n", result.string
+  endif
+
+  xout env
+endop
