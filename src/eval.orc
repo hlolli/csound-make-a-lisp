@@ -109,6 +109,30 @@ opcode MalCopySequenceAs(value:MalValue, resultType:i):MalValue
   xout result
 endop
 
+opcode MalFlattenApplyArgs(args:MalValue):MalValue
+  finalSequence:MalValue = args.list[args.length - 1]
+  prefixLength:i = args.length - 2
+  flattenedLength:i = prefixLength + finalSequence.length
+  values:MalValue[] init flattenedLength
+
+  if (prefixLength > 0) then
+    for index in [0 ... prefixLength - 1] do
+      values[index] = args.list[index + 1]
+    od
+  endif
+
+  if (finalSequence.length > 0) then
+    for index in [0 ... finalSequence.length - 1] do
+      values[prefixLength + index] = finalSequence.list[index]
+    od
+  endif
+
+  result:MalValue = MalMkValue($MAL_LIST_TYPE)
+  result.list = values
+  result.length = flattenedLength
+  xout result
+endop
+
 opcode MalArityError(name:S, expected:i, actual:i):MalValue
   result:MalValue = MalMkError(sprintf("%s: expected %d arguments, got %d", \
     name, expected, actual))
@@ -237,6 +261,23 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
       result = MalArityError(fn.string, 1, args.length)
     else
       result = MalMkThrown(args.list[0])
+    endif
+
+  elseif (strcmp(fn.string, "apply") == 0) then
+    if (args.length < 2) then
+      result = MalMkError(sprintf( \
+        "apply: expected at least 2 arguments, got %d", args.length))
+    else
+      targetFn:MalValue = args.list[0]
+      finalSequence:MalValue = args.list[args.length - 1]
+
+      if (MalIsSequential(finalSequence) == 0) then
+        result = MalMkError( \
+          "apply: final argument must be list or vector")
+      else
+        flattenedArgs:MalValue = MalFlattenApplyArgs(args)
+        result = MalApply(targetFn, flattenedArgs)
+      endif
     endif
 
   elseif (strcmp(fn.string, "list") == 0) then
@@ -1463,6 +1504,7 @@ endop
 opcode MalMkStep9Env():MalEnv
   env:MalEnv = MalMkStep8Env()
   env = MalEnvSet(env, "throw", MalMkBuiltin("throw"))
+  env = MalEnvSet(env, "apply", MalMkBuiltin("apply"))
   env = MalRefreshTopLevelFunctionClosures(env)
   xout env
 endop

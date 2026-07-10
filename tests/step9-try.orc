@@ -50,7 +50,7 @@ opcode ASSERT_THROW(input:S, expectedMessage:S, expectedPayload:S, \
 endop
 
 instr TEST
-  prints "Testing Step 9 throw and try/catch\n"
+  prints "Testing Step 9 throw, try/catch, and apply\n"
   env:MalEnv = MalMkStep9Env()
 
   env = ASSERT_REP_ENV("(throw \"uncaught\")", \
@@ -132,6 +132,50 @@ instr TEST
     "try*: second argument must be (catch* symbol handler)", env)
   env = ASSERT_REP_ENV("(try* 1 (catch* 2 3))", \
     "catch*: binding must be a symbol", env)
+
+  env = ASSERT_REP_ENV("(apply + (list 2 3))", "5", env)
+  env = ASSERT_REP_ENV("(apply + 4 (list 5))", "9", env)
+  env = ASSERT_REP_ENV("(apply + 4 [5])", "9", env)
+  env = ASSERT_REP_ENV("(apply list (list))", "()", env)
+  env = ASSERT_REP_ENV("(apply list 1 [])", "(1)", env)
+  env = ASSERT_REP_ENV( \
+    "(apply list 1 2 [3 4])", "(1 2 3 4)", env)
+
+  env = ASSERT_REP_ENV("(def! apply-source [3 4])", "[3 4]", env)
+  env = ASSERT_REP_ENV( \
+    "(apply list 1 2 apply-source)", "(1 2 3 4)", env)
+  env = ASSERT_REP_ENV("apply-source", "[3 4]", env)
+
+  env = ASSERT_REP_ENV( \
+    "(apply (fn* (a b) (+ a b)) (list 2 3))", "5", env)
+  env = ASSERT_REP_ENV( \
+    "(apply (fn* (a b) (+ a b)) 4 [5])", "9", env)
+  env = ASSERT_REP_ENV( \
+    "(apply (fn* (& more) (list? more)) [1 2 3])", "true", env)
+
+  env = ASSERT_REP_ENV( \
+    "(defmacro! add-macro (fn* (a b) (+ a b)))", \
+    "#<function:fn*>", env)
+  env = ASSERT_REP_ENV("(apply add-macro (list 2 3))", "5", env)
+  env = ASSERT_REP_ENV("(apply add-macro 4 [5])", "9", env)
+  env = ASSERT_REP_ENV( \
+    "(defmacro! ast-macro (fn* (a b) (list '+ a b)))", \
+    "#<function:fn*>", env)
+  env = ASSERT_REP_ENV("(ast-macro 2 3)", "5", env)
+  env = ASSERT_REP_ENV( \
+    "(apply ast-macro (list 2 3))", "(+ 2 3)", env)
+
+  env = ASSERT_REP_ENV( \
+    "(try* (apply throw (list \"from apply\")) (catch* e e))", \
+    "\"from apply\"", env)
+  env = ASSERT_REP_ENV("(apply)", \
+    "apply: expected at least 2 arguments, got 0", env)
+  env = ASSERT_REP_ENV("(apply +)", \
+    "apply: expected at least 2 arguments, got 1", env)
+  env = ASSERT_REP_ENV("(apply + 1)", \
+    "apply: final argument must be list or vector", env)
+  env = ASSERT_REP_ENV("(apply 1 (list 2))", \
+    "cannot apply 1", env)
 endin
 
 schedule("TEST", 0, 0)
