@@ -33,6 +33,21 @@ opcode ASSERT_REP_ENV(input:S, expected:S, env:MalEnv):MalEnv
   xout updatedEnv
 endop
 
+opcode ASSERT_FORM(input:S, name:S, expected:i):i
+  ast:MalValue = read_str(input)
+  actual:i = MalIsForm(ast, name)
+
+  if (actual == expected) then
+    prints "STEP7 MalIsForm %s as %s, Assertion success\n", input, name
+  else
+    prints "STEP7 MalIsForm %s as %s, Assertion failed: expected %d, got %d\n", \
+      input, name, expected, actual
+    exitnow(1)
+  endif
+
+  xout actual
+endop
+
 instr TEST
   prints "Testing Step 7 immutable sequence builtins\n"
   env:MalEnv = MalMkStep6Env()
@@ -72,6 +87,29 @@ instr TEST
     "concat: expected list or vector arguments", env)
   env = ASSERT_REP_ENV("(vec 1)", \
     "vec: expected list or vector argument", env)
+
+  formCheck:i = ASSERT_FORM("(unquote value)", "unquote", 1)
+  formCheck = ASSERT_FORM("(splice-unquote values)", "splice-unquote", 1)
+  formCheck = ASSERT_FORM("(quote value)", "unquote", 0)
+  formCheck = ASSERT_FORM("[unquote value]", "unquote", 0)
+  formCheck = ASSERT_FORM("()", "unquote", 0)
+  formCheck = ASSERT_FORM("unquote", "unquote", 0)
+  formCheck = ASSERT_FORM("(1 value)", "unquote", 0)
+
+  env = ASSERT_REP_ENV("(quote 7)", "7", env)
+  env = ASSERT_REP_ENV("(quote abc)", "abc", env)
+  env = ASSERT_REP_ENV("(quote (1 2 3))", "(1 2 3)", env)
+  env = ASSERT_REP_ENV("(quote (1 2 (3 4)))", "(1 2 (3 4))", env)
+  env = ASSERT_REP_ENV("(quote [1 abc])", "[1 abc]", env)
+  env = ASSERT_REP_ENV("(quote {\"a\" abc})", "{\"a\" abc}", env)
+  env = ASSERT_REP_ENV("(def! quoted (quote (+ 1 2)))", "(+ 1 2)", env)
+  env = ASSERT_REP_ENV("quoted", "(+ 1 2)", env)
+  env = ASSERT_REP_ENV("'abc", "abc", env)
+  env = ASSERT_REP_ENV("'(1 2 3)", "(1 2 3)", env)
+  env = ASSERT_REP_ENV("(quote)", \
+    "quote: expected 1 arguments, got 0", env)
+  env = ASSERT_REP_ENV("(quote 1 2)", \
+    "quote: expected 1 arguments, got 2", env)
 endin
 
 schedule("TEST", 0, 0)

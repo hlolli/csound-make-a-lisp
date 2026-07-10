@@ -70,6 +70,23 @@ opcode MalIsTruthy(value:MalValue):i
   xout result
 endop
 
+opcode MalIsSymbolNamed(value:MalValue, name:S):i
+  result:i = (value.type == $MAL_SYMBOL_TYPE && \
+    strcmp(value.string, name) == 0) ? 1 : 0
+  xout result
+endop
+
+opcode MalIsForm(ast:MalValue, name:S):i
+  result:i = 0
+
+  if (ast.type == $MAL_LIST_TYPE && ast.length > 0) then
+    head:MalValue = ast.list[0]
+    result = MalIsSymbolNamed(head, name)
+  endif
+
+  xout result
+endop
+
 opcode MalIsSequential(value:MalValue):i
   result:i = (value.type == $MAL_LIST_TYPE || \
     value.type == $MAL_VECTOR_TYPE) ? 1 : 0
@@ -644,6 +661,16 @@ opcode MalEvalAstEnv(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   xout result, currentEnv
 endop
 
+opcode MalEvalQuote(ast:MalValue):MalValue
+  if (ast.length != 2) then
+    result:MalValue = MalArityError("quote", 1, ast.length - 1)
+  else
+    result:MalValue = ast.list[1]
+  endif
+
+  xout result
+endop
+
 opcode MalIsFnForm(value:MalValue):i
   result:i = 0
 
@@ -900,7 +927,11 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
     if (workAst.type == $MAL_LIST_TYPE && workAst.length > 0) then
       head:MalValue = workAst.list[0]
 
-      if (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "def!") == 0) then
+      if (MalIsSymbolNamed(head, "quote") == 1) then
+        result = MalEvalQuote(workAst)
+        done = 1
+
+      elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "def!") == 0) then
         result, evalEnv = MalEvalDef(workAst, evalEnv)
         if (preserveReturnEnv == 0) then
           returnEnv = evalEnv
