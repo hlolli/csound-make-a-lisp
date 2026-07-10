@@ -102,6 +102,25 @@ instr TEST
   env = ASSERT_REP_ENV("(vec [1 2])", "[1 2]", env)
   env = ASSERT_REP_ENV("left", "(1 2)", env)
 
+  env = ASSERT_REP_ENV("(nth (list 4 5 6) 1)", "5", env)
+  env = ASSERT_REP_ENV("(nth [4 5 nil] 2)", "nil", env)
+  env = ASSERT_REP_ENV("(first (list))", "nil", env)
+  env = ASSERT_REP_ENV("(first nil)", "nil", env)
+  env = ASSERT_REP_ENV("(first [4 5])", "4", env)
+  env = ASSERT_REP_ENV("(rest (list))", "()", env)
+  env = ASSERT_REP_ENV("(rest nil)", "()", env)
+  env = ASSERT_REP_ENV("(rest [4 5 6])", "(5 6)", env)
+  env = ASSERT_REP_ENV("(def! sequence-source [4 5 6])", "[4 5 6]", env)
+  env = ASSERT_REP_ENV("(rest sequence-source)", "(5 6)", env)
+  env = ASSERT_REP_ENV("sequence-source", "[4 5 6]", env)
+
+  normalFunction:MalValue, env = EVAL_ENV(read_str("(fn* () 1)"), env)
+  macroFunction:MalValue = MalFunctionAsMacro(normalFunction)
+  env = MalEnvSet(env, "host-macro", macroFunction)
+  env = ASSERT_REP_ENV("(macro? host-macro)", "true", env)
+  env = ASSERT_REP_ENV("(macro? (fn* () 1))", "false", env)
+  env = ASSERT_REP_ENV("(macro? +)", "false", env)
+
   env = ASSERT_REP_ENV("(cons 1)", \
     "cons: expected 2 arguments, got 1", env)
   env = ASSERT_REP_ENV("(cons 1 2)", \
@@ -110,6 +129,18 @@ instr TEST
     "concat: expected list or vector arguments", env)
   env = ASSERT_REP_ENV("(vec 1)", \
     "vec: expected list or vector argument", env)
+  env = ASSERT_REP_ENV("(nth (list 1) 1)", \
+    "nth: index out of range", env)
+  env = ASSERT_REP_ENV("(nth (list 1) 0.5)", \
+    "nth: index must be an integer", env)
+  env = ASSERT_REP_ENV("(nth 1 0)", \
+    "nth: first argument must be list or vector", env)
+  env = ASSERT_REP_ENV("(first 1)", \
+    "first: expected list, vector, or nil", env)
+  env = ASSERT_REP_ENV("(rest 1)", \
+    "rest: expected list, vector, or nil", env)
+  env = ASSERT_REP_ENV("(macro?)", \
+    "macro?: expected 1 arguments, got 0", env)
 
   formCheck:i = ASSERT_FORM("(unquote value)", "unquote", 1)
   formCheck = ASSERT_FORM("(splice-unquote values)", "splice-unquote", 1)

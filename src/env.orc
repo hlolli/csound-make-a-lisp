@@ -117,6 +117,9 @@ opcode MalMkStep2Env():MalEnv
   env = MalEnvSet(env, "cons", MalMkBuiltin("cons"))
   env = MalEnvSet(env, "concat", MalMkBuiltin("concat"))
   env = MalEnvSet(env, "vec", MalMkBuiltin("vec"))
+  env = MalEnvSet(env, "nth", MalMkBuiltin("nth"))
+  env = MalEnvSet(env, "first", MalMkBuiltin("first"))
+  env = MalEnvSet(env, "rest", MalMkBuiltin("rest"))
   env = MalEnvSet(env, "list?", MalMkBuiltin("list?"))
   env = MalEnvSet(env, "empty?", MalMkBuiltin("empty?"))
   env = MalEnvSet(env, "count", MalMkBuiltin("count"))
@@ -135,6 +138,7 @@ opcode MalMkStep2Env():MalEnv
   env = MalEnvSet(env, "<", MalMkBuiltin("<"))
   env = MalEnvSet(env, "<=", MalMkBuiltin("<="))
   env = MalEnvSet(env, "not", MalMkBuiltin("not"))
+  env = MalEnvSet(env, "macro?", MalMkBuiltin("macro?"))
   env = MalEnvSet(env, "prn", MalMkBuiltin("prn"))
   xout env
 endop

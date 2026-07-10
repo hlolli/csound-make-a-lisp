@@ -315,6 +315,68 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
       endif
     endif
 
+  elseif (strcmp(fn.string, "nth") == 0) then
+    if (args.length != 2) then
+      result = MalArityError(fn.string, 2, args.length)
+    else
+      sequence:MalValue = args.list[0]
+      indexValue:MalValue = args.list[1]
+
+      if (MalIsSequential(sequence) == 0) then
+        result = MalMkError("nth: first argument must be list or vector")
+      elseif (indexValue.type != $MAL_NUMBER_TYPE) then
+        result = MalMkError("nth: index must be a number")
+      elseif (indexValue.number != int(indexValue.number)) then
+        result = MalMkError("nth: index must be an integer")
+      elseif (indexValue.number < 0 || indexValue.number >= sequence.length) then
+        result = MalMkError("nth: index out of range")
+      else
+        index:i = indexValue.number
+        result = sequence.list[index]
+      endif
+    endif
+
+  elseif (strcmp(fn.string, "first") == 0) then
+    if (args.length != 1) then
+      result = MalArityError(fn.string, 1, args.length)
+    else
+      sequence:MalValue = args.list[0]
+
+      if (sequence.type == $MAL_NIL_TYPE || \
+          (MalIsSequential(sequence) == 1 && sequence.length == 0)) then
+        result = MalMkValue($MAL_NIL_TYPE)
+      elseif (MalIsSequential(sequence) == 0) then
+        result = MalMkError("first: expected list, vector, or nil")
+      else
+        result = sequence.list[0]
+      endif
+    endif
+
+  elseif (strcmp(fn.string, "rest") == 0) then
+    if (args.length != 1) then
+      result = MalArityError(fn.string, 1, args.length)
+    else
+      sequence:MalValue = args.list[0]
+
+      if (sequence.type != $MAL_NIL_TYPE && MalIsSequential(sequence) == 0) then
+        result = MalMkError("rest: expected list, vector, or nil")
+      else
+        result = MalMkValue($MAL_LIST_TYPE)
+
+        if (sequence.type != $MAL_NIL_TYPE && sequence.length > 1) then
+          restLength:i = sequence.length - 1
+          values:MalValue[] init restLength
+
+          for index in [0 ... restLength - 1] do
+            values[index] = sequence.list[index + 1]
+          od
+
+          result.list = values
+          result.length = restLength
+        endif
+      endif
+    endif
+
   elseif (strcmp(fn.string, "list?") == 0) then
     if (args.length != 1) then
       result = MalArityError(fn.string, 1, args.length)
@@ -480,6 +542,13 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
     else
       value:MalValue = args.list[0]
       result = MalMkBool(MalIsTruthy(value) == 0 ? 1 : 0)
+    endif
+
+  elseif (strcmp(fn.string, "macro?") == 0) then
+    if (args.length != 1) then
+      result = MalArityError(fn.string, 1, args.length)
+    else
+      result = MalMkBool(MalIsMacro(args.list[0]))
     endif
 
   elseif (strcmp(fn.string, "prn") == 0) then
