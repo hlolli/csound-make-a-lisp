@@ -74,6 +74,26 @@ opcode MalEnvGet(env:MalEnv, key:S):MalValue
   xout value
 endop
 
+opcode MalEnvRoot(env:MalEnv):MalEnv
+  if (lenarray(env.outer) > 0) then
+    root:MalEnv = MalEnvRoot(env.outer[0])
+  else
+    root:MalEnv = env
+  endif
+
+  xout root
+endop
+
+opcode MalEnvSetRoot(env:MalEnv, root:MalEnv):MalEnv
+  if (lenarray(env.outer) > 0) then
+    env.outer[0] = MalEnvSetRoot(env.outer[0], root)
+  else
+    env = root
+  endif
+
+  xout env
+endop
+
 opcode MalMkStep2Env():MalEnv
   env:MalEnv = MalMkEnv()
   env = MalEnvSet(env, "+", MalMkBuiltinOperator("+"))
@@ -87,6 +107,7 @@ opcode MalMkStep2Env():MalEnv
   env = MalEnvSet(env, "str", MalMkBuiltin("str"))
   env = MalEnvSet(env, "read-string", MalMkBuiltin("read-string"))
   env = MalEnvSet(env, "slurp", MalMkBuiltin("slurp"))
+  env = MalEnvSet(env, "eval", MalMkBuiltin("eval"))
   env = MalEnvSet(env, "=", MalMkBuiltin("="))
   env = MalEnvSet(env, ">", MalMkBuiltin(">"))
   env = MalEnvSet(env, ">=", MalMkBuiltin(">="))

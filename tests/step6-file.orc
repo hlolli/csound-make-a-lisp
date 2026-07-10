@@ -56,6 +56,12 @@ instr TEST
     "\"A line of text\\n\"", env)
   env = ASSERT_REP_ENV("(slurp \"mal/tests/test.txt\")", \
     "\"A line of text\\n\"", env)
+  env = ASSERT_REP_ENV("(eval (read-string \"(+ 2 3)\"))", "5", env)
+  env = ASSERT_REP_ENV("(let* (b 12) (do (eval (read-string \"(def! aa 7)\")) aa))", \
+    "7", env)
+  env = ASSERT_REP_ENV("aa", "7", env)
+  env = ASSERT_REP_ENV("(def! a 1)", "1", env)
+  env = ASSERT_REP_ENV("(let* (a 2) (eval (read-string \"a\")))", "1", env)
 endin
 
 schedule("TEST", 0, 0)

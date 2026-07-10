@@ -751,6 +751,8 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
 
           if (preserveReturnEnv == 0) then
             returnEnv = evalEnv
+          elseif (preserveReturnEnv == 1) then
+            returnEnv = MalEnvRoot(evalEnv)
           endif
 
           if (ifCondition.type == $MAL_ERROR_TYPE) then
@@ -781,6 +783,8 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
 
             if (preserveReturnEnv == 0) then
               returnEnv = evalEnv
+            elseif (preserveReturnEnv == 1) then
+              returnEnv = MalEnvRoot(evalEnv)
             endif
 
             if (result.type == $MAL_ERROR_TYPE) then
@@ -871,6 +875,8 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
 
         if (preserveReturnEnv == 0) then
           returnEnv = evalEnv
+        elseif (preserveReturnEnv == 1) then
+          returnEnv = MalEnvRoot(evalEnv)
         endif
 
         if (evaluatedList.type == $MAL_ERROR_TYPE) then
@@ -887,7 +893,24 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
             od
           endif
 
-          if (fn.type == $MAL_FUNCTION_TYPE) then
+          if (fn.type == $MAL_BUILTIN_TYPE && strcmp(fn.string, "eval") == 0) then
+            if (args.length != 1) then
+              result = MalArityError(fn.string, 1, args.length)
+              done = 1
+            else
+              evalAst:MalValue = args.list[0]
+              evalRoot:MalEnv = MalEnvRoot(evalEnv)
+              result, evalRoot = EVAL_ENV(evalAst, evalRoot)
+              evalEnv = MalEnvSetRoot(evalEnv, evalRoot)
+              if (preserveReturnEnv == 1) then
+                returnEnv = evalRoot
+              else
+                returnEnv = evalEnv
+              endif
+
+              done = 1
+            endif
+          elseif (fn.type == $MAL_FUNCTION_TYPE) then
             bindStatus:MalValue, callEnv:MalEnv = MalBindFunctionEnv(fn, args)
 
             if (bindStatus.type == $MAL_ERROR_TYPE) then
@@ -896,7 +919,7 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
             else
               workAst = fn.list[1]
               evalEnv = callEnv
-              preserveReturnEnv = 1
+              preserveReturnEnv = 2
             endif
           else
             result = MalApply(fn, args)
@@ -909,6 +932,8 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
 
       if (preserveReturnEnv == 0) then
         returnEnv = evalEnv
+      elseif (preserveReturnEnv == 1) then
+        returnEnv = MalEnvRoot(evalEnv)
       endif
 
       done = 1
