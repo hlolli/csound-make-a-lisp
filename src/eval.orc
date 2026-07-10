@@ -1284,7 +1284,7 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
           done = 1
         elseif (MalIsMacro(fn) == 1) then
           rawArgs:MalValue = MalUnevaluatedArgs(workAst)
-          expansion:MalValue = MalApply(fn, rawArgs)
+          expansion:MalValue = MalApplyFunction(fn, rawArgs)
 
           if (expansion.type == $MAL_ERROR_TYPE) then
             result = expansion

@@ -53,10 +53,22 @@ instr TEST
   env = ASSERT_REP_ENV("(identity (+ 2 3))", "5", env)
   env = ASSERT_REP_ENV("(let* (a 123) (identity-macro a))", "123", env)
 
+  env = ASSERT_REP_ENV("(def! macro-source 2)", "2", env)
+  env = ASSERT_REP_ENV( \
+    "(defmacro! captured-value (fn* () macro-source))", \
+    "#<function:fn*>", env)
+  env = ASSERT_REP_ENV( \
+    "(let* (macro-source 3) (captured-value))", "2", env)
+
   env = ASSERT_REP_ENV( \
     "(defmacro! quote-argument (fn* (x) (list 'quote x)))", \
     "#<function:fn*>", env)
   env = ASSERT_REP_ENV("(quote-argument (+ 1 2))", "(+ 1 2)", env)
+
+  env = ASSERT_REP_ENV( \
+    "(defmacro! expand-countdown (fn* (n) (if (= n 0) 0 (list 'expand-countdown (- n 1)))))", \
+    "#<function:fn*>", env)
+  env = ASSERT_REP_ENV("(expand-countdown 2000)", "0", env)
 
   env = ASSERT_REP_ENV("(defmacro!)", \
     "defmacro!: expected 2 arguments, got 0", env)
