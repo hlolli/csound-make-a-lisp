@@ -686,8 +686,7 @@ opcode MalQuasiquoteSequence(ast:MalValue):MalValue
           break
         endif
 
-        previous:MalValue = result
-        result = MalMkList3(MalMkSymbol("concat"), element.list[1], previous)
+        result = MalMkList3(MalMkSymbol("concat"), element.list[1], result)
       else
         quotedElement:MalValue = MalQuasiquote(element)
 
@@ -696,8 +695,7 @@ opcode MalQuasiquoteSequence(ast:MalValue):MalValue
           break
         endif
 
-        previous:MalValue = result
-        result = MalMkList3(MalMkSymbol("cons"), quotedElement, previous)
+        result = MalMkList3(MalMkSymbol("cons"), quotedElement, result)
       endif
     od
   endif
