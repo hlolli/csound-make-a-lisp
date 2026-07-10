@@ -1,6 +1,7 @@
 declare EVAL_ENV(result:MalValue, nextEnv:MalEnv):(MalValue, MalEnv)
 declare MalEquals(left:MalValue, right:MalValue):(i)
 declare MalApply(fn:MalValue, args:MalValue):(MalValue)
+declare MalQuasiquote(ast:MalValue):(MalValue)
 
 opcode MalApplyBuiltinOperator(fn:MalValue, args:MalValue):MalValue
   result:MalValue = MalMkValue($MAL_NUMBER_TYPE)
@@ -666,6 +667,73 @@ opcode MalEvalQuote(ast:MalValue):MalValue
     result:MalValue = MalArityError("quote", 1, ast.length - 1)
   else
     result:MalValue = ast.list[1]
+  endif
+
+  xout result
+endop
+
+opcode MalQuasiquoteSequence(ast:MalValue):MalValue
+  result:MalValue = MalMkValue($MAL_LIST_TYPE)
+
+  if (ast.length > 0) then
+    for offset in [0 ... ast.length - 1] do
+      index:i = ast.length - offset - 1
+      element:MalValue = ast.list[index]
+
+      if (MalIsForm(element, "splice-unquote") == 1) then
+        if (element.length != 2) then
+          result = MalArityError("splice-unquote", 1, element.length - 1)
+          break
+        endif
+
+        previous:MalValue = result
+        result = MalMkList3(MalMkSymbol("concat"), element.list[1], previous)
+      else
+        quotedElement:MalValue = MalQuasiquote(element)
+
+        if (quotedElement.type == $MAL_ERROR_TYPE) then
+          result = quotedElement
+          break
+        endif
+
+        previous:MalValue = result
+        result = MalMkList3(MalMkSymbol("cons"), quotedElement, previous)
+      endif
+    od
+  endif
+
+  xout result
+endop
+
+opcode MalQuasiquote(ast:MalValue):MalValue
+  result:MalValue = ast
+
+  if (MalIsForm(ast, "unquote") == 1) then
+    if (ast.length != 2) then
+      result = MalArityError("unquote", 1, ast.length - 1)
+    else
+      result = ast.list[1]
+    endif
+  else
+    switch ast.type
+      case $MAL_LIST_TYPE
+        result = MalQuasiquoteSequence(ast)
+
+      case $MAL_VECTOR_TYPE
+        quotedValues:MalValue = MalQuasiquoteSequence(ast)
+
+        if (quotedValues.type == $MAL_ERROR_TYPE) then
+          result = quotedValues
+        else
+          result = MalMkList2(MalMkSymbol("vec"), quotedValues)
+        endif
+
+      case $MAL_SYMBOL_TYPE
+        result = MalMkList2(MalMkSymbol("quote"), ast)
+
+      case $MAL_HASH_MAP_TYPE
+        result = MalMkList2(MalMkSymbol("quote"), ast)
+    endsw
   endif
 
   xout result

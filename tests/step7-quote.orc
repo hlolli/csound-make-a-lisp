@@ -48,6 +48,29 @@ opcode ASSERT_FORM(input:S, name:S, expected:i):i
   xout actual
 endop
 
+opcode ASSERT_QUASIQUOTE(input:S, expected:S):i
+  ast:MalValue = read_str(input)
+  transformed:MalValue = MalQuasiquote(ast)
+
+  if (transformed.type == $MAL_ERROR_TYPE) then
+    actual:S = transformed.string
+  else
+    actual:S = pr_str(transformed)
+  endif
+
+  if (strcmp(actual, expected) == 0) then
+    prints "STEP7 quasiquote transform %s, Assertion success\n", input
+    result:i = 1
+  else
+    prints "STEP7 quasiquote transform %s, Assertion failed: expected '%s', got '%s'\n", \
+      input, expected, actual
+    exitnow(1)
+    result = 0
+  endif
+
+  xout result
+endop
+
 instr TEST
   prints "Testing Step 7 immutable sequence builtins\n"
   env:MalEnv = MalMkStep6Env()
@@ -110,6 +133,32 @@ instr TEST
     "quote: expected 1 arguments, got 0", env)
   env = ASSERT_REP_ENV("(quote 1 2)", \
     "quote: expected 1 arguments, got 2", env)
+
+  transformCheck:i = ASSERT_QUASIQUOTE("nil", "nil")
+  transformCheck = ASSERT_QUASIQUOTE("7", "7")
+  transformCheck = ASSERT_QUASIQUOTE("a", "(quote a)")
+  transformCheck = ASSERT_QUASIQUOTE("{\"a\" b}", "(quote {\"a\" b})")
+  transformCheck = ASSERT_QUASIQUOTE("()", "()")
+  transformCheck = ASSERT_QUASIQUOTE("(a 2)", \
+    "(cons (quote a) (cons 2 ()))")
+  transformCheck = ASSERT_QUASIQUOTE("(unquote a)", "a")
+  transformCheck = ASSERT_QUASIQUOTE("(1 (unquote value) 3)", \
+    "(cons 1 (cons value (cons 3 ())))")
+  transformCheck = ASSERT_QUASIQUOTE("(1 (splice-unquote c) 3)", \
+    "(cons 1 (concat c (cons 3 ())))")
+  transformCheck = ASSERT_QUASIQUOTE("(1 (2 (unquote value)))", \
+    "(cons 1 (cons (cons 2 (cons value ())) ()))")
+  transformCheck = ASSERT_QUASIQUOTE("[]", "(vec ())")
+  transformCheck = ASSERT_QUASIQUOTE("[a (unquote b)]", \
+    "(vec (cons (quote a) (cons b ())))")
+  transformCheck = ASSERT_QUASIQUOTE("[1 (splice-unquote c) 3]", \
+    "(vec (cons 1 (concat c (cons 3 ()))))")
+  transformCheck = ASSERT_QUASIQUOTE("(0 unquote)", \
+    "(cons 0 (cons (quote unquote) ()))")
+  transformCheck = ASSERT_QUASIQUOTE("(unquote)", \
+    "unquote: expected 1 arguments, got 0")
+  transformCheck = ASSERT_QUASIQUOTE("((splice-unquote))", \
+    "splice-unquote: expected 1 arguments, got 0")
 endin
 
 schedule("TEST", 0, 0)
