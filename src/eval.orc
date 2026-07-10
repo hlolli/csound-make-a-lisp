@@ -1384,3 +1384,19 @@ opcode MalMkStep6Env():MalEnv
 
   xout env
 endop
+
+opcode MalMkStep8Env():MalEnv
+  env:MalEnv = MalMkStep6Env()
+  source:S = "(defmacro! cond (fn* (& xs) (if (> (count xs) 0) "
+  source strcat source, "(list 'if (first xs) "
+  source strcat source, "(if (> (count xs) 1) (nth xs 1) "
+  source strcat source, "(throw \"odd number of forms to cond\")) "
+  source strcat source, "(cons 'cond (rest (rest xs)))))))"
+  result:MalValue, env = MalEvalSourceEnv(source, env)
+
+  if (result.type == $MAL_ERROR_TYPE) then
+    prints "cond bootstrap failed: %s\n", result.string
+  endif
+
+  xout env
+endop

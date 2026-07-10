@@ -35,7 +35,17 @@ endop
 
 instr TEST
   prints "Testing Step 8 macro definition and expansion\n"
-  env:MalEnv = MalMkStep6Env()
+  env:MalEnv = MalMkStep8Env()
+
+  env = ASSERT_REP_ENV("(macro? cond)", "true", env)
+  env = ASSERT_REP_ENV("(cond)", "nil", env)
+  env = ASSERT_REP_ENV("(cond true 7)", "7", env)
+  env = ASSERT_REP_ENV("(cond false 7)", "nil", env)
+  env = ASSERT_REP_ENV("(cond false missing true 8)", "8", env)
+  env = ASSERT_REP_ENV("(cond true 7 missing 8)", "7", env)
+  env = ASSERT_REP_ENV( \
+    "(cond false 7 false 8 \"else\" 9)", "9", env)
+  env = ASSERT_REP_ENV("(cond true)", "'throw' not found", env)
 
   env = ASSERT_REP_ENV( \
     "(defmacro! unless (fn* (pred a b) `(if ~pred ~b ~a)))", \
