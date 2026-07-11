@@ -259,6 +259,101 @@ opcode MalApplyNumericComparison(fn:MalValue, args:MalValue):MalValue
   xout result
 endop
 
+opcode MalIsFn(value:MalValue):i
+  result:i = 0
+
+  switch value.type
+    case $MAL_BUILTIN_TYPE
+      result = 1
+
+    case $MAL_BUILTIN_OPERATOR_TYPE
+      result = 1
+
+    case $MAL_BUILTIN_OPCODE_TYPE
+      result = 1
+
+    case $MAL_FUNCTION_TYPE
+      result = value.isMacro == 0
+  endsw
+
+  xout result
+endop
+
+opcode MalSeq(value:MalValue):MalValue
+  result:MalValue = MalMkValue($MAL_NIL_TYPE)
+
+  switch value.type
+    case $MAL_NIL_TYPE
+      result = value
+
+    case $MAL_LIST_TYPE
+      if (value.length > 0) then
+        result = value
+      endif
+
+    case $MAL_VECTOR_TYPE
+      if (value.length > 0) then
+        result = MalCopySequenceAs(value, $MAL_LIST_TYPE)
+      endif
+
+    case $MAL_STRING_TYPE
+      characterCount:i = strlen(value.string)
+
+      if (characterCount > 0) then
+        characters:MalValue[] init characterCount
+
+        for index in [0 ... characterCount - 1] do
+          character:S = strsub(value.string, index, index + 1)
+          characters[index] = MalMkString(character)
+        od
+
+        result = MalMkValue($MAL_LIST_TYPE)
+        result.list = characters
+        result.length = characterCount
+      endif
+
+    default
+      result = MalMkError("seq: expected list, vector, string, or nil")
+  endsw
+
+  xout result
+endop
+
+opcode MalConj(args:MalValue):MalValue
+  collection:MalValue = args.list[0]
+  addedCount:i = args.length - 1
+  resultLength:i = collection.length + addedCount
+  values:MalValue[] init resultLength
+  result:MalValue = MalMkValue(collection.type)
+
+  if (collection.type == $MAL_LIST_TYPE) then
+    for index in [0 ... addedCount - 1] do
+      values[index] = args.list[args.length - index - 1]
+    od
+
+    if (collection.length > 0) then
+      for index in [0 ... collection.length - 1] do
+        values[addedCount + index] = collection.list[index]
+      od
+    endif
+
+  elseif (collection.type == $MAL_VECTOR_TYPE) then
+    if (collection.length > 0) then
+      for index in [0 ... collection.length - 1] do
+        values[index] = collection.list[index]
+      od
+    endif
+
+    for index in [0 ... addedCount - 1] do
+      values[collection.length + index] = args.list[index + 1]
+    od
+  endif
+
+  result.list = values
+  result.length = resultLength
+  xout result
+endop
+
 opcode MalSlurpFile(filename:S):MalValue
   result:MalValue = MalMkString("")
   content:S = ""
@@ -417,6 +512,19 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
   elseif (strcmp(fn.string, "symbol?") == 0) then
     result = MalApplyTypePredicate(fn, args, $MAL_SYMBOL_TYPE)
 
+  elseif (strcmp(fn.string, "string?") == 0) then
+    result = MalApplyTypePredicate(fn, args, $MAL_STRING_TYPE)
+
+  elseif (strcmp(fn.string, "number?") == 0) then
+    result = MalApplyTypePredicate(fn, args, $MAL_NUMBER_TYPE)
+
+  elseif (strcmp(fn.string, "fn?") == 0) then
+    if (args.length != 1) then
+      result = MalArityError(fn.string, 1, args.length)
+    else
+      result = MalMkBool(MalIsFn(args.list[0]))
+    endif
+
   elseif (strcmp(fn.string, "symbol") == 0) then
     if (args.length != 1) then
       result = MalArityError(fn.string, 1, args.length)
@@ -562,6 +670,20 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
       endif
     endif
 
+  elseif (strcmp(fn.string, "meta") == 0) then
+    if (args.length != 1) then
+      result = MalArityError(fn.string, 1, args.length)
+    else
+      result = MalMeta(args.list[0])
+    endif
+
+  elseif (strcmp(fn.string, "with-meta") == 0) then
+    if (args.length != 2) then
+      result = MalArityError(fn.string, 2, args.length)
+    else
+      result = MalWithMeta(args.list[0], args.list[1])
+    endif
+
   elseif (strcmp(fn.string, "cons") == 0) then
     if (args.length != 2) then
       result = MalArityError(fn.string, 2, args.length)
@@ -704,6 +826,27 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
       endif
     endif
 
+  elseif (strcmp(fn.string, "seq") == 0) then
+    if (args.length != 1) then
+      result = MalArityError(fn.string, 1, args.length)
+    else
+      result = MalSeq(args.list[0])
+    endif
+
+  elseif (strcmp(fn.string, "conj") == 0) then
+    if (args.length < 2) then
+      result = MalMkError(sprintf( \
+        "conj: expected at least 2 arguments, got %d", args.length))
+    else
+      collection:MalValue = args.list[0]
+
+      if (MalIsSequential(collection) == 0) then
+        result = MalMkError("conj: first argument must be list or vector")
+      else
+        result = MalConj(args)
+      endif
+    endif
+
   elseif (strcmp(fn.string, "list?") == 0) then
     if (args.length != 1) then
       result = MalArityError(fn.string, 1, args.length)
@@ -748,6 +891,20 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
 
   elseif (strcmp(fn.string, "pr-str") == 0) then
     result = MalMkString(MalJoinPrintedArgs(args, 1, " "))
+
+  elseif (strcmp(fn.string, "println") == 0) then
+    output:S = MalJoinPrintedArgs(args, 0, " ")
+    prints "%s\n", output
+    result = MalMkValue($MAL_NIL_TYPE)
+
+  elseif (strcmp(fn.string, "time-ms") == 0) then
+    if (args.length != 0) then
+      result = MalArityError(fn.string, 0, args.length)
+    else
+      seconds:i date
+      result = MalMkValue($MAL_NUMBER_TYPE)
+      result.number = seconds * 1000
+    endif
 
   elseif (strcmp(fn.string, "read-string") == 0) then
     if (args.length != 1) then
@@ -1788,6 +1945,21 @@ opcode MalMkStep9Env():MalEnv
   env = MalEnvSet(env, "keys", MalMkBuiltin("keys"))
   env = MalEnvSet(env, "vals", MalMkBuiltin("vals"))
   env = MalEnvSet(env, "pr-str", MalMkBuiltin("pr-str"))
+  env = MalRefreshTopLevelFunctionClosures(env)
+  xout env
+endop
+
+opcode MalMkStepAEnv():MalEnv
+  env:MalEnv = MalMkStep9Env()
+  env = MalEnvSet(env, "meta", MalMkBuiltin("meta"))
+  env = MalEnvSet(env, "with-meta", MalMkBuiltin("with-meta"))
+  env = MalEnvSet(env, "string?", MalMkBuiltin("string?"))
+  env = MalEnvSet(env, "number?", MalMkBuiltin("number?"))
+  env = MalEnvSet(env, "fn?", MalMkBuiltin("fn?"))
+  env = MalEnvSet(env, "seq", MalMkBuiltin("seq"))
+  env = MalEnvSet(env, "conj", MalMkBuiltin("conj"))
+  env = MalEnvSet(env, "time-ms", MalMkBuiltin("time-ms"))
+  env = MalEnvSet(env, "println", MalMkBuiltin("println"))
   env = MalRefreshTopLevelFunctionClosures(env)
   xout env
 endop

@@ -5,7 +5,7 @@ ksmps = 32
 nchnls = 2
 0dbfs = 1
 
-malReplEnv@global:MalEnv = MalMkStep9Env()
+malReplEnv@global:MalEnv = MalMkStepAEnv()
 
 instr MAL_REPL
   Sescape sprintf "%c", 27
