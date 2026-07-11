@@ -30,7 +30,7 @@ opcode ASSERT_REP_ENV(input:S, expected:S, env:MalEnv):MalEnv
 endop
 
 instr TEST
-  prints "Testing Step A core functions\n"
+  prints "Testing Step A MAL functionality\n"
   env:MalEnv = MalMkStepAEnv()
   env = MalEnvSet(env, "host-opcode", MalMkBuiltinOpcode("oscili"))
 

@@ -9,7 +9,7 @@ default:
 version:
     @{{csound}} --version
 
-test: smoke reader eval step3 step4 step5 step6 step7 step8 step9 step-a script-args unit harness-reader harness-eval harness-env harness-step4 harness-step5 harness-step6 harness-step7 harness-step8 harness-step9 harness-step-a
+test: smoke reader eval step3 step4 step5 step6 step7 step8 step9 step-a script-args unit harness-reader harness-eval harness-env harness-step4 harness-step5 harness-step6 harness-step7 harness-step8 harness-step9 harness-stepA
 
 smoke:
     {{csound}} {{csound_flags}} tests/step0-repl.orc
@@ -48,7 +48,7 @@ step9:
     {{csound}} {{csound_flags}} tests/step9-try.orc
 
 step-a:
-    {{csound}} {{csound_flags}} tests/stepA-core.orc
+    {{csound}} {{csound_flags}} tests/stepA-mal.orc
 
 script-args:
     ./run tests/stepA-script-args.mal first "two words" --gain=0.5 ""
@@ -83,7 +83,7 @@ harness-step8:
 harness-step9:
     python3 mal/runtest.py --test-timeout 120 --deferrable --optional tests/harness/step9_try.mal -- tests/harness/run-step9-try
 
-harness-step-a:
+harness-stepA:
     python3 mal/runtest.py --test-timeout 120 --deferrable --optional tests/harness/stepA_mal.mal -- tests/harness/run-stepA-mal
 
 status:
