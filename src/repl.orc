@@ -11,6 +11,9 @@ instr MAL_REPL
   Sescape sprintf "%c", 27
   Sprompt sprintf "%s[1;36mmal%s[0m %s[2m>%s[0m ", \
     Sescape, Sescape, Sescape, Sescape
+  SreplPrompt strcpy Sprompt
+  SpendingSource init ""
+  iAwaitingInput init 0
   Sline init ""
   kstatus init 0
 
@@ -20,7 +23,44 @@ instr MAL_REPL
   kgoto READY
 
 EVALUATE:
-  Sinput strcpy Sline
+  iQuit:i = strcmp(Sline, ":quit") == 0 || strcmp(Sline, ":q") == 0
+
+  if (iAwaitingInput == 0 && iQuit == 1) then
+    event_i "i", "MAL_EXIT", 0, 0
+    rireturn
+  endif
+
+  if (iAwaitingInput == 1) then
+    iQueued:i = MalInputEnqueue(Sline, $MAL_INPUT_LINE)
+    Sinput strcpy SpendingSource
+    Sprompt strcpy SreplPrompt
+    iAwaitingInput = 0
+  else
+    candidate:MalValue = read_str(Sline)
+    SrequestedPrompt:S, iIsRequest:i = MalInputPromptFromForm(candidate)
+    readlineFn:MalValue = MalEnvGet(malReplEnv, "readline")
+    iUsesBuiltin:i = readlineFn.type == $MAL_BUILTIN_TYPE && \
+      strcmp(readlineFn.string, "readline") == 0
+
+    if (iIsRequest == 1 && iUsesBuiltin == 1) then
+      SpendingSource strcpy Sline
+      Sprompt strcpy SrequestedPrompt
+      iAwaitingInput = 1
+      rireturn
+    endif
+
+    iQueued = MalInputEnqueue(Sline, $MAL_INPUT_LINE)
+
+    if (iQueued == 1) then
+      input:MalValue = MalInputTake()
+      Sinput strcpy input.string
+    endif
+  endif
+
+  if (iQueued == 0) then
+    prints "%s[31minput inbox is full%s[0m\n", Sescape, Sescape
+    rireturn
+  endif
 
   if (strcmp(Sinput, ":help") == 0) then
     Shelp = "Try these forms:\n  (+ 1 2)\n"
@@ -56,15 +96,9 @@ EVALUATE:
 
 READY:
   Sline, kstatus readline Sprompt
-  kQuit strcmpk Sline, ":quit"
-  kShortQuit strcmpk Sline, ":q"
 
   if (kstatus == 1) then
-    if (kQuit == 0 || kShortQuit == 0) then
-      event "i", "MAL_EXIT", 0, 0
-    else
-      reinit EVALUATE
-    endif
+    reinit EVALUATE
   elseif (kstatus < 0) then
     event "i", "MAL_EXIT", 0, 0
   endif

@@ -906,6 +906,20 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
       result.number = seconds * 1000
     endif
 
+  elseif (strcmp(fn.string, "readline") == 0) then
+    if (args.length != 1) then
+      result = MalArityError(fn.string, 1, args.length)
+    else
+      prompt:MalValue = args.list[0]
+
+      if (prompt.type != $MAL_STRING_TYPE) then
+        result = MalMkError("readline: expected string argument")
+      else
+        // Terminal I/O belongs to the k-rate driver.
+        result = MalInputTake()
+      endif
+    endif
+
   elseif (strcmp(fn.string, "read-string") == 0) then
     if (args.length != 1) then
       result = MalArityError(fn.string, 1, args.length)
@@ -1961,6 +1975,7 @@ opcode MalMkStepAEnv():MalEnv
   env = MalEnvSet(env, "conj", MalMkBuiltin("conj"))
   env = MalEnvSet(env, "time-ms", MalMkBuiltin("time-ms"))
   env = MalEnvSet(env, "println", MalMkBuiltin("println"))
+  env = MalEnvSet(env, "readline", MalMkBuiltin("readline"))
   source:S = "(def! *host-language* \"Csound7\")"
   result:MalValue, env = MalEvalSourceEnv(source, env)
 

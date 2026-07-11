@@ -22,6 +22,11 @@
 #define MAL_FUNCTION_TYPE #20#
 #define MAL_ATOM_TYPE #21#
 
+// input inbox
+#define MAL_INPUT_EOF #-1#
+#define MAL_INPUT_LINE #1#
+#define MAL_INPUT_CAPACITY #16#
+
 // tokens
 #define MAL_TAB_TOKEN #9#
 #define MAL_NEWLINE_TOKEN #10#

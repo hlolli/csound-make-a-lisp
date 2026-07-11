@@ -38,6 +38,29 @@ instr TEST
   env = ASSERT_REP_ENV("(list? *ARGV*)", "true", env)
   env = ASSERT_REP_ENV("*ARGV*", "()", env)
 
+  MalInputClear()
+  readlineForm:MalValue = read_str("(readline \"input> \")")
+  SreadlinePrompt:S, iIsReadline:i = MalInputPromptFromForm(readlineForm)
+
+  if (iIsReadline != 1 || strcmp(SreadlinePrompt, "input> ") != 0) then
+    prints "STEPA readline form detection, Assertion failed\n"
+    exitnow(1)
+  endif
+
+  env = ASSERT_REP_ENV("(readline \"empty> \")", "nil", env)
+  iQueued:i = MalInputEnqueue("first line", $MAL_INPUT_LINE)
+  iQueued = MalInputEnqueue("second line", $MAL_INPUT_LINE)
+  env = ASSERT_REP_ENV( \
+    "(readline \"first> \")", "\"first line\"", env)
+  env = ASSERT_REP_ENV( \
+    "(readline \"second> \")", "\"second line\"", env)
+  iQueued = MalInputEnqueue("", $MAL_INPUT_EOF)
+  env = ASSERT_REP_ENV("(readline \"eof> \")", "nil", env)
+  env = ASSERT_REP_ENV("(readline)", \
+    "readline: expected 1 arguments, got 0", env)
+  env = ASSERT_REP_ENV("(readline 1)", \
+    "readline: expected string argument", env)
+
   env = ASSERT_REP_ENV( \
     "(def! ordinary-function (fn* (x) x))", \
     "#<function:fn*>", env)

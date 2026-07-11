@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import json
 import os
 import re
 import subprocess
@@ -11,6 +12,10 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 CSOUND = os.environ.get("CSOUND", "csound")
 ENV_CONSTRUCTOR = os.environ.get("MAL_ENV_CONSTRUCTOR", "MalMkStep2Env")
+READLINE_BRIDGE = os.environ.get("MAL_READLINE_BRIDGE") == "1"
+READLINE_FORM = re.compile(
+    r'^\s*\(\s*readline\s+("(?:\\.|[^"\\])*")\s*\)\s*$'
+)
 
 CSOUND_NOISE = (
     re.compile(r"^--Csound version "),
@@ -43,16 +48,30 @@ def is_csound_noise(line):
 
 def build_orc(history):
     eval_lines = []
+    strset_values = []
 
-    for index in range(1, len(history) + 1):
+    for source, input_line in history:
+        strset_values.append(source)
+        source_index = len(strset_values)
+
+        if input_line is not None:
+            strset_values.append(input_line)
+            input_index = len(strset_values)
+            eval_lines.extend(
+                [
+                    f"  SreadlineInput strget {input_index}",
+                    "  iQueued = MalInputEnqueue(SreadlineInput, $MAL_INPUT_LINE)",
+                ]
+            )
+
         eval_lines.extend(
             [
-                f"  Sinput strget {index}",
+                f"  Sinput strget {source_index}",
                 "  Sresult, env = REP_ENV(Sinput, env)",
             ]
         )
 
-    return "\n".join(
+    source = "\n".join(
         [
             '#include "src/main.orc"',
             "",
@@ -87,6 +106,7 @@ def build_orc(history):
             f"  env:MalEnv = {ENV_CONSTRUCTOR}()",
             '  Sinput = ""',
             '  Sresult = ""',
+            "  iQueued:i = 0",
             *eval_lines,
             '  prints "%s\\n", Sresult',
             "  exitnow(0)",
@@ -96,17 +116,22 @@ def build_orc(history):
             "",
         ]
     )
+    return source, strset_values
 
 
 def eval_history(history):
-    with tempfile.NamedTemporaryFile("w", suffix=".orc", dir=ROOT, delete=False) as file:
-        file.write(build_orc(history))
+    source, strset_values = build_orc(history)
+
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".orc", dir=ROOT, delete=False
+    ) as file:
+        file.write(source)
         step_file = Path(file.name)
 
     try:
         strset_args = [
-            f"--strset{index}={source}"
-            for index, source in enumerate(history, start=1)
+            f"--strset{index}={value}"
+            for index, value in enumerate(strset_values, start=1)
         ]
         proc = subprocess.run(
             [CSOUND, "-n", "-d", "-m128", *strset_args, "--orc", str(step_file)],
@@ -123,9 +148,9 @@ def eval_history(history):
 
     lines = [line for line in proc.stdout.splitlines() if not is_csound_noise(line)]
     if proc.returncode != 0:
-      if lines:
-        return "\n".join(lines)
-      return f"Error: csound exited with {proc.returncode}"
+        if lines:
+            return "\n".join(lines)
+        return f"Error: csound exited with {proc.returncode}"
     return "\n".join(lines)
 
 
@@ -134,13 +159,42 @@ def prompt():
     sys.stdout.flush()
 
 
+def readline_prompt(source):
+    if not READLINE_BRIDGE:
+        return None
+
+    match = READLINE_FORM.match(source)
+    if match is None:
+        return None
+
+    try:
+        return json.loads(match.group(1))
+    except json.JSONDecodeError:
+        return None
+
+
 def main():
     history = []
+    pending_readline = None
     prompt()
 
     for line in sys.stdin:
         source = line.rstrip("\n")
-        history.append(source)
+
+        if pending_readline is not None:
+            history.append((pending_readline, source))
+            pending_readline = None
+        else:
+            requested_prompt = readline_prompt(source)
+
+            if requested_prompt is not None:
+                pending_readline = source
+                sys.stdout.write(requested_prompt)
+                sys.stdout.flush()
+                continue
+
+            history.append((source, None))
+
         output = eval_history(history)
 
         if output:
