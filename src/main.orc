@@ -6,4 +6,5 @@
 #include "src/env.orc"
 #include "src/reader.orc"
 #include "src/printer.orc"
+#include "src/csound.orc"
 #include "src/eval.orc"

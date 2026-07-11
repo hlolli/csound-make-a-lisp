@@ -8,6 +8,8 @@ struct MalReadResult value:MalValue, reader:MalReader
 
 struct MalEnv keys:S[], values:MalValue[], outer:MalEnv[], length:i, id:i, persistent:i
 
+struct MalCsoundRender statements:S, expression:S, outputs:i, error:S
+
 malEmptyValues@global:MalValue[] init 0
 malEmptyEnvs@global:MalEnv[] init 0
 malEmptyStrings@global:S[] init 0
@@ -18,3 +20,4 @@ malFunctionCount@global:i init 0
 malAstNodes@global:MalValue[] init 0
 malAstNodeCount@global:i init 0
 malReaderTokens@global:S[] init 0
+malCsoundTemporaryCount@global:i init 0

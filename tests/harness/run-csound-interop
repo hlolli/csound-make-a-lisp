@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+MAL_ENV_CONSTRUCTOR=MalMkCsoundEnv \
+  exec "$(dirname "$0")/run-step3-env"

@@ -118,27 +118,6 @@ opcode MalInternAst(value:MalValue):MalValue
   xout result
 endop
 
-opcode MalMaterialize(value:MalValue):MalValue
-  isCollection:i = value.type == $MAL_LIST_TYPE || \
-    value.type == $MAL_VECTOR_TYPE || value.type == $MAL_HASH_MAP_TYPE
-
-  if (isCollection == 0) then
-    result:MalValue = value
-  else
-    result = MalMkValue(value.type)
-    result.metadata = value.metadata
-
-    if (value.length > 0) then
-      for index in [0 ... value.length - 1] do
-        child:MalValue = MalMaterialize(MalAt(value, index))
-        result = MalAppendValue(result, child)
-      od
-    endif
-  endif
-
-  xout result
-endop
-
 opcode MalMkNumber(number:i):MalValue
   value:MalValue = MalMkValue($MAL_NUMBER_TYPE)
   value.number = number

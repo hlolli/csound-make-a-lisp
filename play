@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+set -eu
+
+root=$(CDPATH= cd "$(dirname "$0")" && pwd)
+
+if [ "$#" -gt 0 ]; then
+  case "$1" in
+    /*) script=$1 ;;
+    *) script=$PWD/$1 ;;
+  esac
+  shift
+  set -- "$script" "$@"
+fi
+
+cd "$root"
+exec "${CSOUND:-csound}" -d -m0 -odac --orc src/play.orc -- "$@"

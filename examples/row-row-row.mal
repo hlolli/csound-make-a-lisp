@@ -1,0 +1,64 @@
+;; Inspired by Chris Ford's Overtone canon:
+;; https://gist.github.com/ctford/2877443
+
+(definst harpsichord [note 60 amp 0.035 pan 0.5]
+  (csound/outs
+    (csound/pan2
+      (csound/tone
+        (* (csound/pluck
+             1
+             (csound/cpsmidinn note)
+             (csound/cpsmidinn note)
+             0
+             1)
+           (csound/linseg
+             0 0.01 amp
+             (- p3 0.06) (* amp 0.65)
+             0.05 0))
+        2800)
+      pan)))
+
+(def! notes
+  {:C4 60 :D4 62 :E4 64 :F4 65 :G4 67 :C5 72})
+
+;; Each entry is [beat pitch].
+(def! melody
+  [[0 :C4] [1 :C4] [2 :C4] [2.67 :D4] [3 :E4]
+   [4 :E4] [4.67 :D4] [5 :E4] [5.67 :F4] [6 :G4]
+   [8 :C5] [8.33 :C5] [8.66 :C5]
+   [9 :G4] [9.33 :G4] [9.66 :G4]
+   [10 :E4] [10.33 :E4] [10.66 :E4]
+   [11 :C4] [11.33 :C4] [11.66 :C4]
+   [12 :G4] [12.67 :F4] [13 :E4] [13.67 :D4] [14 :C4]])
+
+(def! metro
+  (fn* (beat) (* beat 0.2)))
+
+(def! after
+  (fn* (beats clock)
+    (fn* (beat) (clock (+ beat beats)))))
+
+(def! play
+  (fn* (clock melody pan)
+    (map
+      (fn* (entry)
+        (csound/event
+          "i" harpsichord
+          (clock (first entry))
+          0.9
+          (get notes (nth entry 1))
+          0.035
+          pan))
+      melody)))
+
+(def! play-round
+  (fn* (clock melody)
+    (do
+      (play clock melody 0.12)
+      (play (after 4 clock) melody 0.38)
+      (play (after 8 clock) melody 0.62)
+      (play (after 16 clock) melody 0.88))))
+
+(play-round metro melody)
+(csound/event "e" 7.2 0)
+(println "Row, Row, Row Your Boat")

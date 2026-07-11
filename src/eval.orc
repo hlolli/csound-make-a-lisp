@@ -12,13 +12,26 @@ opcode MalApplyBuiltinOperator(fn:MalValue, args:MalValue):MalValue
   else
     leftArg:MalValue = MalAt(args, 0)
     rightArg:MalValue = MalAt(args, 1)
-    left:i = leftArg.number
-    right:i = rightArg.number
 
-    if (leftArg.type != $MAL_NUMBER_TYPE || \
-        rightArg.type != $MAL_NUMBER_TYPE) then
+    if (MalIsCsoundNode(leftArg) == 1 || MalIsCsoundNode(rightArg) == 1) then
+      leftIsGraphValue:i = leftArg.type == $MAL_NUMBER_TYPE || \
+        MalIsCsoundNode(leftArg) == 1
+      rightIsGraphValue:i = rightArg.type == $MAL_NUMBER_TYPE || \
+        MalIsCsoundNode(rightArg) == 1
+
+      if (leftIsGraphValue == 0 || rightIsGraphValue == 0) then
+        result = MalMkError(sprintf( \
+          "%s: expected numeric or Csound graph arguments", fn.string))
+      else
+        result = MalMkCsoundInfix(fn.string, args)
+      endif
+    elseif (leftArg.type != $MAL_NUMBER_TYPE || \
+            rightArg.type != $MAL_NUMBER_TYPE) then
       result = MalMkError(sprintf("%s: expected numeric arguments", fn.string))
     else
+      left:i = leftArg.number
+      right:i = rightArg.number
+
       if (strlen(fn.string) != 1) then
         result = MalMkError(sprintf("unknown builtin operator '%s'", fn.string))
       else
@@ -274,6 +287,9 @@ opcode MalIsFn(value:MalValue):i
 
     case $MAL_FUNCTION_TYPE
       result = value.isMacro == 0
+
+    case $MAL_CSOUND_INSTRUMENT_TYPE
+      result = 1
   endsw
 
   xout result
@@ -906,6 +922,41 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
       result.number = seconds * 1000
     endif
 
+  elseif (strcmp(fn.string, "csound-eval") == 0) then
+    if (args.length != 1) then
+      result = MalArityError(fn.string, 1, args.length)
+    else
+      source:MalValue = MalAt(args, 0)
+
+      if (source.type != $MAL_STRING_TYPE) then
+        result = MalMkError("csound-eval: expected string argument")
+      else
+        code:S = source.string
+        result = MalCsoundEval(code)
+      endif
+    endif
+
+  elseif (strcmp(fn.string, "csound/param-bindings") == 0) then
+    if (args.length != 1) then
+      result = MalArityError(fn.string, 1, args.length)
+    else
+      result = MalCsoundParamBindings(MalAt(args, 0))
+    endif
+
+  elseif (strcmp(fn.string, "csound/compile-inst") == 0) then
+    if (args.length != 3) then
+      result = MalArityError(fn.string, 3, args.length)
+    else
+      instrumentName:MalValue = MalAt(args, 0)
+      parameters:MalValue = MalAt(args, 1)
+      graph:MalValue = MalAt(args, 2)
+      result = MalCompileCsoundInstrument( \
+        instrumentName, parameters, graph)
+    endif
+
+  elseif (strcmp(fn.string, "csound/event") == 0) then
+    result = MalCsoundEvent(args)
+
   elseif (strcmp(fn.string, "readline") == 0) then
     if (args.length != 1) then
       result = MalArityError(fn.string, 1, args.length)
@@ -1140,8 +1191,12 @@ opcode MalApply(fn:MalValue, args:MalValue):MalValue
     result:MalValue = MalApplyBuiltinOperator(fn, args)
   elseif (fn.type == $MAL_BUILTIN_TYPE) then
     result:MalValue = MalApplyBuiltin(fn, args)
+  elseif (fn.type == $MAL_BUILTIN_OPCODE_TYPE) then
+    result:MalValue = MalApplyCsoundOpcode(fn, args)
   elseif (fn.type == $MAL_FUNCTION_TYPE) then
     result:MalValue = MalApplyFunction(fn, args)
+  elseif (fn.type == $MAL_CSOUND_INSTRUMENT_TYPE) then
+    result:MalValue = MalScheduleCsoundInstrument(fn, args, 0, 1)
   else
     result:MalValue = MalMkError(sprintf("cannot apply %s", pr_str(fn)))
   endif
@@ -1925,6 +1980,39 @@ opcode MalMkStepAEnv():MalEnv
 
   if (result.type == $MAL_ERROR_TYPE) then
     prints "host language bootstrap failed: %s\n", result.string
+  endif
+
+  xout env
+endop
+
+opcode MalMkCsoundEnv():MalEnv
+  env:MalEnv = MalMkStepAEnv()
+  env = MalEnvSet(env, "csound-eval", MalMkBuiltin("csound-eval"))
+  env = MalEnvSet(env, "csound/param-bindings", \
+    MalMkBuiltin("csound/param-bindings"))
+  env = MalEnvSet(env, "csound/compile-inst", \
+    MalMkBuiltin("csound/compile-inst"))
+  env = MalEnvSet(env, "csound/event", MalMkBuiltin("csound/event"))
+  env = MalEnvSet(env, "csound/cpsmidinn", MalMkCsoundOpcode( \
+    "cpsmidinn", $MAL_CSOUND_EXPRESSION_NODE, 1, 1))
+  env = MalEnvSet(env, "csound/pluck", MalMkCsoundOpcode( \
+    "pluck", $MAL_CSOUND_AUDIO_NODE, 5, 7))
+  env = MalEnvSet(env, "csound/poscil", MalMkCsoundOpcode( \
+    "poscil", $MAL_CSOUND_AUDIO_NODE, 2, 4))
+  env = MalEnvSet(env, "csound/linseg", MalMkCsoundOpcode( \
+    "linseg", $MAL_CSOUND_AUDIO_NODE, 3, 33))
+  env = MalEnvSet(env, "csound/tone", MalMkCsoundOpcode( \
+    "tone", $MAL_CSOUND_AUDIO_NODE, 2, 2))
+  env = MalEnvSet(env, "csound/pan2", MalMkCsoundOpcode( \
+    "pan2", $MAL_CSOUND_AUDIO_PAIR_NODE, 2, 2))
+  env = MalEnvSet(env, "csound/outs", MalMkCsoundOpcode( \
+    "outs", $MAL_CSOUND_STATEMENT_NODE, 1, 2))
+
+  source:S = "(defmacro! definst (fn* (name params body) (list 'def! name (list 'csound/compile-inst (list 'quote name) (list 'quote params) (list 'let* (csound/param-bindings params) body)))))"
+  result:MalValue, env = MalEvalSourceEnv(source, env)
+
+  if (result.type == $MAL_ERROR_TYPE) then
+    prints "definst bootstrap failed: %s\n", result.string
   endif
 
   xout env

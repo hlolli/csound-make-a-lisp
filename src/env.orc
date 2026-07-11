@@ -62,7 +62,6 @@ opcode MalEnvAllocateId():i
     MalEnvEnsureCapacity()
     id = malEnvCount
     malEnvCount += 1
-
   endif
 
   xout id
