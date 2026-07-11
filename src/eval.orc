@@ -1960,6 +1960,12 @@ opcode MalMkStepAEnv():MalEnv
   env = MalEnvSet(env, "conj", MalMkBuiltin("conj"))
   env = MalEnvSet(env, "time-ms", MalMkBuiltin("time-ms"))
   env = MalEnvSet(env, "println", MalMkBuiltin("println"))
-  env = MalRefreshTopLevelFunctionClosures(env)
+  source:S = "(def! *host-language* \"Csound7\")"
+  result:MalValue, env = MalEvalSourceEnv(source, env)
+
+  if (result.type == $MAL_ERROR_TYPE) then
+    prints "host language bootstrap failed: %s\n", result.string
+  endif
+
   xout env
 endop

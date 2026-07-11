@@ -34,6 +34,19 @@ instr TEST
   env:MalEnv = MalMkStepAEnv()
   env = MalEnvSet(env, "host-opcode", MalMkBuiltinOpcode("oscili"))
 
+  env = ASSERT_REP_ENV("*host-language*", "\"Csound7\"", env)
+
+  env = ASSERT_REP_ENV( \
+    "(def! ordinary-function (fn* (x) x))", \
+    "#<function:fn*>", env)
+  env = ASSERT_REP_ENV( \
+    "(defmacro! copied-macro ordinary-function)", \
+    "#<function:fn*>", env)
+  env = ASSERT_REP_ENV("(fn? ordinary-function)", "true", env)
+  env = ASSERT_REP_ENV("(macro? ordinary-function)", "false", env)
+  env = ASSERT_REP_ENV("(fn? copied-macro)", "false", env)
+  env = ASSERT_REP_ENV("(macro? copied-macro)", "true", env)
+
   env = ASSERT_REP_ENV("(def! original [1 2 3])", "[1 2 3]", env)
   env = ASSERT_REP_ENV( \
     "(def! decorated (with-meta original {:source \"test\"}))", \
