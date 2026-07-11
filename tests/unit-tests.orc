@@ -131,9 +131,9 @@ instr TEST_BUILTINS
   closure[0] = env
   functionValue:MalValue = MalMkFunctionWithEnv(params, body, closure)
   macroValue:MalValue = MalFunctionAsMacro(functionValue)
-  storedParams:MalValue = functionValue.list[0]
+  storedParams:MalValue = MalFunctionParams(functionValue)
   storedParam:MalValue = storedParams.list[0]
-  storedBody:MalValue = functionValue.list[1]
+  storedBody:MalValue = MalFunctionBody(functionValue)
   functionEnv:MalEnv[] = functionValue.env
   capturedEnv:MalEnv = functionEnv[0]
   captured:MalValue = MalEnvGet(capturedEnv, "captured")
@@ -281,9 +281,7 @@ instr TEST_METADATA
     exitnow(1)
   endif
 
-  readerTokens:S[] init 1
-  readerTokens[0] = "done"
-  reader:MalReader init "done", 0, readerTokens, 1, 1
+  reader:MalReader init "done", 0, 1, 1
   readResult:MalReadResult = MalMkReadResult(macroWithMeta, reader)
   roundTrip:MalValue = MalReadResultValue(readResult)
   roundTripMetadata:MalValue = MalMeta(roundTrip)

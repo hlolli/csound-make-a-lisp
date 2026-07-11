@@ -1,12 +1,20 @@
-struct MalValue type:i, number:i, string:S, list:MalValue[], env:MalEnv[], metadata:MalValue[], length:i, isMacro:i
+struct MalValue type:i, number:i, string:S, list:MalValue[], env:MalEnv[], metadata:MalValue[], length:i, isMacro:i, astRef:i
 
 struct MalTokens length:i, tokens:S[]
 
-struct MalReader peek:S, position:i, tokens:S[], length:i, done:i
+struct MalReader peek:S, position:i, length:i, done:i
 
-struct MalReadResult type:i, number:i, string:S, list:MalValue[], env:MalEnv[], metadata:MalValue[], length:i, isMacro:i, readerPeek:S, readerPosition:i, readerTokens:S[], readerLength:i, readerDone:i
+struct MalReadResult value:MalValue, reader:MalReader
 
-struct MalEnv keys:S[], values:MalValue[], outer:MalEnv[], length:i
+struct MalEnv keys:S[], values:MalValue[], outer:MalEnv[], length:i, id:i, persistent:i
 
+malEmptyValues@global:MalValue[] init 0
+malEmptyEnvs@global:MalEnv[] init 0
+malEmptyStrings@global:S[] init 0
 malAtomValues@global:MalValue[] init 0
 malAtomCount@global:i init 0
+malFunctionDefinitions@global:MalValue[] init 0
+malFunctionCount@global:i init 0
+malAstNodes@global:MalValue[] init 0
+malAstNodeCount@global:i init 0
+malReaderTokens@global:S[] init 0

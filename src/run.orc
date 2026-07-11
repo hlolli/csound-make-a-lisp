@@ -20,7 +20,8 @@ instr MAL_SCRIPT
     scriptPath:S = ScommandLine[0]
     loadForm:MalValue = MalMkList2( \
       MalMkSymbol("load-file"), MalMkString(scriptPath))
-    result:MalValue, env = EVAL_ENV(loadForm, env)
+    scriptInputEnv:MalEnv = env
+    result:MalValue, env = EVAL_ENV(loadForm, scriptInputEnv)
 
     if (result.type == $MAL_ERROR_TYPE) then
       prints "%s\n", result.string

@@ -277,7 +277,7 @@ opcode read_sequence(reader:MalReader, endToken:S, sequenceType:i):MalReadResult
       nextValue:MalValue = MalReadResultValue(next)
       currentToken = MalReadResultReader(next)
 
-      if next.type == $MAL_ERROR_TYPE then
+      if nextValue.type == $MAL_ERROR_TYPE then
         newSequence = nextValue
         ierror = 1
       else
@@ -328,7 +328,7 @@ opcode read_reader_macro(reader:MalReader, macroSymbol:S, macroToken:S):MalReadR
   else
     next:MalReadResult = read_form(reader)
     nextValue:MalValue = MalReadResultValue(next)
-    if next.type == $MAL_ERROR_TYPE then
+    if nextValue.type == $MAL_ERROR_TYPE then
       result = next
     else
       v = MalMkList2(MalMkSymbol(macroSymbol), nextValue)
@@ -352,7 +352,7 @@ opcode read_with_meta(reader:MalReader):MalReadResult
     metaValue:MalValue = MalReadResultValue(meta)
     formReader:MalReader = MalReadResultReader(meta)
 
-    if (meta.type == $MAL_ERROR_TYPE) then
+    if (metaValue.type == $MAL_ERROR_TYPE) then
       result = meta
     elseif formReader.done == 1 then
       v = MalMkError("expected form after '^' metadata, got EOF")
@@ -360,7 +360,7 @@ opcode read_with_meta(reader:MalReader):MalReadResult
     else
       form:MalReadResult = read_form(formReader)
       formValue:MalValue = MalReadResultValue(form)
-      if form.type == $MAL_ERROR_TYPE then
+      if formValue.type == $MAL_ERROR_TYPE then
         result = form
       else
         v = MalMkList3(MalMkSymbol("with-meta"), formValue, metaValue)

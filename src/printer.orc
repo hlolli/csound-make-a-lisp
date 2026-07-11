@@ -38,7 +38,7 @@ opcode MalPrintPrefixedForms(ast:MalValue, prefix:S):S
   Sout = prefix
   if (ast.length > 0) then
     for indx in [0 ... ast.length - 1] do
-      next:MalValue = ast.list[indx]
+      next:MalValue = MalAt(ast, indx)
       Snext = pr_str(next)
       Sout strcat Sout, Snext
     od
@@ -54,7 +54,7 @@ opcode MalPrintDelimitedForms(ast:MalValue, left:S, right:S):S
       if (indx > 0) then
         Sout strcat Sout, " "
       endif
-      Sout strcat Sout, pr_str(ast.list[indx])
+      Sout strcat Sout, pr_str(MalAt(ast, indx))
     od
   endif
 
@@ -66,7 +66,7 @@ opcode MalPrintPrefixedFormsUnreadably(ast:MalValue, prefix:S):S
   Sout = prefix
   if (ast.length > 0) then
     for indx in [0 ... ast.length - 1] do
-      next:MalValue = ast.list[indx]
+      next:MalValue = MalAt(ast, indx)
       Snext = pr_str_unreadably(next)
       Sout strcat Sout, Snext
     od
@@ -82,7 +82,7 @@ opcode MalPrintDelimitedFormsUnreadably(ast:MalValue, left:S, right:S):S
       if (indx > 0) then
         Sout strcat Sout, " "
       endif
-      Sout strcat Sout, pr_str_unreadably(ast.list[indx])
+      Sout strcat Sout, pr_str_unreadably(MalAt(ast, indx))
     od
   endif
 
@@ -158,9 +158,9 @@ opcode pr_str_unreadably(ast:MalValue):S
     case $MAL_WITH_META_TYPE
       Sout strcat Sout, "^"
       if (ast.length > 1) then
-        Sout strcat Sout, pr_str_unreadably(ast.list[1])
+        Sout strcat Sout, pr_str_unreadably(MalAt(ast, 1))
         Sout strcat Sout, " "
-        Sout strcat Sout, pr_str_unreadably(ast.list[0])
+        Sout strcat Sout, pr_str_unreadably(MalAt(ast, 0))
       endif
 
     case $MAL_LIST_TYPE
@@ -253,9 +253,9 @@ opcode pr_str(ast:MalValue):S
     case $MAL_WITH_META_TYPE
       Sout strcat Sout, "^"
       if (ast.length > 1) then
-        Sout strcat Sout, pr_str(ast.list[1])
+        Sout strcat Sout, pr_str(MalAt(ast, 1))
         Sout strcat Sout, " "
-        Sout strcat Sout, pr_str(ast.list[0])
+        Sout strcat Sout, pr_str(MalAt(ast, 0))
       endif
 
     case $MAL_LIST_TYPE

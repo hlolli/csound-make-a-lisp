@@ -1,32 +1,148 @@
+opcode MalEnvHandle(id:i):MalEnv
+  env:MalEnv init malEmptyStrings, malEmptyValues, malEmptyEnvs, 0, id, 0
+  xout env
+endop
+
 opcode MalNextToken(reader:MalReader):MalReader
   if (reader.position + 1 >= reader.length) then
     reader.done = 1
   else
     reader.position += 1
-    STokens[] = reader.tokens
-    reader.peek = STokens[reader.position]
+    reader.peek = malReaderTokens[reader.position]
   endif
   xout(reader)
 endop
 
 opcode MalAppendValue(destination:MalValue, value:MalValue):MalValue
+  capacity:i = lenarray(destination.list)
+
+  if (destination.length >= capacity) then
+    newCapacity:i = capacity > 0 ? capacity * 2 : 1
+    values:MalValue[] init newCapacity
+
+    if (destination.length > 0) then
+      for index in [0 ... destination.length - 1] do
+        values[index] = destination.list[index]
+      od
+    endif
+
+    destination.list = values
+  endif
+
   destination.list[destination.length] = value
   destination.length += 1
   xout destination
 endop
 
 opcode MalMkReader(tstruct:MalTokens):MalReader
-  Stokens[] slicearray_i tstruct.tokens, 0, tstruct.length
-  reader:MalReader init Stokens[0], 0, Stokens, tstruct.length, 0
+  malReaderTokens init tstruct.length
+
+  if (tstruct.length > 0) then
+    for index in [0 ... tstruct.length - 1] do
+      malReaderTokens[index] = tstruct.tokens[index]
+    od
+  endif
+
+  reader:MalReader init malReaderTokens[0], 0, tstruct.length, 0
   xout(reader)
 endop
 
 opcode MalMkValue(type:i):MalValue
-  list:MalValue[] init 12
-  env:MalEnv[] init 0
-  metadata:MalValue[] init 0
-  val:MalValue init type, 0, "", list, env, metadata, 0, 0
+  val:MalValue init type, 0, "", malEmptyValues, malEmptyEnvs, \
+    malEmptyValues, 0, 0, 0
   xout(val)
+endop
+
+opcode MalAt(value:MalValue, index:i):MalValue
+  if (value.astRef == 1) then
+    result:MalValue = malAstNodes[value.number].list[index]
+  else
+    result:MalValue = value.list[index]
+  endif
+
+  xout result
+endop
+
+opcode MalAstEnsureCapacity():void
+  capacity:i = lenarray(malAstNodes)
+
+  if (malAstNodeCount >= capacity) then
+    preserved:MalValue[] init malAstNodeCount
+
+    if (malAstNodeCount > 0) then
+      for index in [0 ... malAstNodeCount - 1] do
+        preserved[index] = malAstNodes[index]
+      od
+    endif
+
+    newCapacity:i = capacity == 0 ? 1024 : capacity * 2
+    malAstNodes init newCapacity
+
+    if (malAstNodeCount > 0) then
+      for index in [0 ... malAstNodeCount - 1] do
+        malAstNodes[index] = preserved[index]
+      od
+    endif
+  endif
+endop
+
+opcode MalInternAst(value:MalValue):MalValue
+  isCollection:i = value.type == $MAL_LIST_TYPE || \
+    value.type == $MAL_VECTOR_TYPE || value.type == $MAL_HASH_MAP_TYPE
+
+  if (isCollection == 0 || value.astRef == 1) then
+    result:MalValue = value
+  else
+    node:MalValue = MalMkValue(value.type)
+    node.metadata = value.metadata
+
+    if (value.length > 0) then
+      for index in [0 ... value.length - 1] do
+        child:MalValue = MalInternAst(value.list[index])
+        node = MalAppendValue(node, child)
+      od
+    endif
+
+    MalAstEnsureCapacity()
+    nodeId:i = malAstNodeCount
+    malAstNodeCount += 1
+    malAstNodes[nodeId] = node
+
+    result = MalMkValue(value.type)
+    result.number = nodeId
+    result.metadata = value.metadata
+    result.length = value.length
+    result.astRef = 1
+  endif
+
+  xout result
+endop
+
+opcode MalMaterialize(value:MalValue):MalValue
+  isCollection:i = value.type == $MAL_LIST_TYPE || \
+    value.type == $MAL_VECTOR_TYPE || value.type == $MAL_HASH_MAP_TYPE
+
+  if (isCollection == 0) then
+    result:MalValue = value
+  else
+    result = MalMkValue(value.type)
+    result.metadata = value.metadata
+
+    if (value.length > 0) then
+      for index in [0 ... value.length - 1] do
+        child:MalValue = MalMaterialize(MalAt(value, index))
+        result = MalAppendValue(result, child)
+      od
+    endif
+  endif
+
+  xout result
+endop
+
+opcode MalMkNumber(number:i):MalValue
+  value:MalValue = MalMkValue($MAL_NUMBER_TYPE)
+  value.number = number
+  xout value
 endop
 
 opcode MalMeta(value:MalValue):MalValue
@@ -123,7 +239,7 @@ opcode MalMapFindKey(mapValue:MalValue, key:MalValue):i
     for entryIndex in [0 ... entryCount - 1] do
       keyIndex:i = entryIndex * 2
 
-      if (MalMapKeysEqual(mapValue.list[keyIndex], key) == 1) then
+      if (MalMapKeysEqual(MalAt(mapValue, keyIndex), key) == 1) then
         result = keyIndex
         break
       endif
@@ -140,7 +256,7 @@ opcode MalMapAssoc(mapValue:MalValue, key:MalValue, value:MalValue):MalValue
 
   if (mapValue.length > 0) then
     for index in [0 ... mapValue.length - 1] do
-      entries[index] = mapValue.list[index]
+      entries[index] = MalAt(mapValue, index)
     od
   endif
 
@@ -170,7 +286,7 @@ opcode MalMapDissoc(mapValue:MalValue, key:MalValue):MalValue
     if (mapValue.length > 2) then
       for index in [0 ... mapValue.length - 1] do
         if (index != keyIndex && index != keyIndex + 1) then
-          entries[destination] = mapValue.list[index]
+          entries[destination] = MalAt(mapValue, index)
           destination += 1
         endif
       od
@@ -190,7 +306,7 @@ opcode MalMapGet(mapValue:MalValue, key:MalValue):MalValue
   if (keyIndex < 0) then
     result:MalValue = MalMkValue($MAL_NIL_TYPE)
   else
-    result:MalValue = mapValue.list[keyIndex + 1]
+    result:MalValue = MalAt(mapValue, keyIndex + 1)
   endif
 
   xout result
@@ -202,7 +318,7 @@ opcode MalMapKeys(mapValue:MalValue):MalValue
 
   if (entryCount > 0) then
     for index in [0 ... entryCount - 1] do
-      values[index] = mapValue.list[index * 2]
+      values[index] = MalAt(mapValue, index * 2)
     od
   endif
 
@@ -218,7 +334,7 @@ opcode MalMapValues(mapValue:MalValue):MalValue
 
   if (entryCount > 0) then
     for index in [0 ... entryCount - 1] do
-      values[index] = mapValue.list[index * 2 + 1]
+      values[index] = MalAt(mapValue, index * 2 + 1)
     od
   endif
 
@@ -235,7 +351,7 @@ opcode MalNormalizeMap(mapValue:MalValue):MalValue
     for index in [0 ... int(mapValue.length / 2) - 1] do
       keyIndex:i = index * 2
       result = MalMapAssoc( \
-        result, mapValue.list[keyIndex], mapValue.list[keyIndex + 1])
+        result, MalAt(mapValue, keyIndex), MalAt(mapValue, keyIndex + 1))
     od
   endif
 
@@ -300,16 +416,63 @@ opcode MalMkBuiltinOpcode(name:S):MalValue
   xout val
 endop
 
+opcode MalFunctionEnsureCapacity():void
+  capacity:i = lenarray(malFunctionDefinitions)
+
+  if (malFunctionCount >= capacity) then
+    preserved:MalValue[] init malFunctionCount
+
+    if (malFunctionCount > 0) then
+      for index in [0 ... malFunctionCount - 1] do
+        preserved[index] = malFunctionDefinitions[index]
+      od
+    endif
+
+    newCapacity:i = capacity == 0 ? 256 : capacity * 2
+    malFunctionDefinitions init newCapacity
+
+    if (malFunctionCount > 0) then
+      for index in [0 ... malFunctionCount - 1] do
+        malFunctionDefinitions[index] = preserved[index]
+      od
+    endif
+  endif
+endop
+
 opcode MalMkFunction(params:MalValue, body:MalValue):MalValue
-  val:MalValue = MalMkValue($MAL_FUNCTION_TYPE)
-  val = MalAppendValue(val, params)
-  val = MalAppendValue(val, body)
-  xout val
+  MalFunctionEnsureCapacity()
+
+  definition:MalValue = MalMkValue($MAL_FUNCTION_TYPE)
+  definition = MalAppendValue(definition, params)
+  definition = MalAppendValue(definition, MalInternAst(body))
+
+  functionId:i = malFunctionCount
+  malFunctionCount += 1
+  malFunctionDefinitions[functionId] = definition
+
+  handle:MalValue = MalMkValue($MAL_FUNCTION_TYPE)
+  handle.number = functionId
+  handle.length = 2
+  xout handle
+endop
+
+opcode MalFunctionParams(fn:MalValue):MalValue
+  xout malFunctionDefinitions[fn.number].list[0]
+endop
+
+opcode MalFunctionBody(fn:MalValue):MalValue
+  xout malFunctionDefinitions[fn.number].list[1]
 endop
 
 opcode MalMkFunctionWithEnv(params:MalValue, body:MalValue, closure:MalEnv[]):MalValue
   val:MalValue = MalMkFunction(params, body)
-  val.env = closure
+
+  if (lenarray(closure) > 0) then
+    reference:MalEnv[] init 1
+    reference[0] = MalEnvHandle(closure[0].id)
+    val.env = reference
+  endif
+
   xout val
 endop
 
@@ -350,22 +513,16 @@ opcode MalMkList3(first:MalValue, second:MalValue, third:MalValue):MalValue
 endop
 
 opcode MalMkReadResult(value:MalValue, reader:MalReader):MalReadResult
-  result:MalReadResult init value.type, value.number, value.string, value.list, \
-    value.env, value.metadata, value.length, value.isMacro, reader.peek, \
-    reader.position, reader.tokens, reader.length, reader.done
+  result:MalReadResult init value, reader
   xout result
 endop
 
 opcode MalReadResultValue(result:MalReadResult):MalValue
-  value:MalValue init result.type, result.number, result.string, result.list, \
-    result.env, result.metadata, result.length, result.isMacro
-  xout value
+  xout result.value
 endop
 
 opcode MalReadResultReader(result:MalReadResult):MalReader
-  reader:MalReader init result.readerPeek, result.readerPosition, \
-    result.readerTokens, result.readerLength, result.readerDone
-  xout reader
+  xout result.reader
 endop
 
 opcode MalIsNumericString(token:S):i

@@ -51,8 +51,8 @@ opcode MalInputPromptFromForm(ast:MalValue):(S, i)
   isRequest:i = 0
 
   if (ast.type == $MAL_LIST_TYPE && ast.length == 2) then
-    head:MalValue = ast.list[0]
-    argument:MalValue = ast.list[1]
+    head:MalValue = MalAt(ast, 0)
+    argument:MalValue = MalAt(ast, 1)
 
     if (head.type == $MAL_SYMBOL_TYPE && \
         strcmp(head.string, "readline") == 0 && \

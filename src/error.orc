@@ -15,7 +15,7 @@ endop
 
 opcode MalErrorPayload(error:MalValue):MalValue
   if (error.type == $MAL_ERROR_TYPE && error.length > 0) then
-    value:MalValue = error.list[0]
+    value:MalValue = MalAt(error, 0)
   else
     value:MalValue = MalMkString(error.string)
   endif
