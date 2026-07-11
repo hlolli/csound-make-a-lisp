@@ -35,6 +35,8 @@ instr TEST
   env = MalEnvSet(env, "host-opcode", MalMkBuiltinOpcode("oscili"))
 
   env = ASSERT_REP_ENV("*host-language*", "\"Csound7\"", env)
+  env = ASSERT_REP_ENV("(list? *ARGV*)", "true", env)
+  env = ASSERT_REP_ENV("*ARGV*", "()", env)
 
   env = ASSERT_REP_ENV( \
     "(def! ordinary-function (fn* (x) x))", \

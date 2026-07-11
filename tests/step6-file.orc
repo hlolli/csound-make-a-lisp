@@ -45,6 +45,8 @@ instr TEST
   prints "Testing Step 6 file and reader builtins\n"
   env:MalEnv = MalMkStep6Env()
 
+  env = ASSERT_REP_ENV("(list? *ARGV*)", "true", env)
+  env = ASSERT_REP_ENV("*ARGV*", "()", env)
   env = ASSERT_REP_ENV("(read-string \"(+ 2 3)\")", "(+ 2 3)", env)
   env = ASSERT_REP_ENV("(read-string \"(1 2 (3 4) nil)\")", \
     "(1 2 (3 4) nil)", env)

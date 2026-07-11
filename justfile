@@ -9,7 +9,7 @@ default:
 version:
     @{{csound}} --version
 
-test: smoke reader eval step3 step4 step5 step6 step7 step8 step9 step-a unit harness-reader harness-eval harness-env harness-step4 harness-step5 harness-step6 harness-step7 harness-step8 harness-step9
+test: smoke reader eval step3 step4 step5 step6 step7 step8 step9 step-a script-args unit harness-reader harness-eval harness-env harness-step4 harness-step5 harness-step6 harness-step7 harness-step8 harness-step9
 
 smoke:
     {{csound}} {{csound_flags}} tests/step0-repl.orc
@@ -49,6 +49,9 @@ step9:
 
 step-a:
     {{csound}} {{csound_flags}} tests/stepA-core.orc
+
+script-args:
+    ./run tests/stepA-script-args.mal first "two words" --gain=0.5 ""
 
 unit:
     {{csound}} {{csound_flags}} tests/unit-tests.orc

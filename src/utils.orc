@@ -60,6 +60,21 @@ opcode MalMkString(value:S):MalValue
   xout val
 endop
 
+opcode MalStringArrayToList(values:S[], startIndex:i):MalValue
+  result:MalValue = MalMkValue($MAL_LIST_TYPE)
+  valueCount:i = lenarray(values)
+  start:i = startIndex < 0 ? 0 : startIndex
+
+  if (start < valueCount) then
+    for index in [start ... valueCount - 1] do
+      value:S = values[index]
+      result = MalAppendValue(result, MalMkString(value))
+    od
+  endif
+
+  xout result
+endop
+
 opcode MalMkKeyword(name:S):MalValue
   val:MalValue = MalMkValue($MAL_KEYWORD_TYPE)
   val.string = name

@@ -1895,6 +1895,7 @@ endop
 
 opcode MalMkStep6Env():MalEnv
   env:MalEnv = MalMkStep2Env()
+  env = MalEnvSet(env, "*ARGV*", MalMkValue($MAL_LIST_TYPE))
   source:S = "(def! load-file (fn* (f) (eval (read-string (str \"(do \" (slurp f) \"\\nnil)\")))))"
   result:MalValue, env = MalEvalSourceEnv(source, env)
 
