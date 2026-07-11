@@ -24,8 +24,28 @@ endop
 opcode MalMkValue(type:i):MalValue
   list:MalValue[] init 12
   env:MalEnv[] init 0
-  val:MalValue init type, 0, "", list, env, 0, 0
+  metadata:MalValue[] init 0
+  val:MalValue init type, 0, "", list, env, metadata, 0, 0
   xout(val)
+endop
+
+opcode MalMeta(value:MalValue):MalValue
+  if (lenarray(value.metadata) == 0) then
+    result:MalValue = MalMkValue($MAL_NIL_TYPE)
+  else
+    result:MalValue = value.metadata[0]
+  endif
+
+  xout result
+endop
+
+opcode MalWithMeta(value:MalValue, metadataValue:MalValue):MalValue
+  metadata:MalValue[] init 1
+  metadata[0] = metadataValue
+
+  result:MalValue = value
+  result.metadata = metadata
+  xout result
 endop
 
 opcode MalMkSymbol(name:S):MalValue
@@ -316,14 +336,14 @@ endop
 
 opcode MalMkReadResult(value:MalValue, reader:MalReader):MalReadResult
   result:MalReadResult init value.type, value.number, value.string, value.list, \
-    value.env, value.length, value.isMacro, reader.peek, reader.position, \
-    reader.tokens, reader.length, reader.done
+    value.env, value.metadata, value.length, value.isMacro, reader.peek, \
+    reader.position, reader.tokens, reader.length, reader.done
   xout result
 endop
 
 opcode MalReadResultValue(result:MalReadResult):MalValue
   value:MalValue init result.type, result.number, result.string, result.list, \
-    result.env, result.length, result.isMacro
+    result.env, result.metadata, result.length, result.isMacro
   xout value
 endop
 

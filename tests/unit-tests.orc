@@ -234,7 +234,72 @@ instr TEST_ENV
   ASSERT_ENV_VALUE(step2Env, "/", $MAL_BUILTIN_OPERATOR_TYPE, "/")
 endin
 
+instr TEST_METADATA
+  prints "Testing metadata storage\n"
+
+  value:MalValue = MalMkList1(MalMkSymbol("value"))
+  metadataValue:MalValue = MalMkKeyword("tag")
+  valueWithMeta:MalValue = MalWithMeta(value, metadataValue)
+  storedMetadata:MalValue = MalMeta(valueWithMeta)
+  originalMetadata:MalValue = MalMeta(value)
+
+  if (lenarray(value.metadata) != 0 || \
+      originalMetadata.type != $MAL_NIL_TYPE) then
+    prints "METADATA, Assertion failed: new values should have no metadata\n"
+    exitnow(1)
+  elseif (lenarray(valueWithMeta.metadata) != 1 || \
+          storedMetadata.type != $MAL_KEYWORD_TYPE || \
+          strcmp(storedMetadata.string, "tag") != 0) then
+    prints "METADATA, Assertion failed: attached metadata was not preserved\n"
+    exitnow(1)
+  elseif (valueWithMeta.type != value.type || \
+          valueWithMeta.length != value.length || \
+          strcmp(valueWithMeta.list[0].string, value.list[0].string) != 0) then
+    prints "METADATA, Assertion failed: with-meta changed the value\n"
+    exitnow(1)
+  elseif (MalEquals(value, valueWithMeta) != 1) then
+    prints "METADATA, Assertion failed: equality considered metadata\n"
+    exitnow(1)
+  endif
+
+  env:MalEnv = MalMkEnv()
+  env = MalEnvSet(env, "captured", MalMkSymbol("binding"))
+  closure:MalEnv[] init 1
+  closure[0] = env
+  functionValue:MalValue = MalMkFunctionWithEnv( \
+    MalMkList1(MalMkSymbol("x")), MalMkSymbol("x"), closure)
+  macroValue:MalValue = MalFunctionAsMacro(functionValue)
+  macroWithMeta:MalValue = MalWithMeta(macroValue, metadataValue)
+  macroEnv:MalEnv[] = macroWithMeta.env
+  captured:MalValue = MalEnvGet(macroEnv[0], "captured")
+
+  if (macroWithMeta.type != $MAL_FUNCTION_TYPE || \
+      macroWithMeta.isMacro != 1 || macroWithMeta.length != 2 || \
+      lenarray(macroEnv) != 1 || captured.type != $MAL_SYMBOL_TYPE || \
+      strcmp(captured.string, "binding") != 0) then
+    prints "METADATA, Assertion failed: function data was not preserved\n"
+    exitnow(1)
+  endif
+
+  readerTokens:S[] init 1
+  readerTokens[0] = "done"
+  reader:MalReader init "done", 0, readerTokens, 1, 1
+  readResult:MalReadResult = MalMkReadResult(macroWithMeta, reader)
+  roundTrip:MalValue = MalReadResultValue(readResult)
+  roundTripMetadata:MalValue = MalMeta(roundTrip)
+
+  if (roundTrip.isMacro != 1 || lenarray(roundTrip.env) != 1 || \
+      roundTripMetadata.type != $MAL_KEYWORD_TYPE || \
+      strcmp(roundTripMetadata.string, "tag") != 0) then
+    prints "METADATA, Assertion failed: reader result lost value data\n"
+    exitnow(1)
+  endif
+
+  prints "METADATA, Assertion success\n"
+endin
+
 schedule("TEST_ERRORS", 0, 0)
 schedule("TEST_BUILTINS", 0, 0)
 schedule("TEST_ENV", 0, 0)
+schedule("TEST_METADATA", 0, 0)
 event_i("e", 0, 0)

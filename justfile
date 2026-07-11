@@ -14,6 +14,9 @@ test: smoke reader eval step3 step4 step5 step6 step7 step8 step9 unit harness-r
 smoke:
     {{csound}} {{csound_flags}} tests/step0-repl.orc
 
+repl:
+    @{{csound}} -d -m0 -odac -+rtaudio=null --orc src/repl.orc
+
 reader:
     {{csound}} {{csound_flags}} tests/step1-reader.orc
 
