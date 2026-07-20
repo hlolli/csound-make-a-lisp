@@ -14,7 +14,7 @@ opcode isCharWordBoundry(char:i):i
       char == $MAL_CURLY_CLOSE_TOKEN  || \
       char == $MAL_BRACKET_OPEN_TOKEN  || \
       char == $MAL_BRACKET_CLOSE_TOKEN) \
-      then
+      ithen
     ires = 1
   endif
   xout(ires)
@@ -25,7 +25,7 @@ opcode nextWordBoundry(input:S, from:i, maxLookahead:i):i
   ifound = 0
   while (indx < maxLookahead && ifound == 0) do
     ipeek = strchar:i(input, indx)
-    if (isCharWordBoundry(ipeek) == 1) then
+    if (isCharWordBoundry(ipeek) == 1) ithen
       ifound = 1
     else
       indx += 1
@@ -40,7 +40,7 @@ opcode nextEndOfLine(input:S, from:i, maxLookahead:i):i
   ifound = 0
   while (indx < maxLookahead && ifound == 0) do
     ipeek = strchar:i(input, indx)
-    if (ipeek == $MAL_NEWLINE_TOKEN) then
+    if (ipeek == $MAL_NEWLINE_TOKEN) ithen
       ifound = 1
     else
       indx += 1
@@ -57,13 +57,13 @@ opcode nextStringTokenDelimiter(input:S, from:i, maxLookahead:i):i
   while (indx < maxLookahead && ifound == 0) do
     ipeek = strchar:i(input, indx)
 
-    if (iescaped == 1) then
+    if (iescaped == 1) ithen
       iescaped = 0
       indx += 1
-    elseif (ipeek == $MAL_BACKSLASH_TOKEN) then
+    elseif (ipeek == $MAL_BACKSLASH_TOKEN) ithen
       iescaped = 1
       indx += 1
-    elseif (ipeek == $MAL_DOUBLE_QUOTE_TOKEN) then
+    elseif (ipeek == $MAL_DOUBLE_QUOTE_TOKEN) ithen
       ifound = indx + 1
     else
       indx += 1
@@ -89,30 +89,30 @@ opcode tokenize(input:S):MalTokens
 
     ;; ignore whitespaces and commas
     if (ipeek == $MAL_SPACE_TOKEN || ipeek == $MAL_TAB_TOKEN || \
-        ipeek == $MAL_COMMA_TOKEN || ipeek == $MAL_NEWLINE_TOKEN) then
+        ipeek == $MAL_COMMA_TOKEN || ipeek == $MAL_NEWLINE_TOKEN) ithen
       indx += 1
       igoto END
     endif
 
     ;; jump over line comments
-    if (ipeek == $MAL_SEMICOLON_TOKEN) then
+    if (ipeek == $MAL_SEMICOLON_TOKEN) ithen
       inextNewline = nextEndOfLine(input, indx, istrLen)
       indx = inextNewline
       igoto END
     endif
 
     ;; test for ~@ token
-    if (ipeek == $MAL_TILDE_TOKEN && ipeek2 == $MAL_AT_TOKEN) then
-      STokens[itokenCnt] = strcpy(strsub(input, indx, indx + 2))
+    if (ipeek == $MAL_TILDE_TOKEN && ipeek2 == $MAL_AT_TOKEN) ithen
+      STokens[itokenCnt] init strcpy(strsub(input, indx, indx + 2))
       itokenCnt += 1
       indx += 2
       igoto END
     endif
 
     ;; capture strings, including escaped quotes and unterminated strings
-    if (ipeek == $MAL_DOUBLE_QUOTE_TOKEN) then
+    if (ipeek == $MAL_DOUBLE_QUOTE_TOKEN) ithen
       inextString = nextStringTokenDelimiter(input, indx, istrLen)
-      STokens[itokenCnt] = strcpy(strsub(input, indx, inextString))
+      STokens[itokenCnt] init strcpy(strsub(input, indx, inextString))
       itokenCnt += 1
       indx = inextString
       igoto END
@@ -129,8 +129,8 @@ opcode tokenize(input:S):MalTokens
         ipeek == $MAL_SINGLE_QUOTE_TOKEN || \
         ipeek == $MAL_BACKTICK_TOKEN || \
         ipeek == $MAL_AT_TOKEN || \
-        ipeek == $MAL_CARET_TOKEN) then
-      STokens[itokenCnt] = strcpy(strsub(input, indx, indx + 1))
+        ipeek == $MAL_CARET_TOKEN) ithen
+      STokens[itokenCnt] init strcpy(strsub(input, indx, indx + 1))
       itokenCnt += 1
       indx += 1
       igoto END
@@ -138,9 +138,9 @@ opcode tokenize(input:S):MalTokens
 
     ;; default case: capture delimited tokens (symbols)
     inextBoundry = nextWordBoundry(input, indx, istrLen)
-    SNext = strsub(input, indx, inextBoundry)
+    SNext init strsub(input, indx, inextBoundry)
     ;; prints "SNext %s %d\n", SNext, itokenCnt
-    STokens[itokenCnt] = SNext
+    STokens[itokenCnt] init SNext
     itokenCnt += 1
     indx = inextBoundry
 
@@ -179,24 +179,24 @@ endop
 opcode MalDecodeStringToken(token:S):S
   itokenLen = strlen(token)
   indx = 1
-  Sout = ""
+  Sout init ""
 
   while (indx < itokenLen - 1) do
     ichar = strchar:i(token, indx)
 
-    if (ichar == $MAL_BACKSLASH_TOKEN && indx + 1 < itokenLen - 1) then
+    if (ichar == $MAL_BACKSLASH_TOKEN && indx + 1 < itokenLen - 1) ithen
       inext = strchar:i(token, indx + 1)
 
-      if (inext == 110) then
-        Schar = sprintf("%c", $MAL_NEWLINE_TOKEN)
+      if (inext == 110) ithen
+        Schar init sprintf("%c", $MAL_NEWLINE_TOKEN)
       else
-        Schar = sprintf("%c", inext)
+        Schar init sprintf("%c", inext)
       endif
 
       Sout strcat Sout, Schar
       indx += 2
     else
-      Schar = sprintf("%c", ichar)
+      Schar init sprintf("%c", ichar)
       Sout strcat Sout, Schar
       indx += 1
     endif
@@ -211,7 +211,7 @@ opcode MalStringTokenHasClosingQuote(token:S):i
 
   if (itokenLen >= 2 && \
       strchar:i(token, 0) == $MAL_DOUBLE_QUOTE_TOKEN && \
-      strchar:i(token, itokenLen - 1) == $MAL_DOUBLE_QUOTE_TOKEN) then
+      strchar:i(token, itokenLen - 1) == $MAL_DOUBLE_QUOTE_TOKEN) ithen
     ibackslashCount = 0
     indx = itokenLen - 2
 
@@ -228,66 +228,61 @@ endop
 
 
 opcode read_atom(reader:MalReader):MalValue
-  Stoken = reader.peek
-  v:MalValue = MalMkValue($MAL_NUMBER_TYPE)
+  Stoken init reader.peek
   itokenLen = strlen(Stoken)
   ifirstChar = strchar:i(Stoken, 0)
 
   if (ifirstChar == $MAL_DOUBLE_QUOTE_TOKEN && \
-      MalStringTokenHasClosingQuote(Stoken) == 0) then
-    v = MalMkError("expected '\"', got EOF")
-  elseif (ifirstChar == $MAL_DOUBLE_QUOTE_TOKEN) then
-    v.type = $MAL_STRING_TYPE
-    v.string = MalDecodeStringToken(Stoken)
-  elseif (ifirstChar == $MAL_COLON_TOKEN) then
-    v.type = $MAL_KEYWORD_TYPE
-    v.string = strsub(Stoken, 1, itokenLen)
-  elseif MalIsNumericString(Stoken) == 1 then
-    v.type = $MAL_NUMBER_TYPE
+      MalStringTokenHasClosingQuote(Stoken) == 0) ithen
+    v:MalValue init MalMkError("expected '\"', got EOF")
+  elseif (ifirstChar == $MAL_DOUBLE_QUOTE_TOKEN) ithen
+    v:MalValue init MalMkString(MalDecodeStringToken(Stoken))
+  elseif (ifirstChar == $MAL_COLON_TOKEN) ithen
+    v:MalValue init MalMkKeyword(strsub(Stoken, 1, itokenLen))
+  elseif MalIsNumericString(Stoken) == 1 ithen
     inum = strtod:i(Stoken)
-    v.number = inum
-  elseif strcmp("nil", Stoken) == 0 then
-    v.type = $MAL_NIL_TYPE
-  elseif strcmp("true", Stoken) == 0 then
-    v.type = $MAL_TRUE_TYPE
-  elseif strcmp("false", Stoken) == 0 then
-    v.type = $MAL_FALSE_TYPE
+    v:MalValue init MalMkNumber(inum)
+  elseif strcmp("nil", Stoken) == 0 ithen
+    v:MalValue init MalMkValue($MAL_NIL_TYPE)
+  elseif strcmp("true", Stoken) == 0 ithen
+    v:MalValue init MalMkValue($MAL_TRUE_TYPE)
+  elseif strcmp("false", Stoken) == 0 ithen
+    v:MalValue init MalMkValue($MAL_FALSE_TYPE)
   else
-    v.type = $MAL_SYMBOL_TYPE
-    v.string = Stoken
+    v:MalValue init MalMkSymbol(Stoken)
   endif
 
   xout v
 endop
 
 opcode read_sequence(reader:MalReader, endToken:S, sequenceType:i):MalReadResult
-  newSequence:MalValue = MalMkValue(sequenceType)
-  currentToken:MalReader = MalNextToken(reader)
+  newSequence:MalValue init MalMkValue(sequenceType)
+  currentToken:MalReader init MalNextToken(reader)
   ierror = 0
   ifoundEnd = 0
 
   while(ifoundEnd == 0 && ierror == 0) do
-    if currentToken.done == 1 then
-      newSequence = MalMkError(sprintf("expected '%s', got EOF", endToken))
+    if currentToken.done == 1 ithen
+      newSequence init MalMkError(sprintf("expected '%s', got EOF", endToken))
       ierror = 1
-    elseif strcmp(currentToken.peek, endToken) == 0 then
+    elseif strcmp(currentToken.peek, endToken) == 0 ithen
       ifoundEnd = 1
     else
-      next:MalReadResult = read_form(currentToken)
-      nextValue:MalValue = MalReadResultValue(next)
-      currentToken = MalReadResultReader(next)
+      next:MalReadResult init read_form(currentToken)
+      nextValue:MalValue init MalReadResultValue(next)
+      currentToken init MalReadResultReader(next)
 
-      if nextValue.type == $MAL_ERROR_TYPE then
-        newSequence = nextValue
+      if nextValue.type == $MAL_ERROR_TYPE ithen
+        newSequence init nextValue
         ierror = 1
       else
-        newSequence = MalAppendValue(newSequence, nextValue)
+        newSequence init MalAppendValue(newSequence, nextValue)
       endif
     endif
   od
 
-  if ierror == 0 then
-    currentToken = MalNextToken(currentToken)
+  if ierror == 0 ithen
+    currentToken init MalNextToken(currentToken)
   endif
 
   xout MalMkReadResult(newSequence, currentToken)
@@ -303,36 +298,36 @@ opcode read_vector(reader:MalReader, endToken:S):MalReadResult
 endop
 
 opcode read_hash_map(reader:MalReader, endToken:S):MalReadResult
-  result:MalReadResult = read_sequence(reader, endToken, $MAL_HASH_MAP_TYPE)
-  value:MalValue = MalReadResultValue(result)
+  result:MalReadResult init read_sequence(reader, endToken, $MAL_HASH_MAP_TYPE)
+  value:MalValue init MalReadResultValue(result)
 
-  if (value.type != $MAL_ERROR_TYPE && value.length % 2 != 0) then
-    value = MalMkError("expected hash-map value, got end of map")
-    result = MalMkReadResult(value, MalReadResultReader(result))
-  elseif (value.type != $MAL_ERROR_TYPE) then
-    value = MalNormalizeMap(value)
-    result = MalMkReadResult(value, MalReadResultReader(result))
+  if (value.type != $MAL_ERROR_TYPE && value.length % 2 != 0) ithen
+    value init MalMkError("expected hash-map value, got end of map")
+    result init MalMkReadResult(value, MalReadResultReader(result))
+  elseif (value.type != $MAL_ERROR_TYPE) ithen
+    value init MalNormalizeMap(value)
+    result init MalMkReadResult(value, MalReadResultReader(result))
   endif
 
   xout result
 endop
 
 opcode read_reader_macro(reader:MalReader, macroSymbol:S, macroToken:S):MalReadResult
-  v:MalValue = MalMkValue($MAL_LIST_TYPE)
-  result:MalReadResult = MalMkReadResult(v, reader)
-  reader = MalNextToken(reader)
+  v:MalValue init MalMkValue($MAL_LIST_TYPE)
+  result:MalReadResult init MalMkReadResult(v, reader)
+  reader init MalNextToken(reader)
 
-  if reader.done == 1 then
-    v = MalMkError(sprintf("expected form after '%s', got EOF", macroToken))
-    result = MalMkReadResult(v, reader)
+  if reader.done == 1 ithen
+    v init MalMkError(sprintf("expected form after '%s', got EOF", macroToken))
+    result init MalMkReadResult(v, reader)
   else
-    next:MalReadResult = read_form(reader)
-    nextValue:MalValue = MalReadResultValue(next)
-    if nextValue.type == $MAL_ERROR_TYPE then
-      result = next
+    next:MalReadResult init read_form(reader)
+    nextValue:MalValue init MalReadResultValue(next)
+    if nextValue.type == $MAL_ERROR_TYPE ithen
+      result init next
     else
-      v = MalMkList2(MalMkSymbol(macroSymbol), nextValue)
-      result = MalMkReadResult(v, MalReadResultReader(next))
+      v init MalMkList2(MalMkSymbol(macroSymbol), nextValue)
+      result init MalMkReadResult(v, MalReadResultReader(next))
     endif
   endif
 
@@ -340,31 +335,31 @@ opcode read_reader_macro(reader:MalReader, macroSymbol:S, macroToken:S):MalReadR
 endop
 
 opcode read_with_meta(reader:MalReader):MalReadResult
-  v:MalValue = MalMkValue($MAL_LIST_TYPE)
-  result:MalReadResult = MalMkReadResult(v, reader)
-  reader = MalNextToken(reader)
+  v:MalValue init MalMkValue($MAL_LIST_TYPE)
+  result:MalReadResult init MalMkReadResult(v, reader)
+  reader init MalNextToken(reader)
 
-  if reader.done == 1 then
-    v = MalMkError("expected metadata after '^', got EOF")
-    result = MalMkReadResult(v, reader)
+  if reader.done == 1 ithen
+    v init MalMkError("expected metadata after '^', got EOF")
+    result init MalMkReadResult(v, reader)
   else
-    meta:MalReadResult = read_form(reader)
-    metaValue:MalValue = MalReadResultValue(meta)
-    formReader:MalReader = MalReadResultReader(meta)
+    meta:MalReadResult init read_form(reader)
+    metaValue:MalValue init MalReadResultValue(meta)
+    formReader:MalReader init MalReadResultReader(meta)
 
-    if (metaValue.type == $MAL_ERROR_TYPE) then
-      result = meta
-    elseif formReader.done == 1 then
-      v = MalMkError("expected form after '^' metadata, got EOF")
-      result = MalMkReadResult(v, formReader)
+    if (metaValue.type == $MAL_ERROR_TYPE) ithen
+      result init meta
+    elseif formReader.done == 1 ithen
+      v init MalMkError("expected form after '^' metadata, got EOF")
+      result init MalMkReadResult(v, formReader)
     else
-      form:MalReadResult = read_form(formReader)
-      formValue:MalValue = MalReadResultValue(form)
-      if formValue.type == $MAL_ERROR_TYPE then
-        result = form
+      form:MalReadResult init read_form(formReader)
+      formValue:MalValue init MalReadResultValue(form)
+      if formValue.type == $MAL_ERROR_TYPE ithen
+        result init form
       else
-        v = MalMkList3(MalMkSymbol("with-meta"), formValue, metaValue)
-        result = MalMkReadResult(v, MalReadResultReader(form))
+        v init MalMkList3(MalMkSymbol("with-meta"), formValue, metaValue)
+        result init MalMkReadResult(v, MalReadResultReader(form))
       endif
     endif
   endif
@@ -374,71 +369,71 @@ endop
 
 
 opcode read_form(reader:MalReader):MalReadResult
-  Stoken = reader.peek
+  Stoken init reader.peek
   itokenLen = strlen(Stoken)
   istrChar  = strchar:i(Stoken, 0)
-  v:MalValue = MalMkError("internal read_form dispatch error")
-  result:MalReadResult = MalMkReadResult(v, reader)
+  v:MalValue init MalMkError("internal read_form dispatch error")
+  result:MalReadResult init MalMkReadResult(v, reader)
 
   switch istrChar
     case $MAL_PAREN_OPEN_TOKEN
-      result = read_list(reader, ")")
+      result init read_list(reader, ")")
 
     case $MAL_BRACKET_OPEN_TOKEN
-      result = read_vector(reader, "]")
+      result init read_vector(reader, "]")
 
     case $MAL_CURLY_OPEN_TOKEN
-      result = read_hash_map(reader, "}")
+      result init read_hash_map(reader, "}")
 
     case $MAL_PAREN_CLOSE_TOKEN
-      v = MalMkError("unexpected ')'")
-      result = MalMkReadResult(v, MalNextToken(reader))
+      v init MalMkError("unexpected ')'")
+      result init MalMkReadResult(v, MalNextToken(reader))
 
     case $MAL_BRACKET_CLOSE_TOKEN
-      v = MalMkError("unexpected ']'")
-      result = MalMkReadResult(v, MalNextToken(reader))
+      v init MalMkError("unexpected ']'")
+      result init MalMkReadResult(v, MalNextToken(reader))
 
     case $MAL_CURLY_CLOSE_TOKEN
-      v = MalMkError("unexpected '}'")
-      result = MalMkReadResult(v, MalNextToken(reader))
+      v init MalMkError("unexpected '}'")
+      result init MalMkReadResult(v, MalNextToken(reader))
 
     case $MAL_SINGLE_QUOTE_TOKEN
-      result = read_reader_macro(reader, "quote", "'")
+      result init read_reader_macro(reader, "quote", "'")
 
     case $MAL_BACKTICK_TOKEN
-      result = read_reader_macro(reader, "quasiquote", "`")
+      result init read_reader_macro(reader, "quasiquote", "`")
 
     case $MAL_TILDE_TOKEN
-      if (itokenLen == 2 && strchar:i(Stoken, 1) == $MAL_AT_TOKEN) then
-        SspliceQuote = sprintf("%c%c", $MAL_TILDE_TOKEN, $MAL_AT_TOKEN)
-        result = read_reader_macro(reader, "splice-unquote", SspliceQuote)
+      if (itokenLen == 2 && strchar:i(Stoken, 1) == $MAL_AT_TOKEN) ithen
+        SspliceQuote init sprintf("%c%c", $MAL_TILDE_TOKEN, $MAL_AT_TOKEN)
+        result init read_reader_macro(reader, "splice-unquote", SspliceQuote)
       else
-        result = read_reader_macro(reader, "unquote", "~")
+        result init read_reader_macro(reader, "unquote", "~")
       endif
 
     case $MAL_AT_TOKEN
-      Sderef = sprintf("%c", $MAL_AT_TOKEN)
-      result = read_reader_macro(reader, "deref", Sderef)
+      Sderef init sprintf("%c", $MAL_AT_TOKEN)
+      result init read_reader_macro(reader, "deref", Sderef)
 
     case $MAL_CARET_TOKEN
-      result = read_with_meta(reader)
+      result init read_with_meta(reader)
 
     default
-      v = read_atom(reader)
-      result = MalMkReadResult(v, MalNextToken(reader))
+      v init read_atom(reader)
+      result init MalMkReadResult(v, MalNextToken(reader))
   endsw
 
   xout result
 endop
 
 opcode read_str(input:S):MalValue
-  tstruct:MalTokens = tokenize(input)
-  returnValue:MalValue = MalMkValue($MAL_NIL_TYPE)
+  tstruct:MalTokens init tokenize(input)
+  returnValue:MalValue init MalMkValue($MAL_NIL_TYPE)
 
-  if (tstruct.length > 0) then
-    reader:MalReader = MalMkReader(tstruct)
-    result:MalReadResult = read_form(reader)
-    returnValue = MalReadResultValue(result)
+  if (tstruct.length > 0) ithen
+    reader:MalReader init MalMkReader(tstruct)
+    result:MalReadResult init read_form(reader)
+    returnValue init MalReadResultValue(result)
   endif
 
   xout returnValue

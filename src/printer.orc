@@ -3,17 +3,17 @@ declare pr_str_unreadably(ast:MalValue):(S)
 opcode MalEscapeStringForPrint(input:S):S
   indx = 0
   ilen = strlen(input)
-  Sout = ""
-  Sbackslash = sprintf("%c", $MAL_BACKSLASH_TOKEN)
+  Sout init ""
+  Sbackslash init sprintf("%c", $MAL_BACKSLASH_TOKEN)
 
-  if (ilen > 0) then
+  if (ilen > 0) ithen
     for indx in [0 ... ilen - 1] do
       ichar = strchar:i(input, indx)
 
       switch ichar
         case $MAL_DOUBLE_QUOTE_TOKEN
           Sout strcat Sout, Sbackslash
-          Schar = sprintf("%c", $MAL_DOUBLE_QUOTE_TOKEN)
+          Schar init sprintf("%c", $MAL_DOUBLE_QUOTE_TOKEN)
           Sout strcat Sout, Schar
 
         case $MAL_NEWLINE_TOKEN
@@ -25,7 +25,7 @@ opcode MalEscapeStringForPrint(input:S):S
           Sout strcat Sout, Sbackslash
 
         default
-          Schar = sprintf("%c", ichar)
+          Schar init sprintf("%c", ichar)
           Sout strcat Sout, Schar
       endsw
     od
@@ -35,11 +35,11 @@ opcode MalEscapeStringForPrint(input:S):S
 endop
 
 opcode MalPrintPrefixedForms(ast:MalValue, prefix:S):S
-  Sout = prefix
-  if (ast.length > 0) then
+  Sout init prefix
+  if (ast.length > 0) ithen
     for indx in [0 ... ast.length - 1] do
-      next:MalValue = MalAt(ast, indx)
-      Snext = pr_str(next)
+      next:MalValue init MalAt(ast, indx)
+      Snext init pr_str(next)
       Sout strcat Sout, Snext
     od
   endif
@@ -48,10 +48,10 @@ opcode MalPrintPrefixedForms(ast:MalValue, prefix:S):S
 endop
 
 opcode MalPrintDelimitedForms(ast:MalValue, left:S, right:S):S
-  Sout = left
-  if (ast.length > 0) then
+  Sout init left
+  if (ast.length > 0) ithen
     for indx in [0 ... ast.length - 1] do
-      if (indx > 0) then
+      if (indx > 0) ithen
         Sout strcat Sout, " "
       endif
       Sout strcat Sout, pr_str(MalAt(ast, indx))
@@ -63,11 +63,11 @@ opcode MalPrintDelimitedForms(ast:MalValue, left:S, right:S):S
 endop
 
 opcode MalPrintPrefixedFormsUnreadably(ast:MalValue, prefix:S):S
-  Sout = prefix
-  if (ast.length > 0) then
+  Sout init prefix
+  if (ast.length > 0) ithen
     for indx in [0 ... ast.length - 1] do
-      next:MalValue = MalAt(ast, indx)
-      Snext = pr_str_unreadably(next)
+      next:MalValue init MalAt(ast, indx)
+      Snext init pr_str_unreadably(next)
       Sout strcat Sout, Snext
     od
   endif
@@ -76,10 +76,10 @@ opcode MalPrintPrefixedFormsUnreadably(ast:MalValue, prefix:S):S
 endop
 
 opcode MalPrintDelimitedFormsUnreadably(ast:MalValue, left:S, right:S):S
-  Sout = left
-  if (ast.length > 0) then
+  Sout init left
+  if (ast.length > 0) ithen
     for indx in [0 ... ast.length - 1] do
-      if (indx > 0) then
+      if (indx > 0) ithen
         Sout strcat Sout, " "
       endif
       Sout strcat Sout, pr_str_unreadably(MalAt(ast, indx))
@@ -93,17 +93,17 @@ endop
 opcode MalPrintNumber(number:i):S
   iwhole = int(number)
 
-  if (number == iwhole) then
-    Sout = sprintf("%d", iwhole)
+  if (number == iwhole) ithen
+    Sout init sprintf("%d", iwhole)
   else
-    Sout = sprintf("%g", number)
+    Sout init sprintf("%g", number)
   endif
 
   xout Sout
 endop
 
 opcode MalPrintBuiltin(kind:S, name:S):S
-  Sout = "#<"
+  Sout init "#<"
   Sout strcat Sout, kind
   Sout strcat Sout, ":"
   Sout strcat Sout, name
@@ -112,11 +112,11 @@ opcode MalPrintBuiltin(kind:S, name:S):S
 endop
 
 opcode pr_str_unreadably(ast:MalValue):S
-  Sout = ""
+  Sout init ""
 
   switch ast.type
     case $MAL_NUMBER_TYPE
-      Snext = MalPrintNumber(ast.number)
+      Snext init MalPrintNumber(ast.number)
       Sout strcat Sout, Snext
 
     case $MAL_NIL_TYPE
@@ -139,50 +139,50 @@ opcode pr_str_unreadably(ast:MalValue):S
       Sout strcat Sout, ast.string
 
     case $MAL_QUOTE_TYPE
-      Sout = MalPrintPrefixedFormsUnreadably(ast, "'")
+      Sout init MalPrintPrefixedFormsUnreadably(ast, "'")
 
     case $MAL_QUASI_QUOTE_TYPE
-      Sout = MalPrintPrefixedFormsUnreadably(ast, "`")
+      Sout init MalPrintPrefixedFormsUnreadably(ast, "`")
 
     case $MAL_UNQUOTE_TYPE
-      Sout = MalPrintPrefixedFormsUnreadably(ast, "~")
+      Sout init MalPrintPrefixedFormsUnreadably(ast, "~")
 
     case $MAL_SPLICE_QUOTE_TYPE
-      SspliceQuote = sprintf("%c%c", $MAL_TILDE_TOKEN, $MAL_AT_TOKEN)
-      Sout = MalPrintPrefixedFormsUnreadably(ast, SspliceQuote)
+      SspliceQuote init sprintf("%c%c", $MAL_TILDE_TOKEN, $MAL_AT_TOKEN)
+      Sout init MalPrintPrefixedFormsUnreadably(ast, SspliceQuote)
 
     case $MAL_DEREF_TYPE
-      Sderef = sprintf("%c", $MAL_AT_TOKEN)
-      Sout = MalPrintPrefixedFormsUnreadably(ast, Sderef)
+      Sderef init sprintf("%c", $MAL_AT_TOKEN)
+      Sout init MalPrintPrefixedFormsUnreadably(ast, Sderef)
 
     case $MAL_WITH_META_TYPE
       Sout strcat Sout, "^"
-      if (ast.length > 1) then
+      if (ast.length > 1) ithen
         Sout strcat Sout, pr_str_unreadably(MalAt(ast, 1))
         Sout strcat Sout, " "
         Sout strcat Sout, pr_str_unreadably(MalAt(ast, 0))
       endif
 
     case $MAL_LIST_TYPE
-      Sout = MalPrintDelimitedFormsUnreadably(ast, "(", ")")
+      Sout init MalPrintDelimitedFormsUnreadably(ast, "(", ")")
 
     case $MAL_VECTOR_TYPE
-      Sout = MalPrintDelimitedFormsUnreadably(ast, "[", "]")
+      Sout init MalPrintDelimitedFormsUnreadably(ast, "[", "]")
 
     case $MAL_HASH_MAP_TYPE
-      Sout = MalPrintDelimitedFormsUnreadably(ast, "{", "}")
+      Sout init MalPrintDelimitedFormsUnreadably(ast, "{", "}")
 
     case $MAL_BUILTIN_TYPE
-      Sout = MalPrintBuiltin("builtin", ast.string)
+      Sout init MalPrintBuiltin("builtin", ast.string)
 
     case $MAL_BUILTIN_OPERATOR_TYPE
-      Sout = MalPrintBuiltin("builtin-operator", ast.string)
+      Sout init MalPrintBuiltin("builtin-operator", ast.string)
 
     case $MAL_BUILTIN_OPCODE_TYPE
-      Sout = MalPrintBuiltin("builtin-opcode", ast.string)
+      Sout init MalPrintBuiltin("builtin-opcode", ast.string)
 
     case $MAL_FUNCTION_TYPE
-      Sout = sprintf("%c<function:fn*>", 35)
+      Sout init sprintf("%c<function:fn*>", 35)
 
     case $MAL_ATOM_TYPE
       Sout strcat Sout, "(atom "
@@ -190,31 +190,31 @@ opcode pr_str_unreadably(ast:MalValue):S
       Sout strcat Sout, ")"
 
     case $MAL_CSOUND_INSTRUMENT_TYPE
-      Sout = MalPrintBuiltin("csound-instrument", ast.string)
+      Sout init MalPrintBuiltin("csound-instrument", ast.string)
 
     case $MAL_CSOUND_NODE_TYPE
-      Sout = MalPrintBuiltin("csound-node", ast.string)
+      Sout init MalPrintBuiltin("csound-node", ast.string)
   endsw
 
   xout(Sout)
 endop
 
 opcode pr_str_with_readability(ast:MalValue, printReadably:i):S
-  if (printReadably == 0) then
-    Sout = pr_str_unreadably(ast)
+  if (printReadably == 0) ithen
+    Sout init pr_str_unreadably(ast)
   else
-    Sout = pr_str(ast)
+    Sout init pr_str(ast)
   endif
 
   xout Sout
 endop
 
 opcode pr_str(ast:MalValue):S
-  Sout = ""
+  Sout init ""
 
   switch ast.type
     case $MAL_NUMBER_TYPE
-      Snext = MalPrintNumber(ast.number)
+      Snext init MalPrintNumber(ast.number)
       Sout strcat Sout, Snext
 
     case $MAL_NIL_TYPE
@@ -234,56 +234,56 @@ opcode pr_str(ast:MalValue):S
       Sout strcat Sout, ast.string
 
     case $MAL_STRING_TYPE
-      Squote = sprintf("%c", $MAL_DOUBLE_QUOTE_TOKEN)
+      Squote init sprintf("%c", $MAL_DOUBLE_QUOTE_TOKEN)
       Sout strcat Sout, Squote
       Sout strcat Sout, MalEscapeStringForPrint(ast.string)
       Sout strcat Sout, Squote
 
     case $MAL_QUOTE_TYPE
-      Sout = MalPrintPrefixedForms(ast, "'")
+      Sout init MalPrintPrefixedForms(ast, "'")
 
     case $MAL_QUASI_QUOTE_TYPE
-      Sout = MalPrintPrefixedForms(ast, "`")
+      Sout init MalPrintPrefixedForms(ast, "`")
 
     case $MAL_UNQUOTE_TYPE
-      Sout = MalPrintPrefixedForms(ast, "~")
+      Sout init MalPrintPrefixedForms(ast, "~")
 
     case $MAL_SPLICE_QUOTE_TYPE
-      SspliceQuote = sprintf("%c%c", $MAL_TILDE_TOKEN, $MAL_AT_TOKEN)
-      Sout = MalPrintPrefixedForms(ast, SspliceQuote)
+      SspliceQuote init sprintf("%c%c", $MAL_TILDE_TOKEN, $MAL_AT_TOKEN)
+      Sout init MalPrintPrefixedForms(ast, SspliceQuote)
 
     case $MAL_DEREF_TYPE
-      Sderef = sprintf("%c", $MAL_AT_TOKEN)
-      Sout = MalPrintPrefixedForms(ast, Sderef)
+      Sderef init sprintf("%c", $MAL_AT_TOKEN)
+      Sout init MalPrintPrefixedForms(ast, Sderef)
 
     case $MAL_WITH_META_TYPE
       Sout strcat Sout, "^"
-      if (ast.length > 1) then
+      if (ast.length > 1) ithen
         Sout strcat Sout, pr_str(MalAt(ast, 1))
         Sout strcat Sout, " "
         Sout strcat Sout, pr_str(MalAt(ast, 0))
       endif
 
     case $MAL_LIST_TYPE
-      Sout = MalPrintDelimitedForms(ast, "(", ")")
+      Sout init MalPrintDelimitedForms(ast, "(", ")")
 
     case $MAL_VECTOR_TYPE
-      Sout = MalPrintDelimitedForms(ast, "[", "]")
+      Sout init MalPrintDelimitedForms(ast, "[", "]")
 
     case $MAL_HASH_MAP_TYPE
-      Sout = MalPrintDelimitedForms(ast, "{", "}")
+      Sout init MalPrintDelimitedForms(ast, "{", "}")
 
     case $MAL_BUILTIN_TYPE
-      Sout = MalPrintBuiltin("builtin", ast.string)
+      Sout init MalPrintBuiltin("builtin", ast.string)
 
     case $MAL_BUILTIN_OPERATOR_TYPE
-      Sout = MalPrintBuiltin("builtin-operator", ast.string)
+      Sout init MalPrintBuiltin("builtin-operator", ast.string)
 
     case $MAL_BUILTIN_OPCODE_TYPE
-      Sout = MalPrintBuiltin("builtin-opcode", ast.string)
+      Sout init MalPrintBuiltin("builtin-opcode", ast.string)
 
     case $MAL_FUNCTION_TYPE
-      Sout = sprintf("%c<function:fn*>", 35)
+      Sout init sprintf("%c<function:fn*>", 35)
 
     case $MAL_ATOM_TYPE
       Sout strcat Sout, "(atom "
@@ -291,10 +291,10 @@ opcode pr_str(ast:MalValue):S
       Sout strcat Sout, ")"
 
     case $MAL_CSOUND_INSTRUMENT_TYPE
-      Sout = MalPrintBuiltin("csound-instrument", ast.string)
+      Sout init MalPrintBuiltin("csound-instrument", ast.string)
 
     case $MAL_CSOUND_NODE_TYPE
-      Sout = MalPrintBuiltin("csound-node", ast.string)
+      Sout init MalPrintBuiltin("csound-node", ast.string)
   endsw
 
   xout(Sout)

@@ -8,21 +8,21 @@ nchnls = 2
 instr MAL_PLAY
   ScommandLine:S[] argv
 
-  if (lenarray(ScommandLine) == 0) then
+  if (lenarray(ScommandLine) == 0) ithen
     prints "Error: missing MAL music script path\n"
     exitnow(1)
   else
-    env:MalEnv = MalMkCsoundEnv()
-    scriptArgs:MalValue = MalStringArrayToList(ScommandLine, 1)
-    env = MalEnvSet(env, "*ARGV*", scriptArgs)
+    env:MalEnv init MalMkCsoundEnv()
+    scriptArgs:MalValue init MalStringArrayToList(ScommandLine, 1)
+    env init MalEnvSet(env, "*ARGV*", scriptArgs)
 
-    scriptPath:S = ScommandLine[0]
-    loadForm:MalValue = MalMkList2( \
+    scriptPath:S init ScommandLine[0]
+    loadForm:MalValue init MalMkList2( \
       MalMkSymbol("load-file"), MalMkString(scriptPath))
-    scriptInputEnv:MalEnv = env
+    scriptInputEnv:MalEnv init env
     result:MalValue, env = EVAL_ENV(loadForm, scriptInputEnv)
 
-    if (result.type == $MAL_ERROR_TYPE) then
+    if (result.type == $MAL_ERROR_TYPE) ithen
       prints "%s\n", result.string
       exitnow(1)
     endif

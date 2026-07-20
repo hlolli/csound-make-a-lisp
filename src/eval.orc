@@ -4,36 +4,36 @@ declare MalApply(fn:MalValue, args:MalValue):(MalValue)
 declare MalQuasiquote(ast:MalValue):(MalValue)
 
 opcode MalApplyBuiltinOperator(fn:MalValue, args:MalValue):MalValue
-  result:MalValue = MalMkValue($MAL_NUMBER_TYPE)
+  result:MalValue init MalMkValue($MAL_NUMBER_TYPE)
 
-  if (args.length != 2) then
-    result = MalMkError(sprintf("%s: expected 2 arguments, got %d", \
+  if (args.length != 2) ithen
+    result init MalMkError(sprintf("%s: expected 2 arguments, got %d", \
       fn.string, args.length))
   else
-    leftArg:MalValue = MalAt(args, 0)
-    rightArg:MalValue = MalAt(args, 1)
+    leftArg:MalValue init MalAt(args, 0)
+    rightArg:MalValue init MalAt(args, 1)
 
-    if (MalIsCsoundNode(leftArg) == 1 || MalIsCsoundNode(rightArg) == 1) then
+    if (MalIsCsoundNode(leftArg) == 1 || MalIsCsoundNode(rightArg) == 1) ithen
       leftIsGraphValue:i = leftArg.type == $MAL_NUMBER_TYPE || \
         MalIsCsoundNode(leftArg) == 1
       rightIsGraphValue:i = rightArg.type == $MAL_NUMBER_TYPE || \
         MalIsCsoundNode(rightArg) == 1
 
-      if (leftIsGraphValue == 0 || rightIsGraphValue == 0) then
-        result = MalMkError(sprintf( \
+      if (leftIsGraphValue == 0 || rightIsGraphValue == 0) ithen
+        result init MalMkError(sprintf( \
           "%s: expected numeric or Csound graph arguments", fn.string))
       else
-        result = MalMkCsoundInfix(fn.string, args)
+        result init MalMkCsoundInfix(fn.string, args)
       endif
     elseif (leftArg.type != $MAL_NUMBER_TYPE || \
-            rightArg.type != $MAL_NUMBER_TYPE) then
-      result = MalMkError(sprintf("%s: expected numeric arguments", fn.string))
+            rightArg.type != $MAL_NUMBER_TYPE) ithen
+      result init MalMkError(sprintf("%s: expected numeric arguments", fn.string))
     else
       left:i = leftArg.number
       right:i = rightArg.number
 
-      if (strlen(fn.string) != 1) then
-        result = MalMkError(sprintf("unknown builtin operator '%s'", fn.string))
+      if (strlen(fn.string) != 1) ithen
+        result init MalMkError(sprintf("unknown builtin operator '%s'", fn.string))
       else
         iop = strchar:i(fn.string, 0)
 
@@ -48,14 +48,14 @@ opcode MalApplyBuiltinOperator(fn:MalValue, args:MalValue):MalValue
             result.number = left * right
 
           case $MAL_SLASH_TOKEN
-            if (right == 0) then
-              result = MalMkError("/: division by zero")
+            if (right == 0) ithen
+              result init MalMkError("/: division by zero")
             else
               result.number = int(left / right)
             endif
 
           default
-            result = MalMkError(sprintf("unknown builtin operator '%s'", fn.string))
+            result init MalMkError(sprintf("unknown builtin operator '%s'", fn.string))
         endsw
       endif
     endif
@@ -65,10 +65,10 @@ opcode MalApplyBuiltinOperator(fn:MalValue, args:MalValue):MalValue
 endop
 
 opcode MalMkBool(condition:i):MalValue
-  if (condition == 0) then
-    result:MalValue = MalMkValue($MAL_FALSE_TYPE)
+  if (condition == 0) ithen
+    result:MalValue init MalMkValue($MAL_FALSE_TYPE)
   else
-    result:MalValue = MalMkValue($MAL_TRUE_TYPE)
+    result:MalValue init MalMkValue($MAL_TRUE_TYPE)
   endif
 
   xout result
@@ -77,7 +77,7 @@ endop
 opcode MalIsTruthy(value:MalValue):i
   result:i = 1
 
-  if (value.type == $MAL_NIL_TYPE || value.type == $MAL_FALSE_TYPE) then
+  if (value.type == $MAL_NIL_TYPE || value.type == $MAL_FALSE_TYPE) ithen
     result = 0
   endif
 
@@ -93,9 +93,9 @@ endop
 opcode MalIsForm(ast:MalValue, name:S):i
   result:i = 0
 
-  if (ast.type == $MAL_LIST_TYPE && ast.length > 0) then
-    head:MalValue = MalAt(ast, 0)
-    result = MalIsSymbolNamed(head, name)
+  if (ast.type == $MAL_LIST_TYPE && ast.length > 0) ithen
+    head:MalValue init MalAt(ast, 0)
+    result init MalIsSymbolNamed(head, name)
   endif
 
   xout result
@@ -110,64 +110,64 @@ endop
 opcode MalCopySequenceAs(value:MalValue, resultType:i):MalValue
   values:MalValue[] init value.length
 
-  if (value.length > 0) then
+  if (value.length > 0) ithen
     for index in [0 ... value.length - 1] do
-      values[index] = MalAt(value, index)
+      values[index] init MalAt(value, index)
     od
   endif
 
-  result:MalValue = MalMkValue(resultType)
-  result.list = values
+  result:MalValue init MalMkValue(resultType)
+  result.list init values
   result.length = value.length
   xout result
 endop
 
 opcode MalFlattenApplyArgs(args:MalValue):MalValue
-  finalSequence:MalValue = MalAt(args, args.length - 1)
+  finalSequence:MalValue init MalAt(args, args.length - 1)
   prefixLength:i = args.length - 2
   flattenedLength:i = prefixLength + finalSequence.length
   values:MalValue[] init flattenedLength
 
-  if (prefixLength > 0) then
+  if (prefixLength > 0) ithen
     for index in [0 ... prefixLength - 1] do
-      values[index] = MalAt(args, index + 1)
+      values[index] init MalAt(args, index + 1)
     od
   endif
 
-  if (finalSequence.length > 0) then
+  if (finalSequence.length > 0) ithen
     for index in [0 ... finalSequence.length - 1] do
-      values[prefixLength + index] = MalAt(finalSequence, index)
+      values[prefixLength + index] init MalAt(finalSequence, index)
     od
   endif
 
-  result:MalValue = MalMkValue($MAL_LIST_TYPE)
-  result.list = values
+  result:MalValue init MalMkValue($MAL_LIST_TYPE)
+  result.list init values
   result.length = flattenedLength
   xout result
 endop
 
 opcode MalMapSequence(fn:MalValue, sequence:MalValue):MalValue
   values:MalValue[] init sequence.length
-  result:MalValue = MalMkValue($MAL_LIST_TYPE)
+  result:MalValue init MalMkValue($MAL_LIST_TYPE)
   failed:i = 0
 
-  if (sequence.length > 0) then
+  if (sequence.length > 0) ithen
     for index in [0 ... sequence.length - 1] do
-      callArgs:MalValue = MalMkList1(MalAt(sequence, index))
-      mapped:MalValue = MalApply(fn, callArgs)
+      callArgs:MalValue init MalMkList1(MalAt(sequence, index))
+      mapped:MalValue init MalApply(fn, callArgs)
 
-      if (mapped.type == $MAL_ERROR_TYPE) then
-        result = mapped
+      if (mapped.type == $MAL_ERROR_TYPE) ithen
+        result init mapped
         failed = 1
         break
       endif
 
-      values[index] = mapped
+      values[index] init mapped
     od
   endif
 
-  if (failed == 0) then
-    result.list = values
+  if (failed == 0) ithen
+    result.list init values
     result.length = sequence.length
   endif
 
@@ -175,13 +175,13 @@ opcode MalMapSequence(fn:MalValue, sequence:MalValue):MalValue
 endop
 
 opcode MalAssocPairs(mapValue:MalValue, args:MalValue, startIndex:i):MalValue
-  result:MalValue = mapValue
+  result:MalValue init mapValue
   pairCount:i = int((args.length - startIndex) / 2)
 
-  if (pairCount > 0) then
+  if (pairCount > 0) ithen
     for pairIndex in [0 ... pairCount - 1] do
       keyIndex:i = startIndex + pairIndex * 2
-      result = MalMapAssoc( \
+      result init MalMapAssoc( \
         result, MalAt(args, keyIndex), MalAt(args, keyIndex + 1))
     od
   endif
@@ -190,11 +190,10 @@ opcode MalAssocPairs(mapValue:MalValue, args:MalValue, startIndex:i):MalValue
 endop
 
 opcode MalDissocKeys(mapValue:MalValue, args:MalValue):MalValue
-  result:MalValue = mapValue
-
-  if (args.length > 1) then
+  result:MalValue init mapValue
+  if (args.length > 1) ithen
     for index in [1 ... args.length - 1] do
-      result = MalMapDissoc(result, MalAt(args, index))
+      result init MalMapDissoc(result, MalAt(args, index))
     od
   endif
 
@@ -202,11 +201,11 @@ opcode MalDissocKeys(mapValue:MalValue, args:MalValue):MalValue
 endop
 
 opcode MalJoinPrintedArgs(args:MalValue, printReadably:i, separator:S):S
-  output:S = ""
+  output:S init ""
 
-  if (args.length > 0) then
+  if (args.length > 0) ithen
     for index in [0 ... args.length - 1] do
-      if (index > 0) then
+      if (index > 0) ithen
         output strcat output, separator
       endif
 
@@ -219,18 +218,18 @@ opcode MalJoinPrintedArgs(args:MalValue, printReadably:i, separator:S):S
 endop
 
 opcode MalArityError(name:S, expected:i, actual:i):MalValue
-  result:MalValue = MalMkError(sprintf("%s: expected %d arguments, got %d", \
+  result:MalValue init MalMkError(sprintf("%s: expected %d arguments, got %d", \
     name, expected, actual))
   xout result
 endop
 
 opcode MalApplyTypePredicate(fn:MalValue, args:MalValue, expectedType:i):MalValue
-  if (args.length != 1) then
-    result:MalValue = MalArityError(fn.string, 1, args.length)
+  if (args.length != 1) ithen
+    result:MalValue init MalArityError(fn.string, 1, args.length)
   else
-    value:MalValue = MalAt(args, 0)
+    value:MalValue init MalAt(args, 0)
     matches:i = value.type == expectedType
-    result:MalValue = MalMkBool(matches)
+    result:MalValue init MalMkBool(matches)
   endif
 
   xout result
@@ -239,13 +238,13 @@ endop
 opcode MalNumberComparison(name:S, left:i, right:i):i
   result:i = 0
 
-  if (strcmp(name, ">") == 0) then
+  if (strcmp(name, ">") == 0) ithen
     result = left > right
-  elseif (strcmp(name, ">=") == 0) then
+  elseif (strcmp(name, ">=") == 0) ithen
     result = left >= right
-  elseif (strcmp(name, "<") == 0) then
+  elseif (strcmp(name, "<") == 0) ithen
     result = left < right
-  elseif (strcmp(name, "<=") == 0) then
+  elseif (strcmp(name, "<=") == 0) ithen
     result = left <= right
   endif
 
@@ -253,19 +252,19 @@ opcode MalNumberComparison(name:S, left:i, right:i):i
 endop
 
 opcode MalApplyNumericComparison(fn:MalValue, args:MalValue):MalValue
-  if (args.length != 2) then
-    result:MalValue = MalArityError(fn.string, 2, args.length)
+  if (args.length != 2) ithen
+    result:MalValue init MalArityError(fn.string, 2, args.length)
   else
-    leftArg:MalValue = MalAt(args, 0)
-    rightArg:MalValue = MalAt(args, 1)
+    leftArg:MalValue init MalAt(args, 0)
+    rightArg:MalValue init MalAt(args, 1)
 
     if (leftArg.type != $MAL_NUMBER_TYPE || \
-        rightArg.type != $MAL_NUMBER_TYPE) then
-      result:MalValue = MalMkError(sprintf("%s: expected numeric arguments", \
+        rightArg.type != $MAL_NUMBER_TYPE) ithen
+      result:MalValue init MalMkError(sprintf("%s: expected numeric arguments", \
         fn.string))
     else
       comparison:i = MalNumberComparison(fn.string, leftArg.number, rightArg.number)
-      result:MalValue = MalMkBool(comparison)
+      result:MalValue init MalMkBool(comparison)
     endif
   endif
 
@@ -296,95 +295,93 @@ opcode MalIsFn(value:MalValue):i
 endop
 
 opcode MalSeq(value:MalValue):MalValue
-  result:MalValue = MalMkValue($MAL_NIL_TYPE)
+  result:MalValue init MalMkValue($MAL_NIL_TYPE)
 
   switch value.type
     case $MAL_NIL_TYPE
-      result = value
-
+      result init value
     case $MAL_LIST_TYPE
-      if (value.length > 0) then
-        result = value
+      if (value.length > 0) ithen
+        result init value
       endif
 
     case $MAL_VECTOR_TYPE
-      if (value.length > 0) then
-        result = MalCopySequenceAs(value, $MAL_LIST_TYPE)
+      if (value.length > 0) ithen
+        result init MalCopySequenceAs(value, $MAL_LIST_TYPE)
       endif
 
     case $MAL_STRING_TYPE
       characterCount:i = strlen(value.string)
 
-      if (characterCount > 0) then
+      if (characterCount > 0) ithen
         characters:MalValue[] init characterCount
 
         for index in [0 ... characterCount - 1] do
-          character:S = strsub(value.string, index, index + 1)
-          characters[index] = MalMkString(character)
+          character:S init strsub(value.string, index, index + 1)
+          characters[index] init MalMkString(character)
         od
 
-        result = MalMkValue($MAL_LIST_TYPE)
-        result.list = characters
+        result init MalMkValue($MAL_LIST_TYPE)
+        result.list init characters
         result.length = characterCount
       endif
 
     default
-      result = MalMkError("seq: expected list, vector, string, or nil")
+      result init MalMkError("seq: expected list, vector, string, or nil")
   endsw
 
   xout result
 endop
 
 opcode MalConj(args:MalValue):MalValue
-  collection:MalValue = MalAt(args, 0)
+  collection:MalValue init MalAt(args, 0)
   addedCount:i = args.length - 1
   resultLength:i = collection.length + addedCount
   values:MalValue[] init resultLength
-  result:MalValue = MalMkValue(collection.type)
+  result:MalValue init MalMkValue(collection.type)
 
-  if (collection.type == $MAL_LIST_TYPE) then
+  if (collection.type == $MAL_LIST_TYPE) ithen
     for index in [0 ... addedCount - 1] do
-      values[index] = MalAt(args, args.length - index - 1)
+      values[index] init MalAt(args, args.length - index - 1)
     od
 
-    if (collection.length > 0) then
+    if (collection.length > 0) ithen
       for index in [0 ... collection.length - 1] do
-        values[addedCount + index] = MalAt(collection, index)
+        values[addedCount + index] init MalAt(collection, index)
       od
     endif
 
-  elseif (collection.type == $MAL_VECTOR_TYPE) then
-    if (collection.length > 0) then
+  elseif (collection.type == $MAL_VECTOR_TYPE) ithen
+    if (collection.length > 0) ithen
       for index in [0 ... collection.length - 1] do
-        values[index] = MalAt(collection, index)
+        values[index] init MalAt(collection, index)
       od
     endif
 
     for index in [0 ... addedCount - 1] do
-      values[collection.length + index] = MalAt(args, index + 1)
+      values[collection.length + index] init MalAt(args, index + 1)
     od
   endif
 
-  result.list = values
+  result.list init values
   result.length = resultLength
   xout result
 endop
 
 opcode MalSlurpFile(filename:S):MalValue
-  result:MalValue = MalMkString("")
-  content:S = ""
-  line:S = ""
+  content:S init ""
+  line:S init ""
   lineNumber:i = 0
 
 read_line:
   line, lineNumber readfi filename
 
-  if (lineNumber != -1) then
+  if (lineNumber != -1) ithen
     content strcat content, line
     igoto read_line
   endif
 
-  result.string = content
+  result:MalValue MalMkString content
   xout result
 endop
 
@@ -393,24 +390,24 @@ opcode MalEquals(left:MalValue, right:MalValue):i
   leftIsSequence:i = 0
   rightIsSequence:i = 0
 
-  if (left.type == $MAL_LIST_TYPE || left.type == $MAL_VECTOR_TYPE) then
+  if (left.type == $MAL_LIST_TYPE || left.type == $MAL_VECTOR_TYPE) ithen
     leftIsSequence = 1
   endif
 
-  if (right.type == $MAL_LIST_TYPE || right.type == $MAL_VECTOR_TYPE) then
+  if (right.type == $MAL_LIST_TYPE || right.type == $MAL_VECTOR_TYPE) ithen
     rightIsSequence = 1
   endif
 
-  if (leftIsSequence == 1 && rightIsSequence == 1) then
-    if (left.length == right.length) then
+  if (leftIsSequence == 1 && rightIsSequence == 1) ithen
+    if (left.length == right.length) ithen
       result = 1
 
-      if (left.length > 0) then
+      if (left.length > 0) ithen
         for index in [0 ... left.length - 1] do
-          leftItem:MalValue = MalAt(left, index)
-          rightItem:MalValue = MalAt(right, index)
+          leftItem:MalValue init MalAt(left, index)
+          rightItem:MalValue init MalAt(right, index)
 
-          if (MalEquals(leftItem, rightItem) == 0) then
+          if (MalEquals(leftItem, rightItem) == 0) ithen
             result = 0
             break
           endif
@@ -418,25 +415,25 @@ opcode MalEquals(left:MalValue, right:MalValue):i
       endif
     endif
   elseif (left.type == $MAL_HASH_MAP_TYPE && \
-          right.type == $MAL_HASH_MAP_TYPE) then
-    if (left.length == right.length) then
+          right.type == $MAL_HASH_MAP_TYPE) ithen
+    if (left.length == right.length) ithen
       result = 1
       entryCount:i = int(left.length / 2)
 
-      if (entryCount > 0) then
+      if (entryCount > 0) ithen
         for entryIndex in [0 ... entryCount - 1] do
           leftKeyIndex:i = entryIndex * 2
           rightKeyIndex:i = MalMapFindKey( \
             right, MalAt(left, leftKeyIndex))
 
-          if (rightKeyIndex < 0) then
+          if (rightKeyIndex < 0) ithen
             result = 0
             break
           else
-            leftValue:MalValue = MalAt(left, leftKeyIndex + 1)
-            rightValue:MalValue = MalAt(right, rightKeyIndex + 1)
+            leftValue:MalValue init MalAt(left, leftKeyIndex + 1)
+            rightValue:MalValue init MalAt(right, rightKeyIndex + 1)
 
-            if (MalEquals(leftValue, rightValue) == 0) then
+            if (MalEquals(leftValue, rightValue) == 0) ithen
               result = 0
               break
             endif
@@ -444,7 +441,7 @@ opcode MalEquals(left:MalValue, right:MalValue):i
         od
       endif
     endif
-  elseif (left.type == right.type) then
+  elseif (left.type == right.type) ithen
     switch left.type
       case $MAL_NUMBER_TYPE
         result = left.number == right.number
@@ -476,265 +473,264 @@ opcode MalEquals(left:MalValue, right:MalValue):i
 endop
 
 opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
-  result:MalValue = MalMkValue($MAL_NIL_TYPE)
+  result:MalValue init MalMkValue($MAL_NIL_TYPE)
 
-  if (strcmp(fn.string, "throw") == 0) then
-    if (args.length != 1) then
-      result = MalArityError(fn.string, 1, args.length)
+  if (strcmp(fn.string, "throw") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
     else
-      result = MalMkThrown(MalAt(args, 0))
+      result init MalMkThrown(MalAt(args, 0))
     endif
 
-  elseif (strcmp(fn.string, "apply") == 0) then
-    if (args.length < 2) then
-      result = MalMkError(sprintf( \
+  elseif (strcmp(fn.string, "apply") == 0) ithen
+    if (args.length < 2) ithen
+      result init MalMkError(sprintf( \
         "apply: expected at least 2 arguments, got %d", args.length))
     else
-      targetFn:MalValue = MalAt(args, 0)
-      finalSequence:MalValue = MalAt(args, args.length - 1)
+      targetFn:MalValue init MalAt(args, 0)
+      finalSequence:MalValue init MalAt(args, args.length - 1)
 
-      if (MalIsSequential(finalSequence) == 0) then
-        result = MalMkError( \
+      if (MalIsSequential(finalSequence) == 0) ithen
+        result init MalMkError( \
           "apply: final argument must be list or vector")
       else
-        flattenedArgs:MalValue = MalFlattenApplyArgs(args)
-        result = MalApply(targetFn, flattenedArgs)
+        flattenedArgs:MalValue init MalFlattenApplyArgs(args)
+        result init MalApply(targetFn, flattenedArgs)
       endif
     endif
 
-  elseif (strcmp(fn.string, "map") == 0) then
-    if (args.length != 2) then
-      result = MalArityError(fn.string, 2, args.length)
+  elseif (strcmp(fn.string, "map") == 0) ithen
+    if (args.length != 2) ithen
+      result init MalArityError(fn.string, 2, args.length)
     else
-      targetFn:MalValue = MalAt(args, 0)
-      sequence:MalValue = MalAt(args, 1)
+      targetFn:MalValue init MalAt(args, 0)
+      sequence:MalValue init MalAt(args, 1)
 
-      if (MalIsSequential(sequence) == 0) then
-        result = MalMkError("map: second argument must be list or vector")
+      if (MalIsSequential(sequence) == 0) ithen
+        result init MalMkError("map: second argument must be list or vector")
       else
-        result = MalMapSequence(targetFn, sequence)
+        result init MalMapSequence(targetFn, sequence)
       endif
     endif
 
-  elseif (strcmp(fn.string, "nil?") == 0) then
-    result = MalApplyTypePredicate(fn, args, $MAL_NIL_TYPE)
+  elseif (strcmp(fn.string, "nil?") == 0) ithen
+    result init MalApplyTypePredicate(fn, args, $MAL_NIL_TYPE)
 
-  elseif (strcmp(fn.string, "true?") == 0) then
-    result = MalApplyTypePredicate(fn, args, $MAL_TRUE_TYPE)
+  elseif (strcmp(fn.string, "true?") == 0) ithen
+    result init MalApplyTypePredicate(fn, args, $MAL_TRUE_TYPE)
 
-  elseif (strcmp(fn.string, "false?") == 0) then
-    result = MalApplyTypePredicate(fn, args, $MAL_FALSE_TYPE)
+  elseif (strcmp(fn.string, "false?") == 0) ithen
+    result init MalApplyTypePredicate(fn, args, $MAL_FALSE_TYPE)
 
-  elseif (strcmp(fn.string, "symbol?") == 0) then
-    result = MalApplyTypePredicate(fn, args, $MAL_SYMBOL_TYPE)
+  elseif (strcmp(fn.string, "symbol?") == 0) ithen
+    result init MalApplyTypePredicate(fn, args, $MAL_SYMBOL_TYPE)
 
-  elseif (strcmp(fn.string, "string?") == 0) then
-    result = MalApplyTypePredicate(fn, args, $MAL_STRING_TYPE)
+  elseif (strcmp(fn.string, "string?") == 0) ithen
+    result init MalApplyTypePredicate(fn, args, $MAL_STRING_TYPE)
 
-  elseif (strcmp(fn.string, "number?") == 0) then
-    result = MalApplyTypePredicate(fn, args, $MAL_NUMBER_TYPE)
+  elseif (strcmp(fn.string, "number?") == 0) ithen
+    result init MalApplyTypePredicate(fn, args, $MAL_NUMBER_TYPE)
 
-  elseif (strcmp(fn.string, "fn?") == 0) then
-    if (args.length != 1) then
-      result = MalArityError(fn.string, 1, args.length)
+  elseif (strcmp(fn.string, "fn?") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
     else
-      result = MalMkBool(MalIsFn(MalAt(args, 0)))
+      result init MalMkBool(MalIsFn(MalAt(args, 0)))
     endif
 
-  elseif (strcmp(fn.string, "symbol") == 0) then
-    if (args.length != 1) then
-      result = MalArityError(fn.string, 1, args.length)
+  elseif (strcmp(fn.string, "symbol") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
     else
-      value:MalValue = MalAt(args, 0)
+      value:MalValue init MalAt(args, 0)
 
-      if (value.type != $MAL_STRING_TYPE) then
-        result = MalMkError("symbol: expected string argument")
+      if (value.type != $MAL_STRING_TYPE) ithen
+        result init MalMkError("symbol: expected string argument")
       else
-        result = MalMkSymbol(value.string)
+        result init MalMkSymbol(value.string)
       endif
     endif
 
-  elseif (strcmp(fn.string, "keyword") == 0) then
-    if (args.length != 1) then
-      result = MalArityError(fn.string, 1, args.length)
+  elseif (strcmp(fn.string, "keyword") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
     else
-      value:MalValue = MalAt(args, 0)
+      value:MalValue init MalAt(args, 0)
 
-      if (value.type == $MAL_KEYWORD_TYPE) then
-        result = value
-      elseif (value.type == $MAL_STRING_TYPE) then
-        result = MalMkKeyword(value.string)
+      if (value.type == $MAL_KEYWORD_TYPE) ithen
+        result init value
+      elseif (value.type == $MAL_STRING_TYPE) ithen
+        result init MalMkKeyword(value.string)
       else
-        result = MalMkError("keyword: expected string or keyword argument")
+        result init MalMkError("keyword: expected string or keyword argument")
       endif
     endif
 
-  elseif (strcmp(fn.string, "keyword?") == 0) then
-    result = MalApplyTypePredicate(fn, args, $MAL_KEYWORD_TYPE)
+  elseif (strcmp(fn.string, "keyword?") == 0) ithen
+    result init MalApplyTypePredicate(fn, args, $MAL_KEYWORD_TYPE)
 
-  elseif (strcmp(fn.string, "list") == 0) then
-    result = args
+  elseif (strcmp(fn.string, "list") == 0) ithen
+    result init args
+  elseif (strcmp(fn.string, "vector") == 0) ithen
+    result init MalCopySequenceAs(args, $MAL_VECTOR_TYPE)
 
-  elseif (strcmp(fn.string, "vector") == 0) then
-    result = MalCopySequenceAs(args, $MAL_VECTOR_TYPE)
+  elseif (strcmp(fn.string, "vector?") == 0) ithen
+    result init MalApplyTypePredicate(fn, args, $MAL_VECTOR_TYPE)
 
-  elseif (strcmp(fn.string, "vector?") == 0) then
-    result = MalApplyTypePredicate(fn, args, $MAL_VECTOR_TYPE)
-
-  elseif (strcmp(fn.string, "sequential?") == 0) then
-    if (args.length != 1) then
-      result = MalArityError(fn.string, 1, args.length)
+  elseif (strcmp(fn.string, "sequential?") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
     else
-      value:MalValue = MalAt(args, 0)
+      value:MalValue init MalAt(args, 0)
       isSequential:i = MalIsSequential(value)
-      result = MalMkBool(isSequential)
+      result init MalMkBool(isSequential)
     endif
 
-  elseif (strcmp(fn.string, "hash-map") == 0) then
-    if (args.length % 2 != 0) then
-      result = MalMkError("hash-map: expected even number of arguments")
+  elseif (strcmp(fn.string, "hash-map") == 0) ithen
+    if (args.length % 2 != 0) ithen
+      result init MalMkError("hash-map: expected even number of arguments")
     else
-      emptyMap:MalValue = MalMkValue($MAL_HASH_MAP_TYPE)
-      result = MalAssocPairs(emptyMap, args, 0)
+      emptyMap:MalValue init MalMkValue($MAL_HASH_MAP_TYPE)
+      result init MalAssocPairs(emptyMap, args, 0)
     endif
 
-  elseif (strcmp(fn.string, "map?") == 0) then
-    result = MalApplyTypePredicate(fn, args, $MAL_HASH_MAP_TYPE)
+  elseif (strcmp(fn.string, "map?") == 0) ithen
+    result init MalApplyTypePredicate(fn, args, $MAL_HASH_MAP_TYPE)
 
-  elseif (strcmp(fn.string, "assoc") == 0) then
-    if (args.length < 1) then
-      result = MalMkError("assoc: expected at least 1 argument, got 0")
+  elseif (strcmp(fn.string, "assoc") == 0) ithen
+    if (args.length < 1) ithen
+      result init MalMkError("assoc: expected at least 1 argument, got 0")
     else
-      mapValue:MalValue = MalAt(args, 0)
+      mapValue:MalValue init MalAt(args, 0)
 
-      if (mapValue.type != $MAL_HASH_MAP_TYPE) then
-        result = MalMkError("assoc: first argument must be a hash map")
-      elseif ((args.length - 1) % 2 != 0) then
-        result = MalMkError("assoc: expected key/value pairs")
+      if (mapValue.type != $MAL_HASH_MAP_TYPE) ithen
+        result init MalMkError("assoc: first argument must be a hash map")
+      elseif ((args.length - 1) % 2 != 0) ithen
+        result init MalMkError("assoc: expected key/value pairs")
       else
-        result = MalAssocPairs(mapValue, args, 1)
+        result init MalAssocPairs(mapValue, args, 1)
       endif
     endif
 
-  elseif (strcmp(fn.string, "dissoc") == 0) then
-    if (args.length < 1) then
-      result = MalMkError("dissoc: expected at least 1 argument, got 0")
+  elseif (strcmp(fn.string, "dissoc") == 0) ithen
+    if (args.length < 1) ithen
+      result init MalMkError("dissoc: expected at least 1 argument, got 0")
     else
-      mapValue:MalValue = MalAt(args, 0)
+      mapValue:MalValue init MalAt(args, 0)
 
-      if (mapValue.type != $MAL_HASH_MAP_TYPE) then
-        result = MalMkError("dissoc: first argument must be a hash map")
+      if (mapValue.type != $MAL_HASH_MAP_TYPE) ithen
+        result init MalMkError("dissoc: first argument must be a hash map")
       else
-        result = MalDissocKeys(mapValue, args)
+        result init MalDissocKeys(mapValue, args)
       endif
     endif
 
-  elseif (strcmp(fn.string, "get") == 0) then
-    if (args.length != 2) then
-      result = MalArityError(fn.string, 2, args.length)
+  elseif (strcmp(fn.string, "get") == 0) ithen
+    if (args.length != 2) ithen
+      result init MalArityError(fn.string, 2, args.length)
     else
-      mapValue:MalValue = MalAt(args, 0)
-      key:MalValue = MalAt(args, 1)
+      mapValue:MalValue init MalAt(args, 0)
+      key:MalValue init MalAt(args, 1)
 
-      if (mapValue.type == $MAL_NIL_TYPE) then
-        result = MalMkValue($MAL_NIL_TYPE)
-      elseif (mapValue.type != $MAL_HASH_MAP_TYPE) then
-        result = MalMkError("get: first argument must be a hash map or nil")
+      if (mapValue.type == $MAL_NIL_TYPE) ithen
+        result init MalMkValue($MAL_NIL_TYPE)
+      elseif (mapValue.type != $MAL_HASH_MAP_TYPE) ithen
+        result init MalMkError("get: first argument must be a hash map or nil")
       else
-        result = MalMapGet(mapValue, key)
+        result init MalMapGet(mapValue, key)
       endif
     endif
 
-  elseif (strcmp(fn.string, "contains?") == 0) then
-    if (args.length != 2) then
-      result = MalArityError(fn.string, 2, args.length)
+  elseif (strcmp(fn.string, "contains?") == 0) ithen
+    if (args.length != 2) ithen
+      result init MalArityError(fn.string, 2, args.length)
     else
-      mapValue:MalValue = MalAt(args, 0)
-      key:MalValue = MalAt(args, 1)
+      mapValue:MalValue init MalAt(args, 0)
+      key:MalValue init MalAt(args, 1)
 
-      if (mapValue.type != $MAL_HASH_MAP_TYPE) then
-        result = MalMkError("contains?: first argument must be a hash map")
+      if (mapValue.type != $MAL_HASH_MAP_TYPE) ithen
+        result init MalMkError("contains?: first argument must be a hash map")
       else
         found:i = MalMapFindKey(mapValue, key) >= 0
-        result = MalMkBool(found)
+        result init MalMkBool(found)
       endif
     endif
 
-  elseif (strcmp(fn.string, "keys") == 0) then
-    if (args.length != 1) then
-      result = MalArityError(fn.string, 1, args.length)
+  elseif (strcmp(fn.string, "keys") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
     else
-      mapValue:MalValue = MalAt(args, 0)
+      mapValue:MalValue init MalAt(args, 0)
 
-      if (mapValue.type != $MAL_HASH_MAP_TYPE) then
-        result = MalMkError("keys: expected hash map argument")
+      if (mapValue.type != $MAL_HASH_MAP_TYPE) ithen
+        result init MalMkError("keys: expected hash map argument")
       else
-        result = MalMapKeys(mapValue)
+        result init MalMapKeys(mapValue)
       endif
     endif
 
-  elseif (strcmp(fn.string, "vals") == 0) then
-    if (args.length != 1) then
-      result = MalArityError(fn.string, 1, args.length)
+  elseif (strcmp(fn.string, "vals") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
     else
-      mapValue:MalValue = MalAt(args, 0)
+      mapValue:MalValue init MalAt(args, 0)
 
-      if (mapValue.type != $MAL_HASH_MAP_TYPE) then
-        result = MalMkError("vals: expected hash map argument")
+      if (mapValue.type != $MAL_HASH_MAP_TYPE) ithen
+        result init MalMkError("vals: expected hash map argument")
       else
-        result = MalMapValues(mapValue)
+        result init MalMapValues(mapValue)
       endif
     endif
 
-  elseif (strcmp(fn.string, "meta") == 0) then
-    if (args.length != 1) then
-      result = MalArityError(fn.string, 1, args.length)
+  elseif (strcmp(fn.string, "meta") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
     else
-      result = MalMeta(MalAt(args, 0))
+      result init MalMeta(MalAt(args, 0))
     endif
 
-  elseif (strcmp(fn.string, "with-meta") == 0) then
-    if (args.length != 2) then
-      result = MalArityError(fn.string, 2, args.length)
+  elseif (strcmp(fn.string, "with-meta") == 0) ithen
+    if (args.length != 2) ithen
+      result init MalArityError(fn.string, 2, args.length)
     else
-      result = MalWithMeta(MalAt(args, 0), MalAt(args, 1))
+      result init MalWithMeta(MalAt(args, 0), MalAt(args, 1))
     endif
 
-  elseif (strcmp(fn.string, "cons") == 0) then
-    if (args.length != 2) then
-      result = MalArityError(fn.string, 2, args.length)
+  elseif (strcmp(fn.string, "cons") == 0) ithen
+    if (args.length != 2) ithen
+      result init MalArityError(fn.string, 2, args.length)
     else
-      first:MalValue = MalAt(args, 0)
-      sequence:MalValue = MalAt(args, 1)
+      first:MalValue init MalAt(args, 0)
+      sequence:MalValue init MalAt(args, 1)
 
-      if (MalIsSequential(sequence) == 0) then
-        result = MalMkError("cons: second argument must be list or vector")
+      if (MalIsSequential(sequence) == 0) ithen
+        result init MalMkError("cons: second argument must be list or vector")
       else
         resultLength:i = sequence.length + 1
         values:MalValue[] init resultLength
-        values[0] = first
+        values[0] init first
 
-        if (sequence.length > 0) then
+        if (sequence.length > 0) ithen
           for index in [0 ... sequence.length - 1] do
-            values[index + 1] = MalAt(sequence, index)
+            values[index + 1] init MalAt(sequence, index)
           od
         endif
 
-        result = MalMkValue($MAL_LIST_TYPE)
-        result.list = values
+        result init MalMkValue($MAL_LIST_TYPE)
+        result.list init values
         result.length = resultLength
       endif
     endif
 
-  elseif (strcmp(fn.string, "concat") == 0) then
+  elseif (strcmp(fn.string, "concat") == 0) ithen
     totalLength:i = 0
     valid:i = 1
 
-    if (args.length > 0) then
+    if (args.length > 0) ithen
       for index in [0 ... args.length - 1] do
-        sequence:MalValue = MalAt(args, index)
+        sequence:MalValue init MalAt(args, index)
 
-        if (MalIsSequential(sequence) == 0) then
+        if (MalIsSequential(sequence) == 0) ithen
           valid = 0
           break
         endif
@@ -743,366 +739,366 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
       od
     endif
 
-    if (valid == 0) then
-      result = MalMkError("concat: expected list or vector arguments")
+    if (valid == 0) ithen
+      result init MalMkError("concat: expected list or vector arguments")
     else
       values:MalValue[] init totalLength
       destinationIndex:i = 0
 
-      if (args.length > 0) then
+      if (args.length > 0) ithen
         for sequenceIndex in [0 ... args.length - 1] do
-          sequence:MalValue = MalAt(args, sequenceIndex)
+          sequence:MalValue init MalAt(args, sequenceIndex)
 
-          if (sequence.length > 0) then
+          if (sequence.length > 0) ithen
             for valueIndex in [0 ... sequence.length - 1] do
-              values[destinationIndex] = MalAt(sequence, valueIndex)
+              values[destinationIndex] init MalAt(sequence, valueIndex)
               destinationIndex += 1
             od
           endif
         od
       endif
 
-      result = MalMkValue($MAL_LIST_TYPE)
-      result.list = values
+      result init MalMkValue($MAL_LIST_TYPE)
+      result.list init values
       result.length = totalLength
     endif
 
-  elseif (strcmp(fn.string, "vec") == 0) then
-    if (args.length != 1) then
-      result = MalArityError(fn.string, 1, args.length)
+  elseif (strcmp(fn.string, "vec") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
     else
-      sequence:MalValue = MalAt(args, 0)
+      sequence:MalValue init MalAt(args, 0)
 
-      if (MalIsSequential(sequence) == 0) then
-        result = MalMkError("vec: expected list or vector argument")
+      if (MalIsSequential(sequence) == 0) ithen
+        result init MalMkError("vec: expected list or vector argument")
       else
-        result = MalCopySequenceAs(sequence, $MAL_VECTOR_TYPE)
+        result init MalCopySequenceAs(sequence, $MAL_VECTOR_TYPE)
       endif
     endif
 
-  elseif (strcmp(fn.string, "nth") == 0) then
-    if (args.length != 2) then
-      result = MalArityError(fn.string, 2, args.length)
+  elseif (strcmp(fn.string, "nth") == 0) ithen
+    if (args.length != 2) ithen
+      result init MalArityError(fn.string, 2, args.length)
     else
-      sequence:MalValue = MalAt(args, 0)
-      indexValue:MalValue = MalAt(args, 1)
+      sequence:MalValue init MalAt(args, 0)
+      indexValue:MalValue init MalAt(args, 1)
 
-      if (MalIsSequential(sequence) == 0) then
-        result = MalMkError("nth: first argument must be list or vector")
-      elseif (indexValue.type != $MAL_NUMBER_TYPE) then
-        result = MalMkError("nth: index must be a number")
-      elseif (indexValue.number != int(indexValue.number)) then
-        result = MalMkError("nth: index must be an integer")
-      elseif (indexValue.number < 0 || indexValue.number >= sequence.length) then
-        result = MalMkError("nth: index out of range")
+      if (MalIsSequential(sequence) == 0) ithen
+        result init MalMkError("nth: first argument must be list or vector")
+      elseif (indexValue.type != $MAL_NUMBER_TYPE) ithen
+        result init MalMkError("nth: index must be a number")
+      elseif (indexValue.number != int(indexValue.number)) ithen
+        result init MalMkError("nth: index must be an integer")
+      elseif (indexValue.number < 0 || indexValue.number >= sequence.length) ithen
+        result init MalMkError("nth: index out of range")
       else
         index:i = indexValue.number
-        result = MalAt(sequence, index)
+        result init MalAt(sequence, index)
       endif
     endif
 
-  elseif (strcmp(fn.string, "first") == 0) then
-    if (args.length != 1) then
-      result = MalArityError(fn.string, 1, args.length)
+  elseif (strcmp(fn.string, "first") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
     else
-      sequence:MalValue = MalAt(args, 0)
+      sequence:MalValue init MalAt(args, 0)
 
       if (sequence.type == $MAL_NIL_TYPE || \
-          (MalIsSequential(sequence) == 1 && sequence.length == 0)) then
-        result = MalMkValue($MAL_NIL_TYPE)
-      elseif (MalIsSequential(sequence) == 0) then
-        result = MalMkError("first: expected list, vector, or nil")
+          (MalIsSequential(sequence) == 1 && sequence.length == 0)) ithen
+        result init MalMkValue($MAL_NIL_TYPE)
+      elseif (MalIsSequential(sequence) == 0) ithen
+        result init MalMkError("first: expected list, vector, or nil")
       else
-        result = MalAt(sequence, 0)
+        result init MalAt(sequence, 0)
       endif
     endif
 
-  elseif (strcmp(fn.string, "rest") == 0) then
-    if (args.length != 1) then
-      result = MalArityError(fn.string, 1, args.length)
+  elseif (strcmp(fn.string, "rest") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
     else
-      sequence:MalValue = MalAt(args, 0)
+      sequence:MalValue init MalAt(args, 0)
 
-      if (sequence.type != $MAL_NIL_TYPE && MalIsSequential(sequence) == 0) then
-        result = MalMkError("rest: expected list, vector, or nil")
+      if (sequence.type != $MAL_NIL_TYPE && MalIsSequential(sequence) == 0) ithen
+        result init MalMkError("rest: expected list, vector, or nil")
       else
-        result = MalMkValue($MAL_LIST_TYPE)
+        result init MalMkValue($MAL_LIST_TYPE)
 
-        if (sequence.type != $MAL_NIL_TYPE && sequence.length > 1) then
+        if (sequence.type != $MAL_NIL_TYPE && sequence.length > 1) ithen
           restLength:i = sequence.length - 1
           values:MalValue[] init restLength
 
           for index in [0 ... restLength - 1] do
-            values[index] = MalAt(sequence, index + 1)
+            values[index] init MalAt(sequence, index + 1)
           od
 
-          result.list = values
+          result.list init values
           result.length = restLength
         endif
       endif
     endif
 
-  elseif (strcmp(fn.string, "seq") == 0) then
-    if (args.length != 1) then
-      result = MalArityError(fn.string, 1, args.length)
+  elseif (strcmp(fn.string, "seq") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
     else
-      result = MalSeq(MalAt(args, 0))
+      result init MalSeq(MalAt(args, 0))
     endif
 
-  elseif (strcmp(fn.string, "conj") == 0) then
-    if (args.length < 2) then
-      result = MalMkError(sprintf( \
+  elseif (strcmp(fn.string, "conj") == 0) ithen
+    if (args.length < 2) ithen
+      result init MalMkError(sprintf( \
         "conj: expected at least 2 arguments, got %d", args.length))
     else
-      collection:MalValue = MalAt(args, 0)
+      collection:MalValue init MalAt(args, 0)
 
-      if (MalIsSequential(collection) == 0) then
-        result = MalMkError("conj: first argument must be list or vector")
+      if (MalIsSequential(collection) == 0) ithen
+        result init MalMkError("conj: first argument must be list or vector")
       else
-        result = MalConj(args)
+        result init MalConj(args)
       endif
     endif
 
-  elseif (strcmp(fn.string, "list?") == 0) then
-    if (args.length != 1) then
-      result = MalArityError(fn.string, 1, args.length)
+  elseif (strcmp(fn.string, "list?") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
     else
-      value:MalValue = MalAt(args, 0)
-      result = MalMkBool(value.type == $MAL_LIST_TYPE ? 1 : 0)
+      value:MalValue init MalAt(args, 0)
+      result init MalMkBool(value.type == $MAL_LIST_TYPE ? 1 : 0)
     endif
 
-  elseif (strcmp(fn.string, "empty?") == 0) then
-    if (args.length != 1) then
-      result = MalArityError(fn.string, 1, args.length)
+  elseif (strcmp(fn.string, "empty?") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
     else
-      value:MalValue = MalAt(args, 0)
+      value:MalValue init MalAt(args, 0)
       isEmpty:i = value.type == $MAL_NIL_TYPE || \
         value.type == $MAL_LIST_TYPE && value.length == 0 || \
         value.type == $MAL_VECTOR_TYPE && value.length == 0 || \
         value.type == $MAL_HASH_MAP_TYPE && value.length == 0
-      result = MalMkBool(isEmpty)
+      result init MalMkBool(isEmpty)
     endif
 
-  elseif (strcmp(fn.string, "count") == 0) then
-    if (args.length != 1) then
-      result = MalArityError(fn.string, 1, args.length)
+  elseif (strcmp(fn.string, "count") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
     else
-      value:MalValue = MalAt(args, 0)
-      result = MalMkValue($MAL_NUMBER_TYPE)
+      value:MalValue init MalAt(args, 0)
+      result init MalMkValue($MAL_NUMBER_TYPE)
 
-      if (value.type == $MAL_NIL_TYPE) then
+      if (value.type == $MAL_NIL_TYPE) ithen
         result.number = 0
       elseif (value.type == $MAL_LIST_TYPE || \
-              value.type == $MAL_VECTOR_TYPE) then
+              value.type == $MAL_VECTOR_TYPE) ithen
         result.number = value.length
-      elseif (value.type == $MAL_HASH_MAP_TYPE) then
+      elseif (value.type == $MAL_HASH_MAP_TYPE) ithen
         result.number = int(value.length / 2)
       else
-        result = MalMkError("count: expected sequence or nil")
+        result init MalMkError("count: expected sequence or nil")
       endif
     endif
 
-  elseif (strcmp(fn.string, "str") == 0) then
-    result = MalMkString(MalJoinPrintedArgs(args, 0, ""))
+  elseif (strcmp(fn.string, "str") == 0) ithen
+    result init MalMkString(MalJoinPrintedArgs(args, 0, ""))
 
-  elseif (strcmp(fn.string, "pr-str") == 0) then
-    result = MalMkString(MalJoinPrintedArgs(args, 1, " "))
+  elseif (strcmp(fn.string, "pr-str") == 0) ithen
+    result init MalMkString(MalJoinPrintedArgs(args, 1, " "))
 
-  elseif (strcmp(fn.string, "println") == 0) then
-    output:S = MalJoinPrintedArgs(args, 0, " ")
+  elseif (strcmp(fn.string, "println") == 0) ithen
+    output:S init MalJoinPrintedArgs(args, 0, " ")
     prints "%s\n", output
-    result = MalMkValue($MAL_NIL_TYPE)
+    result init MalMkValue($MAL_NIL_TYPE)
 
-  elseif (strcmp(fn.string, "time-ms") == 0) then
-    if (args.length != 0) then
-      result = MalArityError(fn.string, 0, args.length)
+  elseif (strcmp(fn.string, "time-ms") == 0) ithen
+    if (args.length != 0) ithen
+      result init MalArityError(fn.string, 0, args.length)
     else
       seconds:i date
-      result = MalMkValue($MAL_NUMBER_TYPE)
+      result init MalMkValue($MAL_NUMBER_TYPE)
       result.number = seconds * 1000
     endif
 
-  elseif (strcmp(fn.string, "csound-eval") == 0) then
-    if (args.length != 1) then
-      result = MalArityError(fn.string, 1, args.length)
+  elseif (strcmp(fn.string, "csound-eval") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
     else
-      source:MalValue = MalAt(args, 0)
+      source:MalValue init MalAt(args, 0)
 
-      if (source.type != $MAL_STRING_TYPE) then
-        result = MalMkError("csound-eval: expected string argument")
+      if (source.type != $MAL_STRING_TYPE) ithen
+        result init MalMkError("csound-eval: expected string argument")
       else
-        code:S = source.string
-        result = MalCsoundEval(code)
+        code:S init source.string
+        result init MalCsoundEval(code)
       endif
     endif
 
-  elseif (strcmp(fn.string, "csound/param-bindings") == 0) then
-    if (args.length != 1) then
-      result = MalArityError(fn.string, 1, args.length)
+  elseif (strcmp(fn.string, "csound/param-bindings") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
     else
-      result = MalCsoundParamBindings(MalAt(args, 0))
+      result init MalCsoundParamBindings(MalAt(args, 0))
     endif
 
-  elseif (strcmp(fn.string, "csound/compile-inst") == 0) then
-    if (args.length != 3) then
-      result = MalArityError(fn.string, 3, args.length)
+  elseif (strcmp(fn.string, "csound/compile-inst") == 0) ithen
+    if (args.length != 3) ithen
+      result init MalArityError(fn.string, 3, args.length)
     else
-      instrumentName:MalValue = MalAt(args, 0)
-      parameters:MalValue = MalAt(args, 1)
-      graph:MalValue = MalAt(args, 2)
-      result = MalCompileCsoundInstrument( \
+      instrumentName:MalValue init MalAt(args, 0)
+      parameters:MalValue init MalAt(args, 1)
+      graph:MalValue init MalAt(args, 2)
+      result init MalCompileCsoundInstrument( \
         instrumentName, parameters, graph)
     endif
 
-  elseif (strcmp(fn.string, "csound/event") == 0) then
-    result = MalCsoundEvent(args)
+  elseif (strcmp(fn.string, "csound/event") == 0) ithen
+    result init MalCsoundEvent(args)
 
-  elseif (strcmp(fn.string, "readline") == 0) then
-    if (args.length != 1) then
-      result = MalArityError(fn.string, 1, args.length)
+  elseif (strcmp(fn.string, "readline") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
     else
-      prompt:MalValue = MalAt(args, 0)
+      prompt:MalValue init MalAt(args, 0)
 
-      if (prompt.type != $MAL_STRING_TYPE) then
-        result = MalMkError("readline: expected string argument")
+      if (prompt.type != $MAL_STRING_TYPE) ithen
+        result init MalMkError("readline: expected string argument")
       else
         // Terminal I/O belongs to the k-rate driver.
-        result = MalInputTake()
+        result init MalInputTake()
       endif
     endif
 
-  elseif (strcmp(fn.string, "read-string") == 0) then
-    if (args.length != 1) then
-      result = MalArityError(fn.string, 1, args.length)
+  elseif (strcmp(fn.string, "read-string") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
     else
-      value:MalValue = MalAt(args, 0)
+      value:MalValue init MalAt(args, 0)
 
-      if (value.type != $MAL_STRING_TYPE) then
-        result = MalMkError("read-string: expected string argument")
+      if (value.type != $MAL_STRING_TYPE) ithen
+        result init MalMkError("read-string: expected string argument")
       else
-        result = read_str(value.string)
+        result init read_str(value.string)
       endif
     endif
 
-  elseif (strcmp(fn.string, "slurp") == 0) then
-    if (args.length != 1) then
-      result = MalArityError(fn.string, 1, args.length)
+  elseif (strcmp(fn.string, "slurp") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
     else
-      value:MalValue = MalAt(args, 0)
+      value:MalValue init MalAt(args, 0)
 
-      if (value.type != $MAL_STRING_TYPE) then
-        result = MalMkError("slurp: expected string argument")
+      if (value.type != $MAL_STRING_TYPE) ithen
+        result init MalMkError("slurp: expected string argument")
       else
-        result = MalSlurpFile(value.string)
+        result init MalSlurpFile(value.string)
       endif
     endif
 
-  elseif (strcmp(fn.string, "atom") == 0) then
-    if (args.length != 1) then
-      result = MalArityError(fn.string, 1, args.length)
+  elseif (strcmp(fn.string, "atom") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
     else
-      result = MalMkAtom(MalAt(args, 0))
+      result init MalMkAtom(MalAt(args, 0))
     endif
 
-  elseif (strcmp(fn.string, "atom?") == 0) then
-    if (args.length != 1) then
-      result = MalArityError(fn.string, 1, args.length)
+  elseif (strcmp(fn.string, "atom?") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
     else
-      value:MalValue = MalAt(args, 0)
-      result = MalMkBool(value.type == $MAL_ATOM_TYPE ? 1 : 0)
+      value:MalValue init MalAt(args, 0)
+      result init MalMkBool(value.type == $MAL_ATOM_TYPE ? 1 : 0)
     endif
 
-  elseif (strcmp(fn.string, "deref") == 0) then
-    if (args.length != 1) then
-      result = MalArityError(fn.string, 1, args.length)
+  elseif (strcmp(fn.string, "deref") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
     else
-      atom:MalValue = MalAt(args, 0)
+      atom:MalValue init MalAt(args, 0)
 
-      if (atom.type != $MAL_ATOM_TYPE) then
-        result = MalMkError("deref: expected atom argument")
+      if (atom.type != $MAL_ATOM_TYPE) ithen
+        result init MalMkError("deref: expected atom argument")
       else
-        result = MalAtomValue(atom)
+        result init MalAtomValue(atom)
       endif
     endif
 
-  elseif (strcmp(fn.string, "reset!") == 0) then
-    if (args.length != 2) then
-      result = MalArityError(fn.string, 2, args.length)
+  elseif (strcmp(fn.string, "reset!") == 0) ithen
+    if (args.length != 2) ithen
+      result init MalArityError(fn.string, 2, args.length)
     else
-      atom:MalValue = MalAt(args, 0)
+      atom:MalValue init MalAt(args, 0)
 
-      if (atom.type != $MAL_ATOM_TYPE) then
-        result = MalMkError("reset!: first argument must be an atom")
+      if (atom.type != $MAL_ATOM_TYPE) ithen
+        result init MalMkError("reset!: first argument must be an atom")
       else
-        value:MalValue = MalAt(args, 1)
-        result = MalAtomSetValue(atom, value)
+        value:MalValue init MalAt(args, 1)
+        result init MalAtomSetValue(atom, value)
       endif
     endif
 
-  elseif (strcmp(fn.string, "swap!") == 0) then
-    if (args.length < 2) then
-      result = MalMkError(sprintf("swap!: expected at least 2 arguments, got %d", \
+  elseif (strcmp(fn.string, "swap!") == 0) ithen
+    if (args.length < 2) ithen
+      result init MalMkError(sprintf("swap!: expected at least 2 arguments, got %d", \
         args.length))
     else
-      atom:MalValue = MalAt(args, 0)
+      atom:MalValue init MalAt(args, 0)
 
-      if (atom.type != $MAL_ATOM_TYPE) then
-        result = MalMkError("swap!: first argument must be an atom")
+      if (atom.type != $MAL_ATOM_TYPE) ithen
+        result init MalMkError("swap!: first argument must be an atom")
       else
-        applyFn:MalValue = MalAt(args, 1)
-        applyArgs:MalValue = MalMkValue($MAL_LIST_TYPE)
-        applyArgs = MalAppendValue(applyArgs, MalAtomValue(atom))
+        applyFn:MalValue init MalAt(args, 1)
+        applyArgs:MalValue init MalMkValue($MAL_LIST_TYPE)
+        applyArgs init MalAppendValue(applyArgs, MalAtomValue(atom))
 
-        if (args.length > 2) then
+        if (args.length > 2) ithen
           for index in [2 ... args.length - 1] do
-            applyArgs = MalAppendValue(applyArgs, MalAt(args, index))
+            applyArgs init MalAppendValue(applyArgs, MalAt(args, index))
           od
         endif
 
-        result = MalApply(applyFn, applyArgs)
-        if (result.type != $MAL_ERROR_TYPE) then
-          result = MalAtomSetValue(atom, result)
+        result init MalApply(applyFn, applyArgs)
+        if (result.type != $MAL_ERROR_TYPE) ithen
+          result init MalAtomSetValue(atom, result)
         endif
       endif
     endif
 
-  elseif (strcmp(fn.string, "=") == 0) then
-    if (args.length != 2) then
-      result = MalArityError(fn.string, 2, args.length)
+  elseif (strcmp(fn.string, "=") == 0) ithen
+    if (args.length != 2) ithen
+      result init MalArityError(fn.string, 2, args.length)
     else
-      left:MalValue = MalAt(args, 0)
-      right:MalValue = MalAt(args, 1)
-      result = MalMkBool(MalEquals(left, right))
+      left:MalValue init MalAt(args, 0)
+      right:MalValue init MalAt(args, 1)
+      result init MalMkBool(MalEquals(left, right))
     endif
 
   elseif (strcmp(fn.string, ">") == 0 || \
           strcmp(fn.string, ">=") == 0 || \
           strcmp(fn.string, "<") == 0 || \
-          strcmp(fn.string, "<=") == 0) then
-    result = MalApplyNumericComparison(fn, args)
+          strcmp(fn.string, "<=") == 0) ithen
+    result init MalApplyNumericComparison(fn, args)
 
-  elseif (strcmp(fn.string, "not") == 0) then
-    if (args.length != 1) then
-      result = MalArityError(fn.string, 1, args.length)
+  elseif (strcmp(fn.string, "not") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
     else
-      value:MalValue = MalAt(args, 0)
-      result = MalMkBool(MalIsTruthy(value) == 0 ? 1 : 0)
+      value:MalValue init MalAt(args, 0)
+      result init MalMkBool(MalIsTruthy(value) == 0 ? 1 : 0)
     endif
 
-  elseif (strcmp(fn.string, "macro?") == 0) then
-    if (args.length != 1) then
-      result = MalArityError(fn.string, 1, args.length)
+  elseif (strcmp(fn.string, "macro?") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
     else
-      result = MalMkBool(MalIsMacro(MalAt(args, 0)))
+      result init MalMkBool(MalIsMacro(MalAt(args, 0)))
     endif
 
-  elseif (strcmp(fn.string, "prn") == 0) then
-    output:S = MalJoinPrintedArgs(args, 1, " ")
+  elseif (strcmp(fn.string, "prn") == 0) ithen
+    output:S init MalJoinPrintedArgs(args, 1, " ")
     prints "%s\n", output
-    result = MalMkValue($MAL_NIL_TYPE)
+    result init MalMkValue($MAL_NIL_TYPE)
 
   else
-    result = MalMkError(sprintf("unknown builtin '%s'", fn.string))
+    result init MalMkError(sprintf("unknown builtin '%s'", fn.string))
   endif
 
   xout result
@@ -1111,11 +1107,11 @@ endop
 opcode MalRestParamIndex(params:MalValue):i
   result:i = -1
 
-  if (params.length > 0) then
+  if (params.length > 0) ithen
     for index in [0 ... params.length - 1] do
-      param:MalValue = MalAt(params, index)
+      param:MalValue init MalAt(params, index)
 
-      if (param.type == $MAL_SYMBOL_TYPE && strcmp(param.string, "&") == 0) then
+      if (param.type == $MAL_SYMBOL_TYPE && strcmp(param.string, "&") == 0) ithen
         result = index
         break
       endif
@@ -1126,45 +1122,45 @@ opcode MalRestParamIndex(params:MalValue):i
 endop
 
 opcode MalBindFunctionEnv(fn:MalValue, args:MalValue):(MalValue, MalEnv)
-  result:MalValue = MalMkValue($MAL_NIL_TYPE)
-  callEnv:MalEnv = MalEnvHandle(-1)
-  params:MalValue = MalFunctionParams(fn)
+  result:MalValue init MalMkValue($MAL_NIL_TYPE)
+  callEnv:MalEnv init MalEnvHandle(-1)
+  params:MalValue init MalFunctionParams(fn)
   restIndex:i = MalRestParamIndex(params)
   requiredCount:i = restIndex >= 0 ? restIndex : params.length
 
-  if (restIndex < 0 && args.length != params.length) then
-    result = MalMkError(sprintf("fn*: expected %d arguments, got %d", \
+  if (restIndex < 0 && args.length != params.length) ithen
+    result init MalMkError(sprintf("fn*: expected %d arguments, got %d", \
       params.length, args.length))
-  elseif (restIndex >= 0 && args.length < requiredCount) then
-    result = MalMkError(sprintf("fn*: expected at least %d arguments, got %d", \
+  elseif (restIndex >= 0 && args.length < requiredCount) ithen
+    result init MalMkError(sprintf("fn*: expected at least %d arguments, got %d", \
       requiredCount, args.length))
-  elseif (lenarray(fn.env) == 0) then
-    result = MalMkError("fn*: missing closure environment")
+  elseif (lenarray(fn.env) == 0) ithen
+    result init MalMkError("fn*: missing closure environment")
   else
-    closure:MalEnv[] = fn.env
-    capturedEnv:MalEnv = MalEnvResolve(closure[0])
-    callEnv = MalMkEnvWithOuter(capturedEnv)
+    closure:MalEnv[] init fn.env
+    capturedEnv:MalEnv init MalEnvResolve(closure[0])
+    callEnv init MalMkEnvWithOuter(capturedEnv)
 
-    if (requiredCount > 0) then
+    if (requiredCount > 0) ithen
       for index in [0 ... requiredCount - 1] do
-        param:MalValue = MalAt(params, index)
-        arg:MalValue = MalAt(args, index)
-        callEnv = MalEnvSet(callEnv, param.string, arg)
+        param:MalValue init MalAt(params, index)
+        arg:MalValue init MalAt(args, index)
+        callEnv init MalEnvSet(callEnv, param.string, arg)
       od
     endif
 
-    if (restIndex >= 0) then
-      restName:MalValue = MalAt(params, restIndex + 1)
-      restValues:MalValue = MalMkValue($MAL_LIST_TYPE)
+    if (restIndex >= 0) ithen
+      restName:MalValue init MalAt(params, restIndex + 1)
+      restValues:MalValue init MalMkValue($MAL_LIST_TYPE)
 
-      if (args.length > requiredCount) then
+      if (args.length > requiredCount) ithen
         for index in [requiredCount ... args.length - 1] do
-          arg:MalValue = MalAt(args, index)
-          restValues = MalAppendValue(restValues, arg)
+          arg:MalValue init MalAt(args, index)
+          restValues init MalAppendValue(restValues, arg)
         od
       endif
 
-      callEnv = MalEnvSet(callEnv, restName.string, restValues)
+      callEnv init MalEnvSet(callEnv, restName.string, restValues)
     endif
 
   endif
@@ -1175,9 +1171,9 @@ endop
 opcode MalApplyFunction(fn:MalValue, args:MalValue):MalValue
   result:MalValue, callEnv:MalEnv = MalBindFunctionEnv(fn, args)
 
-  if (result.type != $MAL_ERROR_TYPE) then
-    body:MalValue = MalFunctionBody(fn)
-    bodyInputEnv:MalEnv = callEnv
+  if (result.type != $MAL_ERROR_TYPE) ithen
+    body:MalValue init MalFunctionBody(fn)
+    bodyInputEnv:MalEnv init callEnv
     result, callEnv = EVAL_ENV(body, bodyInputEnv)
   endif
 
@@ -1187,39 +1183,39 @@ opcode MalApplyFunction(fn:MalValue, args:MalValue):MalValue
 endop
 
 opcode MalApply(fn:MalValue, args:MalValue):MalValue
-  if (fn.type == $MAL_BUILTIN_OPERATOR_TYPE) then
-    result:MalValue = MalApplyBuiltinOperator(fn, args)
-  elseif (fn.type == $MAL_BUILTIN_TYPE) then
-    result:MalValue = MalApplyBuiltin(fn, args)
-  elseif (fn.type == $MAL_BUILTIN_OPCODE_TYPE) then
-    result:MalValue = MalApplyCsoundOpcode(fn, args)
-  elseif (fn.type == $MAL_FUNCTION_TYPE) then
-    result:MalValue = MalApplyFunction(fn, args)
-  elseif (fn.type == $MAL_CSOUND_INSTRUMENT_TYPE) then
-    result:MalValue = MalScheduleCsoundInstrument(fn, args, 0, 1)
+  if (fn.type == $MAL_BUILTIN_OPERATOR_TYPE) ithen
+    result:MalValue init MalApplyBuiltinOperator(fn, args)
+  elseif (fn.type == $MAL_BUILTIN_TYPE) ithen
+    result:MalValue init MalApplyBuiltin(fn, args)
+  elseif (fn.type == $MAL_BUILTIN_OPCODE_TYPE) ithen
+    result:MalValue init MalApplyCsoundOpcode(fn, args)
+  elseif (fn.type == $MAL_FUNCTION_TYPE) ithen
+    result:MalValue init MalApplyFunction(fn, args)
+  elseif (fn.type == $MAL_CSOUND_INSTRUMENT_TYPE) ithen
+    result:MalValue init MalScheduleCsoundInstrument(fn, args, 0, 1)
   else
-    result:MalValue = MalMkError(sprintf("cannot apply %s", pr_str(fn)))
+    result:MalValue init MalMkError(sprintf("cannot apply %s", pr_str(fn)))
   endif
 
   xout result
 endop
 
 opcode MalEvalSequenceEnv(ast:MalValue, env:MalEnv, startIndex:i, resultType:i):(MalValue, MalEnv)
-  result:MalValue = MalMkValue(resultType)
-  currentEnv:MalEnv = env
+  result:MalValue init MalMkValue(resultType)
+  currentEnv:MalEnv init env
   index:i = startIndex
   done:i = 0
 
   while (index < ast.length && done == 0) do
-    value:MalValue = MalAt(ast, index)
-    valueInputEnv:MalEnv = currentEnv
+    value:MalValue init MalAt(ast, index)
+    valueInputEnv:MalEnv init currentEnv
     evaluated:MalValue, currentEnv = EVAL_ENV(value, valueInputEnv)
 
-    if (evaluated.type == $MAL_ERROR_TYPE) then
-      result = evaluated
+    if (evaluated.type == $MAL_ERROR_TYPE) ithen
+      result init evaluated
       done = 1
     else
-      result = MalAppendValue(result, evaluated)
+      result init MalAppendValue(result, evaluated)
     endif
 
     index += 1
@@ -1229,11 +1225,11 @@ opcode MalEvalSequenceEnv(ast:MalValue, env:MalEnv, startIndex:i, resultType:i):
 endop
 
 opcode MalUnevaluatedArgs(ast:MalValue):MalValue
-  result:MalValue = MalMkValue($MAL_LIST_TYPE)
+  result:MalValue init MalMkValue($MAL_LIST_TYPE)
 
-  if (ast.length > 1) then
+  if (ast.length > 1) ithen
     for index in [1 ... ast.length - 1] do
-      result = MalAppendValue(result, MalAt(ast, index))
+      result init MalAppendValue(result, MalAt(ast, index))
     od
   endif
 
@@ -1241,22 +1237,22 @@ opcode MalUnevaluatedArgs(ast:MalValue):MalValue
 endop
 
 opcode MalEvalHashMapEnv(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
-  result:MalValue = MalMkValue($MAL_HASH_MAP_TYPE)
-  currentEnv:MalEnv = env
+  result:MalValue init MalMkValue($MAL_HASH_MAP_TYPE)
+  currentEnv:MalEnv init env
   index:i = 0
   done:i = 0
 
   while (index < ast.length && done == 0) do
-    key:MalValue = MalAt(ast, index)
-    value:MalValue = MalAt(ast, index + 1)
-    valueInputEnv:MalEnv = currentEnv
+    key:MalValue init MalAt(ast, index)
+    value:MalValue init MalAt(ast, index + 1)
+    valueInputEnv:MalEnv init currentEnv
     evaluated:MalValue, currentEnv = EVAL_ENV(value, valueInputEnv)
 
-    if (evaluated.type == $MAL_ERROR_TYPE) then
-      result = evaluated
+    if (evaluated.type == $MAL_ERROR_TYPE) ithen
+      result init evaluated
       done = 1
     else
-      result = MalMapAssoc(result, key, evaluated)
+      result init MalMapAssoc(result, key, evaluated)
     endif
 
     index += 2
@@ -1266,12 +1262,11 @@ opcode MalEvalHashMapEnv(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
 endop
 
 opcode MalEvalAstEnv(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
-  result:MalValue = ast
-  currentEnv:MalEnv = env
-
+  result:MalValue init ast
+  currentEnv:MalEnv init env
   switch ast.type
     case $MAL_SYMBOL_TYPE
-      result = MalEnvGet(env, ast.string)
+      result init MalEnvGet(env, ast.string)
 
     case $MAL_LIST_TYPE
       result, currentEnv = MalEvalSequenceEnv(ast, env, 0, $MAL_LIST_TYPE)
@@ -1287,39 +1282,39 @@ opcode MalEvalAstEnv(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
 endop
 
 opcode MalEvalQuote(ast:MalValue):MalValue
-  if (ast.length != 2) then
-    result:MalValue = MalArityError("quote", 1, ast.length - 1)
+  if (ast.length != 2) ithen
+    result:MalValue init MalArityError("quote", 1, ast.length - 1)
   else
-    result:MalValue = MalAt(ast, 1)
+    result:MalValue init MalAt(ast, 1)
   endif
 
   xout result
 endop
 
 opcode MalQuasiquoteSequence(ast:MalValue):MalValue
-  result:MalValue = MalMkValue($MAL_LIST_TYPE)
+  result:MalValue init MalMkValue($MAL_LIST_TYPE)
 
-  if (ast.length > 0) then
+  if (ast.length > 0) ithen
     for offset in [0 ... ast.length - 1] do
       index:i = ast.length - offset - 1
-      element:MalValue = MalAt(ast, index)
+      element:MalValue init MalAt(ast, index)
 
-      if (MalIsForm(element, "splice-unquote") == 1) then
-        if (element.length != 2) then
-          result = MalArityError("splice-unquote", 1, element.length - 1)
+      if (MalIsForm(element, "splice-unquote") == 1) ithen
+        if (element.length != 2) ithen
+          result init MalArityError("splice-unquote", 1, element.length - 1)
           break
         endif
 
-        result = MalMkList3(MalMkSymbol("concat"), MalAt(element, 1), result)
+        result init MalMkList3(MalMkSymbol("concat"), MalAt(element, 1), result)
       else
-        quotedElement:MalValue = MalQuasiquote(element)
+        quotedElement:MalValue init MalQuasiquote(element)
 
-        if (quotedElement.type == $MAL_ERROR_TYPE) then
-          result = quotedElement
+        if (quotedElement.type == $MAL_ERROR_TYPE) ithen
+          result init quotedElement
           break
         endif
 
-        result = MalMkList3(MalMkSymbol("cons"), quotedElement, result)
+        result init MalMkList3(MalMkSymbol("cons"), quotedElement, result)
       endif
     od
   endif
@@ -1328,33 +1323,32 @@ opcode MalQuasiquoteSequence(ast:MalValue):MalValue
 endop
 
 opcode MalQuasiquote(ast:MalValue):MalValue
-  result:MalValue = ast
-
-  if (MalIsForm(ast, "unquote") == 1) then
-    if (ast.length != 2) then
-      result = MalArityError("unquote", 1, ast.length - 1)
+  result:MalValue init ast
+  if (MalIsForm(ast, "unquote") == 1) ithen
+    if (ast.length != 2) ithen
+      result init MalArityError("unquote", 1, ast.length - 1)
     else
-      result = MalAt(ast, 1)
+      result init MalAt(ast, 1)
     endif
   else
     switch ast.type
       case $MAL_LIST_TYPE
-        result = MalQuasiquoteSequence(ast)
+        result init MalQuasiquoteSequence(ast)
 
       case $MAL_VECTOR_TYPE
-        quotedValues:MalValue = MalQuasiquoteSequence(ast)
+        quotedValues:MalValue init MalQuasiquoteSequence(ast)
 
-        if (quotedValues.type == $MAL_ERROR_TYPE) then
-          result = quotedValues
+        if (quotedValues.type == $MAL_ERROR_TYPE) ithen
+          result init quotedValues
         else
-          result = MalMkList2(MalMkSymbol("vec"), quotedValues)
+          result init MalMkList2(MalMkSymbol("vec"), quotedValues)
         endif
 
       case $MAL_SYMBOL_TYPE
-        result = MalMkList2(MalMkSymbol("quote"), ast)
+        result init MalMkList2(MalMkSymbol("quote"), ast)
 
       case $MAL_HASH_MAP_TYPE
-        result = MalMkList2(MalMkSymbol("quote"), ast)
+        result init MalMkList2(MalMkSymbol("quote"), ast)
     endsw
   endif
 
@@ -1364,10 +1358,10 @@ endop
 opcode MalIsFnForm(value:MalValue):i
   result:i = 0
 
-  if (value.type == $MAL_LIST_TYPE && value.length > 0) then
-    head:MalValue = MalAt(value, 0)
+  if (value.type == $MAL_LIST_TYPE && value.length > 0) ithen
+    head:MalValue init MalAt(value, 0)
 
-    if (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "fn*") == 0) then
+    if (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "fn*") == 0) ithen
       result = 1
     endif
   endif
@@ -1376,14 +1370,17 @@ opcode MalIsFnForm(value:MalValue):i
 endop
 
 opcode MalFunctionCaptureEnv(fn:MalValue, env:MalEnv):MalValue
-  if (fn.type == $MAL_FUNCTION_TYPE) then
-    retainedEnv:MalEnv = MalEnvRetain(env)
+  if (fn.type == $MAL_FUNCTION_TYPE) ithen
+    retainedEnv:MalEnv init MalEnvRetain(env)
     closure:MalEnv[] init 1
-    closure[0] = MalEnvHandle(retainedEnv.id)
-    fn.env = closure
+    closure[0] init MalEnvHandle(retainedEnv.id)
+    result:MalValue init fn.type, fn.number, fn.string, fn.list, closure, \
+      fn.metadata, fn.length, fn.isMacro, fn.astRef
+  else
+    result:MalValue init fn
   endif
 
-  xout fn
+  xout result
 endop
 
 opcode MalRefreshTopLevelFunctionClosures(env:MalEnv):MalEnv
@@ -1391,41 +1388,40 @@ opcode MalRefreshTopLevelFunctionClosures(env:MalEnv):MalEnv
 endop
 
 opcode MalEvalDefinition(ast:MalValue, env:MalEnv, name:S, asMacro:i):(MalValue, MalEnv)
-  result:MalValue = MalMkValue($MAL_NIL_TYPE)
-  currentEnv:MalEnv = env
-
-  if (ast.length != 3) then
-    result = MalMkError(sprintf("%s: expected 2 arguments, got %d", \
+  result:MalValue init MalMkValue($MAL_NIL_TYPE)
+  currentEnv:MalEnv init env
+  if (ast.length != 3) ithen
+    result init MalMkError(sprintf("%s: expected 2 arguments, got %d", \
       name, ast.length - 1))
   else
-    symbol:MalValue = MalAt(ast, 1)
-    valueForm:MalValue = MalAt(ast, 2)
+    symbol:MalValue init MalAt(ast, 1)
+    valueForm:MalValue init MalAt(ast, 2)
 
-    if (symbol.type != $MAL_SYMBOL_TYPE) then
-      result = MalMkError(sprintf("%s: first argument must be a symbol", name))
+    if (symbol.type != $MAL_SYMBOL_TYPE) ithen
+      result init MalMkError(sprintf("%s: first argument must be a symbol", name))
     else
-      definitionInputEnv:MalEnv = currentEnv
+      definitionInputEnv:MalEnv init currentEnv
       value:MalValue, currentEnv = EVAL_ENV(valueForm, definitionInputEnv)
 
-      if (value.type == $MAL_ERROR_TYPE) then
-        result = value
-      elseif (asMacro == 1 && value.type != $MAL_FUNCTION_TYPE) then
-        result = MalMkError(sprintf("%s: value must be a function", name))
+      if (value.type == $MAL_ERROR_TYPE) ithen
+        result init value
+      elseif (asMacro == 1 && value.type != $MAL_FUNCTION_TYPE) ithen
+        result init MalMkError(sprintf("%s: value must be a function", name))
       else
-        if (asMacro == 1) then
-          value = MalFunctionAsMacro(value)
+        if (asMacro == 1) ithen
+          value init MalFunctionAsMacro(value)
         endif
 
-        currentEnv = MalEnvSet(currentEnv, symbol.string, value)
+        currentEnv init MalEnvSet(currentEnv, symbol.string, value)
 
-        if (MalIsFnForm(valueForm) == 1) then
-          value = MalFunctionCaptureEnv(value, currentEnv)
-          currentEnv = MalEnvSet(currentEnv, symbol.string, value)
+        if (MalIsFnForm(valueForm) == 1) ithen
+          value init MalFunctionCaptureEnv(value, currentEnv)
+          currentEnv init MalEnvSet(currentEnv, symbol.string, value)
         endif
 
-        currentEnv = MalRefreshTopLevelFunctionClosures(currentEnv)
-        value = MalEnvGet(currentEnv, symbol.string)
-        result = value
+        currentEnv init MalRefreshTopLevelFunctionClosures(currentEnv)
+        value init MalEnvGet(currentEnv, symbol.string)
+        result init value
       endif
     endif
   endif
@@ -1449,17 +1445,17 @@ opcode MalParamsAreValid(params:MalValue):i
   valid:i = 1
   restIndex:i = -1
 
-  if (params.type != $MAL_LIST_TYPE && params.type != $MAL_VECTOR_TYPE) then
+  if (params.type != $MAL_LIST_TYPE && params.type != $MAL_VECTOR_TYPE) ithen
     valid = 0
-  elseif (params.length > 0) then
+  elseif (params.length > 0) ithen
     for index in [0 ... params.length - 1] do
-      param:MalValue = MalAt(params, index)
+      param:MalValue init MalAt(params, index)
 
-      if (param.type != $MAL_SYMBOL_TYPE) then
+      if (param.type != $MAL_SYMBOL_TYPE) ithen
         valid = 0
         break
-      elseif (strcmp(param.string, "&") == 0) then
-        if (restIndex >= 0 || index != params.length - 2) then
+      elseif (strcmp(param.string, "&") == 0) ithen
+        if (restIndex >= 0 || index != params.length - 2) ithen
           valid = 0
           break
         endif
@@ -1473,23 +1469,22 @@ opcode MalParamsAreValid(params:MalValue):i
 endop
 
 opcode MalEvalFn(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
-  result:MalValue = MalMkValue($MAL_NIL_TYPE)
-  currentEnv:MalEnv = env
-
-  if (ast.length != 3) then
-    result = MalMkError(sprintf("fn*: expected 2 arguments, got %d", \
+  result:MalValue init MalMkValue($MAL_NIL_TYPE)
+  currentEnv:MalEnv init env
+  if (ast.length != 3) ithen
+    result init MalMkError(sprintf("fn*: expected 2 arguments, got %d", \
       ast.length - 1))
   else
-    params:MalValue = MalAt(ast, 1)
-    body:MalValue = MalAt(ast, 2)
+    params:MalValue init MalAt(ast, 1)
+    body:MalValue init MalAt(ast, 2)
 
-    if (params.type != $MAL_LIST_TYPE && params.type != $MAL_VECTOR_TYPE) then
-      result = MalMkError("fn*: params must be list or vector")
-    elseif (MalParamsAreValid(params) == 0) then
-      result = MalMkError("fn*: params must be symbols")
+    if (params.type != $MAL_LIST_TYPE && params.type != $MAL_VECTOR_TYPE) ithen
+      result init MalMkError("fn*: params must be list or vector")
+    elseif (MalParamsAreValid(params) == 0) ithen
+      result init MalMkError("fn*: params must be symbols")
     else
-      result = MalMkFunction(params, body)
-      result = MalFunctionCaptureEnv(result, currentEnv)
+      result init MalMkFunction(params, body)
+      result init MalFunctionCaptureEnv(result, currentEnv)
     endif
   endif
 
@@ -1497,26 +1492,25 @@ opcode MalEvalFn(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
 endop
 
 opcode MalEvalIf(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
-  result:MalValue = MalMkValue($MAL_NIL_TYPE)
-  currentEnv:MalEnv = env
-
-  if (ast.length < 3 || ast.length > 4) then
-    result = MalMkError(sprintf("if: expected 2 or 3 arguments, got %d", \
+  result:MalValue init MalMkValue($MAL_NIL_TYPE)
+  currentEnv:MalEnv init env
+  if (ast.length < 3 || ast.length > 4) ithen
+    result init MalMkError(sprintf("if: expected 2 or 3 arguments, got %d", \
       ast.length - 1))
   else
-    conditionForm:MalValue = MalAt(ast, 1)
-    branchInputEnv:MalEnv = currentEnv
+    conditionForm:MalValue init MalAt(ast, 1)
+    branchInputEnv:MalEnv init currentEnv
     condition:MalValue, currentEnv = EVAL_ENV(conditionForm, branchInputEnv)
 
-    if (condition.type == $MAL_ERROR_TYPE) then
-      result = condition
-    elseif (MalIsTruthy(condition) == 1) then
-      thenForm:MalValue = MalAt(ast, 2)
-      branchInputEnv = currentEnv
+    if (condition.type == $MAL_ERROR_TYPE) ithen
+      result init condition
+    elseif (MalIsTruthy(condition) == 1) ithen
+      thenForm:MalValue init MalAt(ast, 2)
+      branchInputEnv init currentEnv
       result, currentEnv = EVAL_ENV(thenForm, branchInputEnv)
-    elseif (ast.length == 4) then
-      elseForm:MalValue = MalAt(ast, 3)
-      branchInputEnv = currentEnv
+    elseif (ast.length == 4) ithen
+      elseForm:MalValue init MalAt(ast, 3)
+      branchInputEnv init currentEnv
       result, currentEnv = EVAL_ENV(elseForm, branchInputEnv)
     endif
   endif
@@ -1525,17 +1519,17 @@ opcode MalEvalIf(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
 endop
 
 opcode MalEvalDo(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
-  result:MalValue = MalMkValue($MAL_NIL_TYPE)
-  currentEnv:MalEnv = env
+  result:MalValue init MalMkValue($MAL_NIL_TYPE)
+  currentEnv:MalEnv init env
   index:i = 1
   done:i = 0
 
   while (index < ast.length && done == 0) do
-    form:MalValue = MalAt(ast, index)
-    formInputEnv:MalEnv = currentEnv
+    form:MalValue init MalAt(ast, index)
+    formInputEnv:MalEnv init currentEnv
     result, currentEnv = EVAL_ENV(form, formInputEnv)
 
-    if (result.type == $MAL_ERROR_TYPE) then
+    if (result.type == $MAL_ERROR_TYPE) ithen
       done = 1
     endif
 
@@ -1546,50 +1540,50 @@ opcode MalEvalDo(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
 endop
 
 opcode MalEvalLet(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
-  result:MalValue = MalMkValue($MAL_NIL_TYPE)
-  currentEnv:MalEnv = env
-  letEnv:MalEnv = MalMkEnvWithOuter(env)
+  result:MalValue init MalMkValue($MAL_NIL_TYPE)
+  currentEnv:MalEnv init env
+  letEnv:MalEnv init MalMkEnvWithOuter(env)
 
-  if (ast.length != 3) then
-    result = MalMkError(sprintf("let*: expected 2 arguments, got %d", \
+  if (ast.length != 3) ithen
+    result init MalMkError(sprintf("let*: expected 2 arguments, got %d", \
       ast.length - 1))
   else
-    bindings:MalValue = MalAt(ast, 1)
-    body:MalValue = MalAt(ast, 2)
+    bindings:MalValue init MalAt(ast, 1)
+    body:MalValue init MalAt(ast, 2)
 
     if (bindings.type != $MAL_LIST_TYPE && \
-        bindings.type != $MAL_VECTOR_TYPE) then
-      result = MalMkError("let*: bindings must be list or vector")
-    elseif (bindings.length % 2 != 0) then
-      result = MalMkError("let*: bindings must contain even number of forms")
+        bindings.type != $MAL_VECTOR_TYPE) ithen
+      result init MalMkError("let*: bindings must be list or vector")
+    elseif (bindings.length % 2 != 0) ithen
+      result init MalMkError("let*: bindings must contain even number of forms")
     else
       index:i = 0
       done:i = 0
 
       while (index < bindings.length && done == 0) do
-        name:MalValue = MalAt(bindings, index)
-        valueForm:MalValue = MalAt(bindings, index + 1)
+        name:MalValue init MalAt(bindings, index)
+        valueForm:MalValue init MalAt(bindings, index + 1)
 
-        if (name.type != $MAL_SYMBOL_TYPE) then
-          result = MalMkError("let*: binding name must be a symbol")
+        if (name.type != $MAL_SYMBOL_TYPE) ithen
+          result init MalMkError("let*: binding name must be a symbol")
           done = 1
         else
-          letInputEnv:MalEnv = letEnv
+          letInputEnv:MalEnv init letEnv
           value:MalValue, letEnv = EVAL_ENV(valueForm, letInputEnv)
 
-          if (value.type == $MAL_ERROR_TYPE) then
-            result = value
+          if (value.type == $MAL_ERROR_TYPE) ithen
+            result init value
             done = 1
           else
-            letEnv = MalEnvSet(letEnv, name.string, value)
+            letEnv init MalEnvSet(letEnv, name.string, value)
 
             index += 2
           endif
         endif
       od
 
-      if (done == 0) then
-        letInputEnv = letEnv
+      if (done == 0) ithen
+        letInputEnv init letEnv
         result, letEnv = EVAL_ENV(body, letInputEnv)
       endif
     endif
@@ -1601,134 +1595,134 @@ opcode MalEvalLet(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
 endop
 
 opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
-  result:MalValue = ast
-  workAst:MalValue = ast
-  evalEnv:MalEnv = env
-  returnEnv:MalEnv = env
-  recursiveInputEnv:MalEnv = env
-  transientEnvs:MalValue = MalMkValue($MAL_LIST_TYPE)
+  result:MalValue init ast
+  workAst:MalValue init ast
+  evalEnv:MalEnv init env
+  returnEnv:MalEnv init env
+  recursiveInputEnv:MalEnv init env
+  transientEnvs:MalValue init MalMkValue($MAL_LIST_TYPE)
   done:i = 0
 
   while (done == 0) do
     hasDebug:i = MalEnvHas(evalEnv, "DEBUG-EVAL")
 
-    if (hasDebug == 1) then
-      debugValue:MalValue = MalEnvGet(evalEnv, "DEBUG-EVAL")
+    if (hasDebug == 1) ithen
+      debugValue:MalValue init MalEnvGet(evalEnv, "DEBUG-EVAL")
 
-      if (MalIsTruthy(debugValue) == 1) then
-        SdebugAst:S = pr_str(workAst)
+      if (MalIsTruthy(debugValue) == 1) ithen
+        SdebugAst:S init pr_str(workAst)
         prints "EVAL: %s\n", SdebugAst
       endif
     endif
 
-    if (workAst.type == $MAL_LIST_TYPE && workAst.length > 0) then
-      head:MalValue = MalAt(workAst, 0)
+    if (workAst.type == $MAL_LIST_TYPE && workAst.length > 0) ithen
+      head:MalValue init MalAt(workAst, 0)
 
-      if (MalIsSymbolNamed(head, "quote") == 1) then
-        result = MalEvalQuote(workAst)
+      if (MalIsSymbolNamed(head, "quote") == 1) ithen
+        result init MalEvalQuote(workAst)
         done = 1
 
-      elseif (MalIsSymbolNamed(head, "quasiquote") == 1) then
-        if (workAst.length != 2) then
-          result = MalArityError("quasiquote", 1, workAst.length - 1)
+      elseif (MalIsSymbolNamed(head, "quasiquote") == 1) ithen
+        if (workAst.length != 2) ithen
+          result init MalArityError("quasiquote", 1, workAst.length - 1)
           done = 1
         else
-          workAst = MalQuasiquote(MalAt(workAst, 1))
+          workAst init MalQuasiquote(MalAt(workAst, 1))
 
-          if (workAst.type == $MAL_ERROR_TYPE) then
-            result = workAst
+          if (workAst.type == $MAL_ERROR_TYPE) ithen
+            result init workAst
             done = 1
           endif
         endif
 
-      elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "def!") == 0) then
-        recursiveInputEnv = evalEnv
+      elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "def!") == 0) ithen
+        recursiveInputEnv init evalEnv
         result, evalEnv = MalEvalDef(workAst, recursiveInputEnv)
         done = 1
 
-      elseif (MalIsSymbolNamed(head, "defmacro!") == 1) then
-        recursiveInputEnv = evalEnv
+      elseif (MalIsSymbolNamed(head, "defmacro!") == 1) ithen
+        recursiveInputEnv init evalEnv
         result, evalEnv = MalEvalDefMacro(workAst, recursiveInputEnv)
         done = 1
 
-      elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "fn*") == 0) then
-        recursiveInputEnv = evalEnv
+      elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "fn*") == 0) ithen
+        recursiveInputEnv init evalEnv
         result, evalEnv = MalEvalFn(workAst, recursiveInputEnv)
         done = 1
 
-      elseif (MalIsSymbolNamed(head, "try*") == 1) then
+      elseif (MalIsSymbolNamed(head, "try*") == 1) ithen
         tryArgCount:i = workAst.length - 1
 
-        if (tryArgCount < 1 || tryArgCount > 2) then
-          result = MalMkError(sprintf( \
+        if (tryArgCount < 1 || tryArgCount > 2) ithen
+          result init MalMkError(sprintf( \
             "try*: expected 1 or 2 arguments, got %d", tryArgCount))
           done = 1
-        elseif (tryArgCount == 1) then
-          workAst = MalAt(workAst, 1)
+        elseif (tryArgCount == 1) ithen
+          workAst init MalAt(workAst, 1)
         else
-          catchClause:MalValue = MalAt(workAst, 2)
+          catchClause:MalValue init MalAt(workAst, 2)
 
           if (MalIsForm(catchClause, "catch*") == 0 || \
-              catchClause.length != 3) then
-            result = MalMkError( \
+              catchClause.length != 3) ithen
+            result init MalMkError( \
               "try*: second argument must be (catch* symbol handler)")
             done = 1
           else
-            catchBinding:MalValue = MalAt(catchClause, 1)
+            catchBinding:MalValue init MalAt(catchClause, 1)
 
-            if (catchBinding.type != $MAL_SYMBOL_TYPE) then
-              result = MalMkError("catch*: binding must be a symbol")
+            if (catchBinding.type != $MAL_SYMBOL_TYPE) ithen
+              result init MalMkError("catch*: binding must be a symbol")
               done = 1
             else
-              tryForm:MalValue = MalAt(workAst, 1)
-              recursiveInputEnv = evalEnv
+              tryForm:MalValue init MalAt(workAst, 1)
+              recursiveInputEnv init evalEnv
               tryResult:MalValue, evalEnv = EVAL_ENV( \
                 tryForm, recursiveInputEnv)
 
-              if (tryResult.type == $MAL_ERROR_TYPE) then
-                catchEnv:MalEnv = MalMkEnvWithOuter(evalEnv)
-                transientEnvs = MalAppendValue( \
+              if (tryResult.type == $MAL_ERROR_TYPE) ithen
+                catchEnv:MalEnv init MalMkEnvWithOuter(evalEnv)
+                transientEnvs init MalAppendValue( \
                   transientEnvs, MalMkNumber(catchEnv.id))
-                catchValue:MalValue = MalErrorPayload(tryResult)
-                catchEnv = MalEnvSet( \
+                catchValue:MalValue init MalErrorPayload(tryResult)
+                catchEnv init MalEnvSet( \
                   catchEnv, catchBinding.string, catchValue)
-                workAst = MalAt(catchClause, 2)
-                evalEnv = catchEnv
+                workAst init MalAt(catchClause, 2)
+                evalEnv init catchEnv
               else
-                result = tryResult
+                result init tryResult
                 done = 1
               endif
             endif
           endif
         endif
 
-      elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "if") == 0) then
-        if (workAst.length < 3 || workAst.length > 4) then
-          result = MalMkError(sprintf("if: expected 2 or 3 arguments, got %d", \
+      elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "if") == 0) ithen
+        if (workAst.length < 3 || workAst.length > 4) ithen
+          result init MalMkError(sprintf("if: expected 2 or 3 arguments, got %d", \
             workAst.length - 1))
           done = 1
         else
-          ifConditionForm:MalValue = MalAt(workAst, 1)
-          recursiveInputEnv = evalEnv
+          ifConditionForm:MalValue init MalAt(workAst, 1)
+          recursiveInputEnv init evalEnv
           ifCondition:MalValue, evalEnv = EVAL_ENV( \
             ifConditionForm, recursiveInputEnv)
 
-          if (ifCondition.type == $MAL_ERROR_TYPE) then
-            result = ifCondition
+          if (ifCondition.type == $MAL_ERROR_TYPE) ithen
+            result init ifCondition
             done = 1
-          elseif (MalIsTruthy(ifCondition) == 1) then
-            workAst = MalAt(workAst, 2)
-          elseif (workAst.length == 4) then
-            workAst = MalAt(workAst, 3)
+          elseif (MalIsTruthy(ifCondition) == 1) ithen
+            workAst init MalAt(workAst, 2)
+          elseif (workAst.length == 4) ithen
+            workAst init MalAt(workAst, 3)
           else
-            result = MalMkValue($MAL_NIL_TYPE)
+            result init MalMkValue($MAL_NIL_TYPE)
             done = 1
           endif
         endif
 
-      elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "do") == 0) then
-        if (workAst.length == 1) then
-          result = MalMkValue($MAL_NIL_TYPE)
+      elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "do") == 0) ithen
+        if (workAst.length == 1) ithen
+          result init MalMkValue($MAL_NIL_TYPE)
           done = 1
         else
           doIndex:i = 1
@@ -1736,11 +1730,11 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
           doLastIndex:i = workAst.length - 1
 
           while (doIndex < doLastIndex && doError == 0) do
-            doForm:MalValue = MalAt(workAst, doIndex)
-            recursiveInputEnv = evalEnv
+            doForm:MalValue init MalAt(workAst, doIndex)
+            recursiveInputEnv init evalEnv
             result, evalEnv = EVAL_ENV(doForm, recursiveInputEnv)
 
-            if (result.type == $MAL_ERROR_TYPE) then
+            if (result.type == $MAL_ERROR_TYPE) ithen
               doError = 1
               done = 1
             endif
@@ -1748,137 +1742,137 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
             doIndex += 1
           od
 
-          if (doError == 0) then
-            workAst = MalAt(workAst, doLastIndex)
+          if (doError == 0) ithen
+            workAst init MalAt(workAst, doLastIndex)
           endif
         endif
 
-      elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "let*") == 0) then
-        letEnv:MalEnv = MalMkEnvWithOuter(evalEnv)
-        transientEnvs = MalAppendValue( \
+      elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "let*") == 0) ithen
+        letEnv:MalEnv init MalMkEnvWithOuter(evalEnv)
+        transientEnvs init MalAppendValue( \
           transientEnvs, MalMkNumber(letEnv.id))
 
-        if (workAst.length != 3) then
-          result = MalMkError(sprintf("let*: expected 2 arguments, got %d", \
+        if (workAst.length != 3) ithen
+          result init MalMkError(sprintf("let*: expected 2 arguments, got %d", \
             workAst.length - 1))
           done = 1
         else
-          letBindings:MalValue = MalAt(workAst, 1)
-          letBody:MalValue = MalAt(workAst, 2)
+          letBindings:MalValue init MalAt(workAst, 1)
+          letBody:MalValue init MalAt(workAst, 2)
 
           if (letBindings.type != $MAL_LIST_TYPE && \
-              letBindings.type != $MAL_VECTOR_TYPE) then
-            result = MalMkError("let*: bindings must be list or vector")
+              letBindings.type != $MAL_VECTOR_TYPE) ithen
+            result init MalMkError("let*: bindings must be list or vector")
             done = 1
-          elseif (letBindings.length % 2 != 0) then
-            result = MalMkError("let*: bindings must contain even number of forms")
+          elseif (letBindings.length % 2 != 0) ithen
+            result init MalMkError("let*: bindings must contain even number of forms")
             done = 1
           else
             letIndex:i = 0
             letError:i = 0
 
             while (letIndex < letBindings.length && letError == 0) do
-              letName:MalValue = MalAt(letBindings, letIndex)
-              letValueForm:MalValue = MalAt(letBindings, letIndex + 1)
+              letName:MalValue init MalAt(letBindings, letIndex)
+              letValueForm:MalValue init MalAt(letBindings, letIndex + 1)
 
-              if (letName.type != $MAL_SYMBOL_TYPE) then
-                result = MalMkError("let*: binding name must be a symbol")
+              if (letName.type != $MAL_SYMBOL_TYPE) ithen
+                result init MalMkError("let*: binding name must be a symbol")
                 letError = 1
                 done = 1
               else
-                recursiveInputEnv = letEnv
+                recursiveInputEnv init letEnv
                 letValue:MalValue, letEnv = EVAL_ENV( \
                   letValueForm, recursiveInputEnv)
 
-                if (letValue.type == $MAL_ERROR_TYPE) then
-                  result = letValue
+                if (letValue.type == $MAL_ERROR_TYPE) ithen
+                  result init letValue
                   letError = 1
                   done = 1
                 else
-                  letEnv = MalEnvSet(letEnv, letName.string, letValue)
+                  letEnv init MalEnvSet(letEnv, letName.string, letValue)
 
                   letIndex += 2
                 endif
               endif
             od
 
-            if (letError == 0) then
-              workAst = letBody
-              evalEnv = letEnv
+            if (letError == 0) ithen
+              workAst init letBody
+              evalEnv init letEnv
             endif
           endif
         endif
 
       else
-        recursiveInputEnv = evalEnv
+        recursiveInputEnv init evalEnv
         fn:MalValue, evalEnv = EVAL_ENV(head, recursiveInputEnv)
 
-        if (fn.type == $MAL_ERROR_TYPE) then
-          result = fn
+        if (fn.type == $MAL_ERROR_TYPE) ithen
+          result init fn
           done = 1
-        elseif (MalIsMacro(fn) == 1) then
-          rawArgs:MalValue = MalUnevaluatedArgs(workAst)
-          expansion:MalValue = MalApplyFunction(fn, rawArgs)
+        elseif (MalIsMacro(fn) == 1) ithen
+          rawArgs:MalValue init MalUnevaluatedArgs(workAst)
+          expansion:MalValue init MalApplyFunction(fn, rawArgs)
 
-          if (expansion.type == $MAL_ERROR_TYPE) then
-            result = expansion
+          if (expansion.type == $MAL_ERROR_TYPE) ithen
+            result init expansion
             done = 1
           else
-            workAst = expansion
+            workAst init expansion
           endif
         else
-          recursiveInputEnv = evalEnv
+          recursiveInputEnv init evalEnv
           args:MalValue, evalEnv = MalEvalSequenceEnv( \
             workAst, recursiveInputEnv, 1, $MAL_LIST_TYPE)
 
-          if (args.type == $MAL_ERROR_TYPE) then
-            result = args
+          if (args.type == $MAL_ERROR_TYPE) ithen
+            result init args
             done = 1
-          elseif (fn.type == $MAL_BUILTIN_TYPE && strcmp(fn.string, "eval") == 0) then
-            if (args.length != 1) then
-              result = MalArityError(fn.string, 1, args.length)
+          elseif (fn.type == $MAL_BUILTIN_TYPE && strcmp(fn.string, "eval") == 0) ithen
+            if (args.length != 1) ithen
+              result init MalArityError(fn.string, 1, args.length)
               done = 1
             else
-              evalAst:MalValue = MalAt(args, 0)
-              evalRoot:MalEnv = MalEnvRoot(evalEnv)
-              recursiveInputEnv = evalRoot
+              evalAst:MalValue init MalAt(args, 0)
+              evalRoot:MalEnv init MalEnvRoot(evalEnv)
+              recursiveInputEnv init evalRoot
               result, evalRoot = EVAL_ENV(evalAst, recursiveInputEnv)
-              evalEnv = MalEnvSetRoot(evalEnv, evalRoot)
+              evalEnv init MalEnvSetRoot(evalEnv, evalRoot)
 
               done = 1
             endif
-          elseif (fn.type == $MAL_FUNCTION_TYPE) then
+          elseif (fn.type == $MAL_FUNCTION_TYPE) ithen
             bindStatus:MalValue, callEnv:MalEnv = MalBindFunctionEnv(fn, args)
 
-            if (bindStatus.type == $MAL_ERROR_TYPE) then
-              result = bindStatus
+            if (bindStatus.type == $MAL_ERROR_TYPE) ithen
+              result init bindStatus
               done = 1
             else
-              transientEnvs = MalAppendValue( \
+              transientEnvs init MalAppendValue( \
                 transientEnvs, MalMkNumber(callEnv.id))
-              workAst = MalFunctionBody(fn)
-              evalEnv = callEnv
+              workAst init MalFunctionBody(fn)
+              evalEnv init callEnv
             endif
           else
-            result = MalApply(fn, args)
+            result init MalApply(fn, args)
             done = 1
           endif
         endif
       endif
     else
-      recursiveInputEnv = evalEnv
+      recursiveInputEnv init evalEnv
       result, evalEnv = MalEvalAstEnv(workAst, recursiveInputEnv)
 
       done = 1
     endif
   od
 
-  returnEnv = MalEnvResolve(returnEnv)
+  returnEnv init MalEnvResolve(returnEnv)
 
-  if (transientEnvs.length > 0) then
+  if (transientEnvs.length > 0) ithen
     for releaseIndex in [0 ... transientEnvs.length - 1] do
       reverseIndex:i = transientEnvs.length - releaseIndex - 1
-      envValue:MalValue = MalAt(transientEnvs, reverseIndex)
+      envValue:MalValue init MalAt(transientEnvs, reverseIndex)
       envId:i = envValue.number
       MalEnvRelease(MalEnvHandle(envId))
     od
@@ -1893,13 +1887,12 @@ opcode EVAL(ast:MalValue, env:MalEnv):MalValue
 endop
 
 opcode MalEvalSourceEnv(source:S, env:MalEnv):(MalValue, MalEnv)
-  ast:MalValue = read_str(source)
-  currentEnv:MalEnv = env
-
-  if (ast.type == $MAL_ERROR_TYPE) then
-    result:MalValue = ast
+  ast:MalValue init read_str(source)
+  currentEnv:MalEnv init env
+  if (ast.type == $MAL_ERROR_TYPE) ithen
+    result:MalValue init ast
   else
-    sourceInputEnv:MalEnv = currentEnv
+    sourceInputEnv:MalEnv init currentEnv
     result, currentEnv = EVAL_ENV(ast, sourceInputEnv)
   endif
 
@@ -1907,12 +1900,12 @@ opcode MalEvalSourceEnv(source:S, env:MalEnv):(MalValue, MalEnv)
 endop
 
 opcode MalMkStep6Env():MalEnv
-  env:MalEnv = MalMkStep2Env()
-  env = MalEnvSet(env, "*ARGV*", MalMkValue($MAL_LIST_TYPE))
-  source:S = "(def! load-file (fn* (f) (eval (read-string (str \"(do \" (slurp f) \"\\nnil)\")))))"
+  env:MalEnv init MalMkStep2Env()
+  env init MalEnvSet(env, "*ARGV*", MalMkValue($MAL_LIST_TYPE))
+  source:S init "(def! load-file (fn* (f) (eval (read-string (str \"(do \" (slurp f) \"\\nnil)\")))))"
   result:MalValue, env = MalEvalSourceEnv(source, env)
 
-  if (result.type == $MAL_ERROR_TYPE) then
+  if (result.type == $MAL_ERROR_TYPE) ithen
     prints "load-file bootstrap failed: %s\n", result.string
   endif
 
@@ -1920,15 +1913,15 @@ opcode MalMkStep6Env():MalEnv
 endop
 
 opcode MalMkStep8Env():MalEnv
-  env:MalEnv = MalMkStep6Env()
-  source:S = "(defmacro! cond (fn* (& xs) (if (> (count xs) 0) "
+  env:MalEnv init MalMkStep6Env()
+  source:S init "(defmacro! cond (fn* (& xs) (if (> (count xs) 0) "
   source strcat source, "(list 'if (first xs) "
   source strcat source, "(if (> (count xs) 1) (nth xs 1) "
   source strcat source, "(throw \"odd number of forms to cond\")) "
   source strcat source, "(cons 'cond (rest (rest xs)))))))"
   result:MalValue, env = MalEvalSourceEnv(source, env)
 
-  if (result.type == $MAL_ERROR_TYPE) then
+  if (result.type == $MAL_ERROR_TYPE) ithen
     prints "cond bootstrap failed: %s\n", result.string
   endif
 
@@ -1936,49 +1929,49 @@ opcode MalMkStep8Env():MalEnv
 endop
 
 opcode MalMkStep9Env():MalEnv
-  env:MalEnv = MalMkStep8Env()
-  env = MalEnvSet(env, "throw", MalMkBuiltin("throw"))
-  env = MalEnvSet(env, "apply", MalMkBuiltin("apply"))
-  env = MalEnvSet(env, "map", MalMkBuiltin("map"))
-  env = MalEnvSet(env, "nil?", MalMkBuiltin("nil?"))
-  env = MalEnvSet(env, "true?", MalMkBuiltin("true?"))
-  env = MalEnvSet(env, "false?", MalMkBuiltin("false?"))
-  env = MalEnvSet(env, "symbol", MalMkBuiltin("symbol"))
-  env = MalEnvSet(env, "symbol?", MalMkBuiltin("symbol?"))
-  env = MalEnvSet(env, "keyword", MalMkBuiltin("keyword"))
-  env = MalEnvSet(env, "keyword?", MalMkBuiltin("keyword?"))
-  env = MalEnvSet(env, "vector", MalMkBuiltin("vector"))
-  env = MalEnvSet(env, "vector?", MalMkBuiltin("vector?"))
-  env = MalEnvSet(env, "sequential?", MalMkBuiltin("sequential?"))
-  env = MalEnvSet(env, "hash-map", MalMkBuiltin("hash-map"))
-  env = MalEnvSet(env, "map?", MalMkBuiltin("map?"))
-  env = MalEnvSet(env, "assoc", MalMkBuiltin("assoc"))
-  env = MalEnvSet(env, "dissoc", MalMkBuiltin("dissoc"))
-  env = MalEnvSet(env, "get", MalMkBuiltin("get"))
-  env = MalEnvSet(env, "contains?", MalMkBuiltin("contains?"))
-  env = MalEnvSet(env, "keys", MalMkBuiltin("keys"))
-  env = MalEnvSet(env, "vals", MalMkBuiltin("vals"))
-  env = MalEnvSet(env, "pr-str", MalMkBuiltin("pr-str"))
-  env = MalRefreshTopLevelFunctionClosures(env)
+  env:MalEnv init MalMkStep8Env()
+  env init MalEnvSet(env, "throw", MalMkBuiltin("throw"))
+  env init MalEnvSet(env, "apply", MalMkBuiltin("apply"))
+  env init MalEnvSet(env, "map", MalMkBuiltin("map"))
+  env init MalEnvSet(env, "nil?", MalMkBuiltin("nil?"))
+  env init MalEnvSet(env, "true?", MalMkBuiltin("true?"))
+  env init MalEnvSet(env, "false?", MalMkBuiltin("false?"))
+  env init MalEnvSet(env, "symbol", MalMkBuiltin("symbol"))
+  env init MalEnvSet(env, "symbol?", MalMkBuiltin("symbol?"))
+  env init MalEnvSet(env, "keyword", MalMkBuiltin("keyword"))
+  env init MalEnvSet(env, "keyword?", MalMkBuiltin("keyword?"))
+  env init MalEnvSet(env, "vector", MalMkBuiltin("vector"))
+  env init MalEnvSet(env, "vector?", MalMkBuiltin("vector?"))
+  env init MalEnvSet(env, "sequential?", MalMkBuiltin("sequential?"))
+  env init MalEnvSet(env, "hash-map", MalMkBuiltin("hash-map"))
+  env init MalEnvSet(env, "map?", MalMkBuiltin("map?"))
+  env init MalEnvSet(env, "assoc", MalMkBuiltin("assoc"))
+  env init MalEnvSet(env, "dissoc", MalMkBuiltin("dissoc"))
+  env init MalEnvSet(env, "get", MalMkBuiltin("get"))
+  env init MalEnvSet(env, "contains?", MalMkBuiltin("contains?"))
+  env init MalEnvSet(env, "keys", MalMkBuiltin("keys"))
+  env init MalEnvSet(env, "vals", MalMkBuiltin("vals"))
+  env init MalEnvSet(env, "pr-str", MalMkBuiltin("pr-str"))
+  env init MalRefreshTopLevelFunctionClosures(env)
   xout env
 endop
 
 opcode MalMkStepAEnv():MalEnv
-  env:MalEnv = MalMkStep9Env()
-  env = MalEnvSet(env, "meta", MalMkBuiltin("meta"))
-  env = MalEnvSet(env, "with-meta", MalMkBuiltin("with-meta"))
-  env = MalEnvSet(env, "string?", MalMkBuiltin("string?"))
-  env = MalEnvSet(env, "number?", MalMkBuiltin("number?"))
-  env = MalEnvSet(env, "fn?", MalMkBuiltin("fn?"))
-  env = MalEnvSet(env, "seq", MalMkBuiltin("seq"))
-  env = MalEnvSet(env, "conj", MalMkBuiltin("conj"))
-  env = MalEnvSet(env, "time-ms", MalMkBuiltin("time-ms"))
-  env = MalEnvSet(env, "println", MalMkBuiltin("println"))
-  env = MalEnvSet(env, "readline", MalMkBuiltin("readline"))
-  source:S = "(def! *host-language* \"Csound7\")"
+  env:MalEnv init MalMkStep9Env()
+  env init MalEnvSet(env, "meta", MalMkBuiltin("meta"))
+  env init MalEnvSet(env, "with-meta", MalMkBuiltin("with-meta"))
+  env init MalEnvSet(env, "string?", MalMkBuiltin("string?"))
+  env init MalEnvSet(env, "number?", MalMkBuiltin("number?"))
+  env init MalEnvSet(env, "fn?", MalMkBuiltin("fn?"))
+  env init MalEnvSet(env, "seq", MalMkBuiltin("seq"))
+  env init MalEnvSet(env, "conj", MalMkBuiltin("conj"))
+  env init MalEnvSet(env, "time-ms", MalMkBuiltin("time-ms"))
+  env init MalEnvSet(env, "println", MalMkBuiltin("println"))
+  env init MalEnvSet(env, "readline", MalMkBuiltin("readline"))
+  source:S init "(def! *host-language* \"Csound7\")"
   result:MalValue, env = MalEvalSourceEnv(source, env)
 
-  if (result.type == $MAL_ERROR_TYPE) then
+  if (result.type == $MAL_ERROR_TYPE) ithen
     prints "host language bootstrap failed: %s\n", result.string
   endif
 
@@ -1986,32 +1979,32 @@ opcode MalMkStepAEnv():MalEnv
 endop
 
 opcode MalMkCsoundEnv():MalEnv
-  env:MalEnv = MalMkStepAEnv()
-  env = MalEnvSet(env, "csound-eval", MalMkBuiltin("csound-eval"))
-  env = MalEnvSet(env, "csound/param-bindings", \
+  env:MalEnv init MalMkStepAEnv()
+  env init MalEnvSet(env, "csound-eval", MalMkBuiltin("csound-eval"))
+  env init MalEnvSet(env, "csound/param-bindings", \
     MalMkBuiltin("csound/param-bindings"))
-  env = MalEnvSet(env, "csound/compile-inst", \
+  env init MalEnvSet(env, "csound/compile-inst", \
     MalMkBuiltin("csound/compile-inst"))
-  env = MalEnvSet(env, "csound/event", MalMkBuiltin("csound/event"))
-  env = MalEnvSet(env, "csound/cpsmidinn", MalMkCsoundOpcode( \
+  env init MalEnvSet(env, "csound/event", MalMkBuiltin("csound/event"))
+  env init MalEnvSet(env, "csound/cpsmidinn", MalMkCsoundOpcode( \
     "cpsmidinn", $MAL_CSOUND_EXPRESSION_NODE, 1, 1))
-  env = MalEnvSet(env, "csound/pluck", MalMkCsoundOpcode( \
+  env init MalEnvSet(env, "csound/pluck", MalMkCsoundOpcode( \
     "pluck", $MAL_CSOUND_AUDIO_NODE, 5, 7))
-  env = MalEnvSet(env, "csound/poscil", MalMkCsoundOpcode( \
+  env init MalEnvSet(env, "csound/poscil", MalMkCsoundOpcode( \
     "poscil", $MAL_CSOUND_AUDIO_NODE, 2, 4))
-  env = MalEnvSet(env, "csound/linseg", MalMkCsoundOpcode( \
+  env init MalEnvSet(env, "csound/linseg", MalMkCsoundOpcode( \
     "linseg", $MAL_CSOUND_AUDIO_NODE, 3, 33))
-  env = MalEnvSet(env, "csound/tone", MalMkCsoundOpcode( \
+  env init MalEnvSet(env, "csound/tone", MalMkCsoundOpcode( \
     "tone", $MAL_CSOUND_AUDIO_NODE, 2, 2))
-  env = MalEnvSet(env, "csound/pan2", MalMkCsoundOpcode( \
+  env init MalEnvSet(env, "csound/pan2", MalMkCsoundOpcode( \
     "pan2", $MAL_CSOUND_AUDIO_PAIR_NODE, 2, 2))
-  env = MalEnvSet(env, "csound/outs", MalMkCsoundOpcode( \
+  env init MalEnvSet(env, "csound/outs", MalMkCsoundOpcode( \
     "outs", $MAL_CSOUND_STATEMENT_NODE, 1, 2))
 
-  source:S = "(defmacro! definst (fn* (name params body) (list 'def! name (list 'csound/compile-inst (list 'quote name) (list 'quote params) (list 'let* (csound/param-bindings params) body)))))"
+  source:S init "(defmacro! definst (fn* (name params body) (list 'def! name (list 'csound/compile-inst (list 'quote name) (list 'quote params) (list 'let* (csound/param-bindings params) body)))))"
   result:MalValue, env = MalEvalSourceEnv(source, env)
 
-  if (result.type == $MAL_ERROR_TYPE) then
+  if (result.type == $MAL_ERROR_TYPE) ithen
     prints "definst bootstrap failed: %s\n", result.string
   endif
 
