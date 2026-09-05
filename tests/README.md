@@ -16,6 +16,18 @@ just smoke
 just reader
 ```
 
+The Csound interop checks cover signature matching, rate selection, multiple
+outputs, typed arrays, and instrument scheduling. They also render three
+instruments and check that each produces stereo audio without clipping:
+
+```sh
+just --set csound "$CSOUND" csound-interop
+```
+
+`just test` includes this render check and the interactive interop harness.
+The render check needs no reference MAL checkout or audio device. See
+[INTEROP.md](../INTEROP.md) for the API and required Csound build.
+
 Run the reference MAL interpreters inside Csound MAL with:
 
 ```sh

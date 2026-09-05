@@ -13,7 +13,7 @@ default:
 version:
     @{{csound}} --version
 
-test: smoke reader eval step3 step4 step5 step6 step7 step8 step9 step-a script-args unit harness-reader harness-eval harness-env harness-step4 harness-step5 harness-step6 harness-step7 harness-step8 harness-step9 harness-stepA harness-csound
+test: smoke reader eval step3 step4 step5 step6 step7 step8 step9 step-a script-args unit harness-reader harness-eval harness-env harness-step4 harness-step5 harness-step6 harness-step7 harness-step8 harness-step9 harness-stepA harness-csound csound-interop
 
 smoke:
     {{csound}} {{csound_flags}} tests/step0-repl.orc
@@ -95,6 +95,9 @@ harness-stepA:
 
 harness-csound:
     python3 mal/runtest.py --no-deferrable --no-optional tests/harness/csound_interop.mal -- tests/harness/run-csound-interop
+
+csound-interop:
+    python3 tests/check-csound-interop.py --csound "{{csound}}"
 
 selfhost:
     python3 tests/selfhost/check.py --csound "{{csound}}"
