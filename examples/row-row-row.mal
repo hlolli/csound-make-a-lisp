@@ -5,7 +5,7 @@
 ;; Inspired by Chris Ford's Overtone canon:
 ;; https://gist.github.com/ctford/2877443
 
-(definst harpsichord [note 60 amp 0.035 pan 0.5]
+(csound/definst harpsichord [note 60 amp 0.035 pan 0.5]
   (csound/outs
     (csound/pan2
       (csound/tone

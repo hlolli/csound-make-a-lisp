@@ -1,0 +1,101 @@
+;; This Source Code Form is subject to the terms of the Mozilla Public
+;; License, v. 2.0. If a copy of the MPL was not distributed with this
+;; file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+(def! check (fn* (label expected actual)
+  (if (= expected actual) (println "PASS" label) (throw (str label ": expected " (pr-str expected) ", got " (pr-str actual))))))
+
+(check "qualified eval" 5 (csound/eval "return 2 + 3"))
+(check "old eval" 5 (csound-eval "return 2 + 3"))
+(check "qualified macro" true (macro? csound/definst))
+(check "old macro" true (macro? definst))
+(check "bare opcode absent" "'poscil' not found" (try* poscil (catch* e e)))
+(check "number" :i (csound/type 42))
+(check "string" :S (csound/type "hello"))
+(check "init function" :i (csound/type (csound/cpsmidinn 69)))
+(def! kosc (csound/at-rate :k csound/poscil))
+(def! kfreq (kosc 1 2))
+(check "control overload" :k (csound/type kfreq))
+(check "function inference" :k (csound/type (csound/cpsmidinn kfreq)))
+(check "control arithmetic" :k (csound/type (+ kfreq 2)))
+(def! signal (csound/poscil 0.05 (+ 440 kfreq)))
+(check "default audio" :a (csound/type signal))
+(check "audio arithmetic" :a (csound/type (* signal kfreq)))
+(check "audio frequency overload" :a (csound/type (csound/poscil 0.05 signal)))
+(check "audio amplitude overload" :a (csound/type (csound/poscil signal 440)))
+(check "audio both overload" :a (csound/type (csound/poscil signal signal)))
+(check "optional defaults" :a (csound/type (csound/poscil 0.05 440 -1 0)))
+(check "filter optional" :a (csound/type (csound/tone signal 2000 0)))
+(check "filter audio cutoff" :a (csound/type (csound/tone signal signal)))
+(check "envelope control" :k (csound/type ((csound/at-rate :k csound/linseg) 0 0.01 1 0.02 0)))
+(check "invalid rate" "csound/poscil: unsupported outputs i"
+  (try* (csound/at-rate :i csound/poscil) (catch* e e)))
+(check "no downcast" "csound/cpsmidinn: no matching signature for (a)"
+  (try* (csound/cpsmidinn signal) (catch* e e)))
+(check "optional must init" "csound/poscil: no matching signature for (i, i, k)"
+  (try* (csound/poscil 0.05 440 kfreq) (catch* e e)))
+(check "string mismatch" "csound/poscil: no matching signature for (S, i)"
+  (try* (csound/poscil "wrong" 440) (catch* e e)))
+(check "nil mismatch" "csound/poscil: no matching signature for (invalid, i)"
+  (try* (csound/poscil nil 440) (catch* e e)))
+(check "too few" "csound/poscil: no matching signature for (i)"
+  (try* (csound/poscil 1) (catch* e e)))
+(check "too many" "csound/poscil: no matching signature for (i, i, i, i, i)"
+  (try* (csound/poscil 1 2 3 4 5) (catch* e e)))
+(check "duration/value groups" "csound/linseg: no matching signature for (i, i, i, i)"
+  (try* (csound/linseg 0 1 1 2) (catch* e e)))
+(check "long envelope" :a
+  (csound/type (apply csound/linseg (cons 0 [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]))))
+(def! stereo (csound/pan2 signal 0.5 0))
+(check "pair" [:a :a] (csound/type stereo))
+(check "explicit pair" [:a :a] (csound/type ((csound/at-rate [:a :a] csound/pan2) signal 0.5)))
+(def! channels (csound/outputs stereo))
+(check "outputs vector" true (vector? channels))
+(check "left output" :a (csound/type (nth channels 0)))
+(check "right output" :a (csound/type (nth channels 1)))
+(check "tuple arithmetic rejected" "+: expected scalar numeric operands, got (a,a, i)"
+  (try* (+ stereo 1) (catch* e e)))
+(check "statement" nil (csound/type (csound/outs stereo)))
+(check "statement as argument" "csound/tone: no matching signature for (, i)"
+  (try* (csound/tone (csound/outs stereo) 2000) (catch* e e)))
+(check "untyped vector rejected" "csound/tone: no matching signature for (invalid, i)"
+  (try* (csound/tone [1 2] 2000) (catch* e e)))
+(def! ia (csound/array :i [440 660]))
+(def! ka (csound/array :k [kfreq 660]))
+(def! sa (csound/array :S ["left" "right"]))
+(check "init array" :i-array (csound/type ia))
+(check "control array" :k-array (csound/type ka))
+(check "string array" :S-array (csound/type sa))
+(check "empty typed array" :i-array (csound/type (csound/array :i [])))
+(check "init element" :i (csound/type (csound/aget ia 0)))
+(check "control element" :k (csound/type (csound/aget ka 0)))
+(check "string element" :S (csound/type (csound/aget sa 1)))
+(check "mixed array rejected" "csound/array: element 1 expected i, got S"
+  (try* (csound/array :i [1 "bad"]) (catch* e e)))
+(check "array no downcast" "csound/array: element 0 expected i, got k"
+  (try* (csound/array :i [kfreq]) (catch* e e)))
+(check "array bounds" "csound/aget: index out of bounds"
+  (try* (csound/aget ia 2) (catch* e e)))
+(check "array fractional index" "csound/aget: index must be a nonnegative integer"
+  (try* (csound/aget ia 0.5) (catch* e e)))
+(check "array negative index" "csound/aget: index must be a nonnegative integer"
+  (try* (csound/aget ia -1) (catch* e e)))
+(check "array index rate" "csound/aget: expected a one-dimensional array and an init-rate index"
+  (try* (csound/aget ia kfreq) (catch* e e)))
+(def! pan-array ((csound/at-rate :a-array csound/pan2) signal 0.5))
+(check "array output" :a-array (csound/type pan-array))
+(check "array is one output" 1 (count (csound/outputs pan-array)))
+(check "array not tuple" "csound/outs: no matching signature for (a[])"
+  (try* (csound/outs pan-array) (catch* e e)))
+(def! array-graph (csound/outs (csound/aget pan-array 0) (csound/aget pan-array 1)))
+(check "array instrument source" true (string? (csound/source 'ArraySource [] array-graph)))
+(check "source does not define" "'ArraySource' not found" (try* ArraySource (catch* e e)))
+(csound/definst ArrayTone [] array-graph)
+(csound/definst TupleTone [] (csound/outs (nth channels 0) (nth channels 1)))
+(csound/definst TypedTone []
+  (csound/outs (csound/pan2 (csound/poscil 0.02 (+ (csound/aget ia 0) (csound/aget ka 0))) 0.5)))
+(csound/event "i" ArrayTone 0 0.05)
+(csound/event "i" TupleTone 0.05 0.05)
+(csound/event "i" TypedTone 0.1 0.05)
+(csound/event "e" 0.16 0)
+(println "CSOUND-INTEROP-PASS")

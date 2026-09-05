@@ -922,14 +922,14 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
       result.number = seconds * 1000
     endif
 
-  elseif (strcmp(fn.string, "csound-eval") == 0) ithen
+  elseif (strcmp(fn.string, "csound/eval") == 0 || strcmp(fn.string, "csound-eval") == 0) ithen
     if (args.length != 1) ithen
       result init MalArityError(fn.string, 1, args.length)
     else
       source:MalValue init MalAt(args, 0)
 
       if (source.type != $MAL_STRING_TYPE) ithen
-        result init MalMkError("csound-eval: expected string argument")
+        result init MalMkError(sprintf("%s: expected string argument", fn.string))
       else
         code:S init source.string
         result init MalCsoundEval(code)
@@ -952,6 +952,36 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
       graph:MalValue init MalAt(args, 2)
       result init MalCompileCsoundInstrument( \
         instrumentName, parameters, graph)
+    endif
+
+  elseif (strcmp(fn.string, "csound/at-rate") == 0 || \
+          strcmp(fn.string, "csound/array") == 0 || \
+          strcmp(fn.string, "csound/aget") == 0) ithen
+    if (args.length != 2) ithen
+      result init MalArityError(fn.string, 2, args.length)
+    elseif (strcmp(fn.string, "csound/at-rate") == 0) ithen
+      result init MalCsoundAtRate(MalAt(args, 0), MalAt(args, 1))
+    elseif (strcmp(fn.string, "csound/array") == 0) ithen
+      result init MalCsoundArray(MalAt(args, 0), MalAt(args, 1))
+    else
+      result init MalCsoundArrayAt(MalAt(args, 0), MalAt(args, 1))
+    endif
+
+  elseif (strcmp(fn.string, "csound/outputs") == 0 || \
+          strcmp(fn.string, "csound/type") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(fn.string, 1, args.length)
+    elseif (strcmp(fn.string, "csound/type") == 0) ithen
+      result init MalCsoundType(MalAt(args, 0))
+    else
+      result init MalCsoundOutputs(MalAt(args, 0))
+    endif
+
+  elseif (strcmp(fn.string, "csound/source") == 0) ithen
+    if (args.length != 3) ithen
+      result init MalArityError(fn.string, 3, args.length)
+    else
+      result init MalCsoundInstrumentSource(MalAt(args, 0), MalAt(args, 1), MalAt(args, 2))
     endif
 
   elseif (strcmp(fn.string, "csound/event") == 0) ithen
@@ -2014,27 +2044,24 @@ opcode MalMkCsoundEnv():MalEnv
   env init MalEnvSet(env, "csound/compile-inst", \
     MalMkBuiltin("csound/compile-inst"))
   env init MalEnvSet(env, "csound/event", MalMkBuiltin("csound/event"))
-  env init MalEnvSet(env, "csound/cpsmidinn", MalMkCsoundOpcode( \
-    "cpsmidinn", $MAL_CSOUND_EXPRESSION_NODE, 1, 1))
-  env init MalEnvSet(env, "csound/pluck", MalMkCsoundOpcode( \
-    "pluck", $MAL_CSOUND_AUDIO_NODE, 5, 7))
-  env init MalEnvSet(env, "csound/poscil", MalMkCsoundOpcode( \
-    "poscil", $MAL_CSOUND_AUDIO_NODE, 2, 4))
-  env init MalEnvSet(env, "csound/linseg", MalMkCsoundOpcode( \
-    "linseg", $MAL_CSOUND_AUDIO_NODE, 3, 33))
-  env init MalEnvSet(env, "csound/tone", MalMkCsoundOpcode( \
-    "tone", $MAL_CSOUND_AUDIO_NODE, 2, 2))
-  env init MalEnvSet(env, "csound/pan2", MalMkCsoundOpcode( \
-    "pan2", $MAL_CSOUND_AUDIO_PAIR_NODE, 2, 2))
-  env init MalEnvSet(env, "csound/outs", MalMkCsoundOpcode( \
-    "outs", $MAL_CSOUND_STATEMENT_NODE, 1, 2))
+  env init MalEnvSet(env, "csound/eval", MalMkBuiltin("csound/eval"))
+  env init MalEnvSet(env, "csound/at-rate", MalMkBuiltin("csound/at-rate"))
+  env init MalEnvSet(env, "csound/array", MalMkBuiltin("csound/array"))
+  env init MalEnvSet(env, "csound/aget", MalMkBuiltin("csound/aget"))
+  env init MalEnvSet(env, "csound/outputs", MalMkBuiltin("csound/outputs"))
+  env init MalEnvSet(env, "csound/type", MalMkBuiltin("csound/type"))
+  env init MalEnvSet(env, "csound/source", MalMkBuiltin("csound/source"))
+  env init MalCsoundInstallOpcodes(env)
 
-  source:S init "(defmacro! definst (fn* (name params body) (list 'def! name (list 'csound/compile-inst (list 'quote name) (list 'quote params) (list 'let* (csound/param-bindings params) body)))))"
+  source:S init "(defmacro! csound/definst (fn* (name params body) (list 'def! name (list 'csound/compile-inst (list 'quote name) (list 'quote params) (list 'let* (csound/param-bindings params) body)))))"
   result:MalValue, env = MalEvalSourceEnv(source, env)
 
   if (result.type == $MAL_ERROR_TYPE) ithen
     prints "definst bootstrap failed: %s\n", result.string
   endif
+
+  ;; Compatibility alias; new programs use the qualified macro.
+  env init MalEnvSet(env, "definst", MalEnvGet(env, "csound/definst"))
 
   xout env
 endop

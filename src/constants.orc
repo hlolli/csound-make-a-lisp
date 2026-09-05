@@ -31,10 +31,10 @@
 // Csound graph node kinds
 #define MAL_CSOUND_PARAM_NODE #1#
 #define MAL_CSOUND_INFIX_NODE #2#
-#define MAL_CSOUND_EXPRESSION_NODE #3#
-#define MAL_CSOUND_AUDIO_NODE #4#
-#define MAL_CSOUND_AUDIO_PAIR_NODE #5#
-#define MAL_CSOUND_STATEMENT_NODE #6#
+#define MAL_CSOUND_CALL_NODE #3#
+#define MAL_CSOUND_ARRAY_NODE #4#
+#define MAL_CSOUND_PROJECTION_NODE #5#
+#define MAL_CSOUND_INDEX_NODE #6#
 
 // input inbox
 #define MAL_INPUT_EOF #-1#

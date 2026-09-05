@@ -5,28 +5,28 @@
 ;; Csound-specific Step A extension. These tests are deliberately separate
 ;; from the portable MAL harness.
 
-(fn? csound-eval)
+(fn? csound/eval)
 ;=>true
 
-(csound-eval "return 2 + 3")
+(csound/eval "return 2 + 3")
 ;=>5
 
-(csound-eval "return 9 / 4")
+(csound/eval "return 9 / 4")
 ;=>2.25
 
-(csound-eval "return -3.5")
+(csound/eval "return -3.5")
 ;=>-3.5
 
-(csound-eval)
-;=>csound-eval: expected 1 arguments, got 0
+(csound/eval)
+;=>csound/eval: expected 1 arguments, got 0
 
-(csound-eval "return 1" "return 2")
-;=>csound-eval: expected 1 arguments, got 2
+(csound/eval "return 1" "return 2")
+;=>csound/eval: expected 1 arguments, got 2
 
-(csound-eval 1)
-;=>csound-eval: expected string argument
+(csound/eval 1)
+;=>csound/eval: expected string argument
 
-(macro? definst)
+(macro? csound/definst)
 ;=>true
 
 (fn? csound/poscil)
@@ -38,7 +38,7 @@
 (- (csound/poscil 0.05 440) 0.01)
 ;=>#<csound-node:->
 
-(definst TestTone [frequency 440 amplitude 0.05 pan 0.5] (csound/outs (csound/pan2 (* (csound/poscil amplitude frequency) (csound/linseg 0 0.001 amplitude (- p3 0.002) 0)) pan)))
+(csound/definst TestTone [frequency 440 amplitude 0.05 pan 0.5] (csound/outs (csound/pan2 (* (csound/poscil amplitude frequency) (csound/linseg 0 0.001 amplitude (- p3 0.002) 0)) pan)))
 ;=>#<csound-instrument:TestTone>
 
 (fn? TestTone)
@@ -56,11 +56,11 @@
 (TestTone 220 0.02 0.5 99)
 ;=>TestTone: expected at most 3 arguments, got 4
 
-(definst bad-name [frequency 440] (csound/outs (csound/poscil 0.05 frequency)))
-;=>definst: name must be a Csound-compatible symbol
+(csound/definst bad-name [frequency 440] (csound/outs (csound/poscil 0.05 frequency)))
+;=>csound/definst: name must be a Csound-compatible symbol
 
-(definst BadParam [p3 1] (csound/outs (csound/pan2 (csound/poscil 0.05 440) 0.5)))
-;=>definst: p2 and p3 are implicit parameters
+(csound/definst BadParam [p3 1] (csound/outs (csound/pan2 (csound/poscil 0.05 440) 0.5)))
+;=>csound/definst: p2 and p3 are implicit parameters
 
-(definst BadOutput [] (csound/outs (csound/poscil 0.05 440)))
-;=>outs: expected two audio outputs
+(csound/definst BadOutput [] (csound/outs (csound/poscil 0.05 440)))
+;=>csound/outs: no matching signature for (a)

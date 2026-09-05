@@ -2,54 +2,76 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+;; Graph payload: output types, stable identity, then arguments. Identity lets
+;; code generation emit a shared stateful node once per instrument.
 declare MalCsoundRenderValue(value:MalValue):(MalCsoundRender)
 declare MalArityError(name:S, expected:i, actual:i):(MalValue)
 
-opcode MalMkCsoundOpcode(name:S, kind:i, minArity:i, maxArity:i):MalValue
-  opcodeValue:MalValue init MalMkValue($MAL_BUILTIN_OPCODE_TYPE)
-  opcodeValue.string init name
-  opcodeValue.number = kind
-  opcodeValue init MalAppendValue(opcodeValue, MalMkNumber(minArity))
-  opcodeValue init MalAppendValue(opcodeValue, MalMkNumber(maxArity))
-  xout opcodeValue
+opcode MalCsoundTypes(value:MalValue):S
+  result:S init "invalid"
+  if (value.type == $MAL_NUMBER_TYPE) ithen
+    result init "i"
+  elseif (value.type == $MAL_STRING_TYPE) ithen
+    result init "S"
+  elseif (value.type == $MAL_CSOUND_NODE_TYPE) ithen
+    types:MalValue init MalAt(value, 0)
+    result init types.string
+  endif
+  xout result
 endop
 
-opcode MalMkCsoundNode(name:S, kind:i, args:MalValue):MalValue
+opcode MalCsoundTypeList(types:S):S[]
+  result:S[] init 0
+  if (strlen(types) > 0) ithen
+    count:i = 1
+    for index in [0 ... strlen(types) - 1] do
+      if (strchar:i(types, index) == 44) ithen
+        count += 1
+      endif
+    od
+    result init count
+    start:i = 0
+    part:i = 0
+    for index in [0 ... strlen(types)] do
+      if (index == strlen(types) || strchar:i(types, index) == 44) ithen
+        result[part] init strsub(types, start, index)
+        part += 1
+        start = index + 1
+      endif
+    od
+  endif
+  xout result
+endop
+
+opcode MalCsoundTypeCost(actual:S, expected:S):i
+  result:i = -1
+  if (strcmp(actual, expected) == 0) ithen
+    result = 0
+  elseif (strcmp(actual, "i") == 0 && strcmp(expected, "k") == 0) ithen
+    result = 1
+  endif
+  ;; Arrays match exactly. A scalar promotion never changes an array's rate.
+  xout result
+endop
+
+opcode MalMkCsoundNode(name:S, kind:i, types:S, args:MalValue):MalValue
   node:MalValue init MalMkValue($MAL_CSOUND_NODE_TYPE)
   node.string init name
   node.number = kind
-
+  node init MalAppendValue(node, MalMkString(types))
+  node init MalAppendValue(node, MalMkNumber(malCsoundNodeCount))
+  malCsoundNodeCount += 1
   if (args.length > 0) ithen
     for index in [0 ... args.length - 1] do
       node init MalAppendValue(node, MalAt(args, index))
     od
   endif
-
   xout node
 endop
 
 opcode MalMkCsoundParam(index:i):MalValue
-  emptyArgs:MalValue init MalMkValue($MAL_LIST_TYPE)
-  node:MalValue init MalMkCsoundNode( \
-    sprintf("p%d", index), $MAL_CSOUND_PARAM_NODE, emptyArgs)
-  xout node
-endop
-
-opcode MalMkCsoundInfix(operator:S, args:MalValue):MalValue
-  xout MalMkCsoundNode(operator, $MAL_CSOUND_INFIX_NODE, args)
-endop
-
-opcode MalMkCsoundInstrument(name:S, defaults:MalValue):MalValue
-  instrument:MalValue init MalMkValue($MAL_CSOUND_INSTRUMENT_TYPE)
-  instrument.string init name
-
-  if (defaults.length > 0) ithen
-    for index in [0 ... defaults.length - 1] do
-      instrument init MalAppendValue(instrument, MalAt(defaults, index))
-    od
-  endif
-
-  xout instrument
+  args:MalValue init MalMkValue($MAL_LIST_TYPE)
+  xout MalMkCsoundNode(sprintf("p%d", index), $MAL_CSOUND_PARAM_NODE, "i", args)
 endop
 
 opcode MalIsCsoundNode(value:MalValue):i
@@ -58,411 +80,284 @@ opcode MalIsCsoundNode(value:MalValue):i
   xout result
 endop
 
-opcode MalCsoundOpcodeArity(fn:MalValue, args:MalValue):MalValue
-  result:MalValue init MalMkValue($MAL_NIL_TYPE)
-
-  if (fn.length != 2) ithen
-    result init MalMkError(sprintf( \
-      "%s: missing Csound opcode signature", fn.string))
-  else
-    minValue:MalValue init MalAt(fn, 0)
-    maxValue:MalValue init MalAt(fn, 1)
-    minArity:i = minValue.number
-    maxArity:i = maxValue.number
-
-    if (args.length < minArity || args.length > maxArity) ithen
-      if (minArity == maxArity) ithen
-        result init MalArityError(fn.string, minArity, args.length)
-      else
-        result init MalMkError(sprintf( \
-          "%s: expected %d to %d arguments, got %d", \
-          fn.string, minArity, maxArity, args.length))
-      endif
-    endif
-  endif
-
-  xout result
-endop
-
-opcode MalApplyCsoundOpcode(fn:MalValue, args:MalValue):MalValue
-  result:MalValue init MalCsoundOpcodeArity(fn, args)
-
-  if (result.type != $MAL_ERROR_TYPE) ithen
-    result init MalMkCsoundNode(fn.string, fn.number, args)
-  endif
-
-  xout result
-endop
-
-opcode MalCsoundParamBindings(params:MalValue):MalValue
-  result:MalValue init MalMkValue($MAL_VECTOR_TYPE)
-
-  if (params.type != $MAL_LIST_TYPE && params.type != $MAL_VECTOR_TYPE) ithen
-    result init MalMkError("definst: parameters must be a list or vector")
-  elseif (params.length % 2 != 0) ithen
-    result init MalMkError("definst: parameters must contain name/default pairs")
-  else
-    result init MalAppendValue(result, MalMkSymbol("p2"))
-    result init MalAppendValue(result, MalMkCsoundParam(2))
-    result init MalAppendValue(result, MalMkSymbol("p3"))
-    result init MalAppendValue(result, MalMkCsoundParam(3))
-
-    if (params.length > 0) ithen
-      for index in [0 ... int(params.length / 2) - 1] do
-        name:MalValue init MalAt(params, index * 2)
-        defaultValue:MalValue init MalAt(params, index * 2 + 1)
-
-        if (name.type != $MAL_SYMBOL_TYPE) ithen
-          result init MalMkError("definst: parameter names must be symbols")
-          break
-        elseif (strcmp(name.string, "p2") == 0 || \
-                strcmp(name.string, "p3") == 0) ithen
-          result init MalMkError("definst: p2 and p3 are implicit parameters")
-          break
-        elseif (defaultValue.type != $MAL_NUMBER_TYPE) ithen
-          result init MalMkError("definst: parameter defaults must be numbers")
-          break
-        else
-          result init MalAppendValue(result, name)
-          result init MalAppendValue(result, MalMkCsoundParam(index + 4))
-        endif
-      od
-    endif
-  endif
-
-  xout result
-endop
-
-opcode MalCsoundIdentifierIsValid(value:MalValue):i
-  valid:i = value.type == $MAL_SYMBOL_TYPE && strlen(value.string) > 0
-
-  if (valid == 1) ithen
-    for index in [0 ... strlen(value.string) - 1] do
-      character:i = strchar:i(value.string, index)
-      isLetter:i = (character >= 65 && character <= 90) || \
-        (character >= 97 && character <= 122)
-      isDigit:i = character >= 48 && character <= 57
-      isUnderscore:i = character == 95
-
-      if ((index == 0 && isLetter == 0 && isUnderscore == 0) || \
-          (index > 0 && isLetter == 0 && isDigit == 0 && \
-           isUnderscore == 0)) ithen
-        valid = 0
-        break
-      endif
-    od
-  endif
-
-  xout valid
-endop
-
-opcode MalCsoundAppendRender(aggregate:MalCsoundRender, \
-                             child:MalCsoundRender):MalCsoundRender
-  statements:S init aggregate.statements
-  statements strcat statements, child.statements
-  aggregate.statements init statements
-
-  if (strlen(aggregate.error) == 0 && strlen(child.error) > 0) ithen
-    aggregate.error init child.error
-  endif
-
-  xout aggregate
-endop
-
-opcode MalCsoundRenderArguments(node:MalValue, \
-                                allowPairs:i):(MalCsoundRender)
-  result:MalCsoundRender init "", "", 0, ""
-
-  if (node.length > 0) ithen
-    for index in [0 ... node.length - 1] do
-      argument:MalCsoundRender init MalCsoundRenderValue(MalAt(node, index))
-      result init MalCsoundAppendRender(result, argument)
-
-      if (strlen(result.error) > 0) ithen
-        break
-      elseif (argument.outputs == 0) ithen
-        result.error init sprintf( \
-          "%s: statement cannot be used as an argument", node.string)
-        break
-      elseif (allowPairs == 0 && argument.outputs != 1) ithen
-        result.error init sprintf( \
-          "%s: expected a single-value argument", node.string)
-        break
-      else
-        expression:S init result.expression
-
-        if (strlen(result.expression) > 0) ithen
-          expression strcat expression, ", "
-        endif
-
-        expression strcat expression, argument.expression
-        result.expression init expression
-        result.outputs += argument.outputs
-      endif
-    od
-  endif
-
-  xout result
-endop
-
-opcode MalCsoundRenderValue(value:MalValue):MalCsoundRender
-  result:MalCsoundRender init "", "", 0, ""
-
-  switch value.type
-    case $MAL_NUMBER_TYPE
-      result.expression init MalPrintNumber(value.number)
-      result.outputs = 1
-
-    case $MAL_CSOUND_NODE_TYPE
-      switch value.number
-        case $MAL_CSOUND_PARAM_NODE
-          result.expression init value.string
-          result.outputs = 1
-
-        case $MAL_CSOUND_INFIX_NODE
-          if (value.length != 2) ithen
-            result.error init sprintf("%s: malformed Csound expression", \
-              value.string)
-          else
-            left:MalCsoundRender init MalCsoundRenderValue(MalAt(value, 0))
-            right:MalCsoundRender init MalCsoundRenderValue(MalAt(value, 1))
-            result init MalCsoundAppendRender(result, left)
-            result init MalCsoundAppendRender(result, right)
-
-            if (strlen(result.error) == 0 && \
-                (left.outputs != 1 || right.outputs != 1)) ithen
-              result.error init sprintf( \
-                "%s: expected single-value operands", value.string)
-            elseif (strlen(result.error) == 0) ithen
-              result.expression init sprintf("(%s %s %s)", \
-                left.expression, value.string, right.expression)
-              result.outputs = 1
-            endif
-          endif
-
-        case $MAL_CSOUND_EXPRESSION_NODE
-          arguments:MalCsoundRender init MalCsoundRenderArguments(value, 0)
-          result init MalCsoundAppendRender(result, arguments)
-
-          if (strlen(result.error) == 0) ithen
-            result.expression init sprintf("%s(%s)", \
-              value.string, arguments.expression)
-            result.outputs = 1
-          endif
-
-        case $MAL_CSOUND_AUDIO_NODE
-          arguments:MalCsoundRender init MalCsoundRenderArguments(value, 0)
-          result init MalCsoundAppendRender(result, arguments)
-
-          if (strlen(result.error) == 0) ithen
-            variable:S init sprintf("aMal%d", malCsoundTemporaryCount)
-            malCsoundTemporaryCount += 1
-            statements:S init result.statements
-            statement:S init sprintf("  %s %s %s\n", \
-              variable, value.string, arguments.expression)
-            statements strcat statements, statement
-            result.statements init statements
-            result.expression init variable
-            result.outputs = 1
-          endif
-
-        case $MAL_CSOUND_AUDIO_PAIR_NODE
-          arguments:MalCsoundRender init MalCsoundRenderArguments(value, 0)
-          result init MalCsoundAppendRender(result, arguments)
-
-          if (strlen(result.error) == 0) ithen
-            leftVariable:S init sprintf("aMal%dL", malCsoundTemporaryCount)
-            rightVariable:S init sprintf("aMal%dR", malCsoundTemporaryCount)
-            malCsoundTemporaryCount += 1
-            statements:S init result.statements
-            statement:S init sprintf("  %s, %s %s %s\n", \
-              leftVariable, rightVariable, value.string, arguments.expression)
-            statements strcat statements, statement
-            result.statements init statements
-            result.expression init sprintf("%s, %s", \
-              leftVariable, rightVariable)
-            result.outputs = 2
-          endif
-
-        case $MAL_CSOUND_STATEMENT_NODE
-          arguments:MalCsoundRender init MalCsoundRenderArguments(value, 1)
-          result init MalCsoundAppendRender(result, arguments)
-
-          if (strlen(result.error) == 0 && \
-              strcmp(value.string, "outs") == 0 && \
-              arguments.outputs != 2) ithen
-            result.error init "outs: expected two audio outputs"
-          elseif (strlen(result.error) == 0) ithen
-            statements:S init result.statements
-            statement:S init sprintf("  %s %s\n", \
-              value.string, arguments.expression)
-            statements strcat statements, statement
-            result.statements init statements
-          endif
-
-        default
-          result.error init sprintf("unknown Csound node '%s'", value.string)
-      endsw
-
-    default
-      result.error init sprintf("cannot use %s in a Csound graph", pr_str(value))
-  endsw
-
-  xout result
-endop
-
-opcode MalCsoundDefaults(params:MalValue):MalValue
-  defaults:MalValue init MalMkValue($MAL_LIST_TYPE)
-
-  if (params.length > 0) ithen
-    for index in [0 ... int(params.length / 2) - 1] do
-      defaults init MalAppendValue(defaults, MalAt(params, index * 2 + 1))
-    od
-  endif
-
-  xout defaults
-endop
-
-opcode MalCompileCsoundInstrument(name:MalValue, params:MalValue, \
-                                  graph:MalValue):MalValue
-  bindings:MalValue init MalCsoundParamBindings(params)
-
-  if (MalCsoundIdentifierIsValid(name) == 0) ithen
-    result:MalValue init MalMkError( \
-      "definst: name must be a Csound-compatible symbol")
-  elseif (bindings.type == $MAL_ERROR_TYPE) ithen
-    result init bindings
-  else
-    malCsoundTemporaryCount = 0
-    rendered:MalCsoundRender init MalCsoundRenderValue(graph)
-
-    if (strlen(rendered.error) > 0) ithen
-      result init MalMkError(rendered.error)
-    elseif (rendered.outputs != 0) ithen
-      result init MalMkError( \
-        "definst: body must end in an output statement")
-    else
-      source:S init sprintf("instr %s\n%sendin\nreturn 1\n", \
-        name.string, rendered.statements)
-      compiled:i evalstr source
-
-      if (compiled != 1) ithen
-        result init MalMkError(sprintf( \
-          "definst: Csound could not compile instrument '%s'", name.string))
-      else
-        defaults:MalValue init MalCsoundDefaults(params)
-        result init MalMkCsoundInstrument(name.string, defaults)
-      endif
-    endif
-  endif
-
-  xout result
-endop
-
-opcode MalScheduleCsoundInstrument(instrument:MalValue, args:MalValue, \
-                                   start:i, duration:i):MalValue
-  result:MalValue init MalMkValue($MAL_NIL_TYPE)
-
-  if (args.length > instrument.length) ithen
-    result init MalMkError(sprintf( \
-      "%s: expected at most %d arguments, got %d", \
-      instrument.string, instrument.length, args.length))
-  else
-    scoreLine:S init sprintf("i \"%s\" %s %s", instrument.string, \
-      MalPrintNumber(start), MalPrintNumber(duration))
-
-    if (instrument.length > 0) ithen
-      for index in [0 ... instrument.length - 1] do
-        if (index < args.length) ithen
-          argument:MalValue init MalAt(args, index)
-        else
-          argument init MalAt(instrument, index)
-        endif
-
-        if (argument.type != $MAL_NUMBER_TYPE) ithen
-          result init MalMkError(sprintf( \
-            "%s: instrument arguments must be numbers", instrument.string))
-          break
-        endif
-
-        scoreArgument:S init sprintf(" %s", MalPrintNumber(argument.number))
-        scoreLine strcat scoreLine, scoreArgument
-      od
-    endif
-
-    if (result.type != $MAL_ERROR_TYPE) ithen
-      scoreline_i scoreLine
-    endif
-  endif
-
-  xout result
-endop
-
-opcode MalCsoundEvent(args:MalValue):MalValue
-  if (args.length < 1) ithen
+opcode MalMkCsoundInfix(operator:S, args:MalValue):MalValue
+  left:S init MalCsoundTypes(MalAt(args, 0))
+  right:S init MalCsoundTypes(MalAt(args, 1))
+  if (strlen(left) != 1 || strlen(right) != 1 || \
+      strindex("ika", left) < 0 || strindex("ika", right) < 0) ithen
     result:MalValue init MalMkError(sprintf( \
-      "csound/event: expected event type and arguments, got %d arguments", \
-      args.length))
+      "%s: expected scalar numeric operands, got (%s, %s)", operator, left, right))
   else
-    eventType:MalValue init MalAt(args, 0)
-
-    if (eventType.type != $MAL_STRING_TYPE) ithen
-      result init MalMkError("csound/event: event type must be a string")
-    elseif (strcmp(eventType.string, "i") == 0) ithen
-      if (args.length < 4) ithen
-        result init MalMkError( \
-          "csound/event: instrument events need instrument, p2, and p3")
-      else
-        instrument:MalValue init MalAt(args, 1)
-        start:MalValue init MalAt(args, 2)
-        duration:MalValue init MalAt(args, 3)
-
-        if (instrument.type != $MAL_CSOUND_INSTRUMENT_TYPE) ithen
-          result init MalMkError( \
-            "csound/event: expected a Csound instrument for an i event")
-        elseif (start.type != $MAL_NUMBER_TYPE || \
-                duration.type != $MAL_NUMBER_TYPE) ithen
-          result init MalMkError("csound/event: p2 and p3 must be numbers")
-        else
-          instrumentArgs:MalValue init MalMkValue($MAL_LIST_TYPE)
-
-          if (args.length > 4) ithen
-            for index in [4 ... args.length - 1] do
-              instrumentArgs init MalAppendValue(instrumentArgs, MalAt(args, index))
-            od
-          endif
-
-          result init MalScheduleCsoundInstrument(instrument, instrumentArgs, \
-            start.number, duration.number)
-        endif
-      endif
-    elseif (strcmp(eventType.string, "e") == 0) ithen
-      if (args.length != 3) ithen
-        result init MalMkError(sprintf( \
-          "csound/event: e event expects 2 arguments, got %d", \
-          args.length - 1))
-      else
-        endTime:MalValue init MalAt(args, 1)
-        endDuration:MalValue init MalAt(args, 2)
-
-        if (endTime.type != $MAL_NUMBER_TYPE || \
-            endDuration.type != $MAL_NUMBER_TYPE) ithen
-          result init MalMkError("csound/event: e event arguments must be numbers")
-        else
-          event_i "e", endTime.number, endDuration.number
-          result init MalMkValue($MAL_NIL_TYPE)
-        endif
-      endif
-    else
-      result init MalMkError(sprintf("csound/event: unsupported event type '%s'", \
-        eventType.string))
+    rate:S init "i"
+    if (strcmp(left, "a") == 0 || strcmp(right, "a") == 0) ithen
+      rate init "a"
+    elseif (strcmp(left, "k") == 0 || strcmp(right, "k") == 0) ithen
+      rate init "k"
     endif
+    result init MalMkCsoundNode(operator, $MAL_CSOUND_INFIX_NODE, rate, args)
   endif
-
   xout result
 endop
 
-opcode MalCsoundEval(source:S):MalValue
-  evaluated:i evalstr source
-  xout MalMkNumber(evaluated)
+;; Signature fields: outputs, required argument count; payload: fixed input
+;; types, repeated group types, minimum group count. Omitted arguments are left
+;; out of the emitted call, so Csound supplies its own defaults.
+opcode MalCsoundSignature(outputs:S, inputs:S, required:i, \
+                          repeated:S, minGroups:i):MalValue
+  value:MalValue init MalMkValue($MAL_VECTOR_TYPE)
+  value.string init outputs
+  value.number = required
+  value init MalAppendValue(value, MalMkString(inputs))
+  value init MalAppendValue(value, MalMkString(repeated))
+  value init MalAppendValue(value, MalMkNumber(minGroups))
+  xout value
 endop
+
+opcode MalMkCsoundOpcode(name:S, preferred:S):MalValue
+  value:MalValue init MalMkValue($MAL_BUILTIN_OPCODE_TYPE)
+  value.string init name
+  value init MalAppendValue(value, MalMkString(preferred))
+  xout value
+endop
+
+opcode MalCsoundOutputs(value:MalValue):MalValue
+  types:S[] init MalCsoundTypeList(MalCsoundTypes(value))
+  result:MalValue init MalMkValue($MAL_VECTOR_TYPE)
+  if (value.type != $MAL_CSOUND_NODE_TYPE || lenarray(types) == 0) ithen
+    result init MalMkError("csound/outputs: expected a graph with outputs")
+  else
+    for index in [0 ... lenarray(types) - 1] do
+      args:MalValue init MalMkList2(value, MalMkNumber(index))
+      projection:MalValue init MalMkCsoundNode(value.string, \
+        $MAL_CSOUND_PROJECTION_NODE, types[index], args)
+      result init MalAppendValue(result, projection)
+    od
+  endif
+  xout result
+endop
+
+opcode MalCsoundFlatten(args:MalValue):MalValue
+  result:MalValue init MalMkValue($MAL_LIST_TYPE)
+  if (args.length > 0) ithen
+    for index in [0 ... args.length - 1] do
+      arg:MalValue init MalAt(args, index)
+      types:S init MalCsoundTypes(arg)
+      if (strindex(types, ",") >= 0) ithen
+        outputs:MalValue init MalCsoundOutputs(arg)
+        for outputIndex in [0 ... outputs.length - 1] do
+          result init MalAppendValue(result, MalAt(outputs, outputIndex))
+        od
+      else
+        result init MalAppendValue(result, arg)
+      endif
+    od
+  endif
+  xout result
+endop
+
+opcode MalCsoundSignatureCost(signature:MalValue, args:MalValue):i
+  fixedValue:MalValue init MalAt(signature, 0)
+  repeatValue:MalValue init MalAt(signature, 1)
+  minValue:MalValue init MalAt(signature, 2)
+  fixed:S[] init MalCsoundTypeList(fixedValue.string)
+  repeated:S[] init MalCsoundTypeList(repeatValue.string)
+  fixedCount:i = lenarray(fixed)
+  repeatCount:i = lenarray(repeated)
+  cost:i = 0
+  if (args.length < signature.number) ithen
+    cost = -1
+  elseif (repeatCount == 0 && args.length > fixedCount) ithen
+    cost = -1
+  elseif (repeatCount > 0) ithen
+    extra:i = args.length - fixedCount
+    if (extra < minValue.number * repeatCount || extra % repeatCount != 0) ithen
+      cost = -1
+    endif
+  endif
+  if (cost >= 0 && args.length > 0) ithen
+    for index in [0 ... args.length - 1] do
+      if (index < fixedCount) ithen
+        expected:S init fixed[index]
+      else
+        expected init repeated[(index - fixedCount) % repeatCount]
+      endif
+      actual:S init MalCsoundTypes(MalAt(args, index))
+      argumentCost:i = MalCsoundTypeCost(actual, expected)
+      if (argumentCost < 0) ithen
+        cost = -1
+        break
+      endif
+      cost += argumentCost
+    od
+  endif
+  xout cost
+endop
+
+opcode MalApplyCsoundOpcode(fn:MalValue, rawArgs:MalValue):MalValue
+  args:MalValue init MalCsoundFlatten(rawArgs)
+  selected:i = -1
+  bestCost:i = 1000000
+  ambiguous:i = 0
+  preference:MalValue init MalAt(fn, 0)
+  if (fn.length > 1) ithen
+    for index in [1 ... fn.length - 1] do
+      signature:MalValue init MalAt(fn, index)
+      if (strlen(preference.string) == 0 || \
+          strcmp(preference.string, signature.string) == 0) ithen
+        cost:i = MalCsoundSignatureCost(signature, args)
+        if (cost >= 0 && cost < bestCost) ithen
+          bestCost = cost
+          selected = index
+          ambiguous = 0
+        elseif (cost >= 0 && cost == bestCost) ithen
+          ambiguous = 1
+        endif
+      endif
+    od
+  endif
+  if (selected < 0) ithen
+    actual:S init ""
+    if (args.length > 0) ithen
+      for index in [0 ... args.length - 1] do
+        if (index > 0) ithen
+          actual strcat actual, ", "
+        endif
+        actual strcat actual, MalCsoundTypes(MalAt(args, index))
+      od
+    endif
+    result:MalValue init MalMkError(sprintf( \
+      "csound/%s: no matching signature for (%s)", fn.string, actual))
+  elseif (ambiguous == 1) ithen
+    result init MalMkError(sprintf( \
+      "csound/%s: ambiguous signature; select outputs with csound/at-rate", fn.string))
+  else
+    signature:MalValue init MalAt(fn, selected)
+    result init MalMkCsoundNode(fn.string, $MAL_CSOUND_CALL_NODE, signature.string, args)
+  endif
+  xout result
+endop
+
+opcode MalCsoundTypeName(name:S):S
+  result:S init name
+  if (strlen(name) == 7 && strcmp(strsub(name, 1), "-array") == 0) ithen
+    result init sprintf("%s[]", strsub(name, 0, 1))
+  endif
+  xout result
+endop
+
+opcode MalCsoundTypeKeyword(name:S):MalValue
+  result:S init name
+  if (strlen(name) == 3 && strcmp(strsub(name, 1), "[]") == 0) ithen
+    result init sprintf("%s-array", strsub(name, 0, 1))
+  endif
+  xout MalMkKeyword(result)
+endop
+
+opcode MalCsoundAtRate(rate:MalValue, fn:MalValue):MalValue
+  selector:S init ""
+  if (rate.type == $MAL_KEYWORD_TYPE) ithen
+    selector init MalCsoundTypeName(rate.string)
+  elseif (rate.type == $MAL_VECTOR_TYPE && rate.length > 0) ithen
+    for index in [0 ... rate.length - 1] do
+      part:MalValue init MalAt(rate, index)
+      if (part.type != $MAL_KEYWORD_TYPE) ithen
+        selector init "invalid"
+        break
+      endif
+      if (index > 0) ithen
+        selector strcat selector, ","
+      endif
+      selector strcat selector, MalCsoundTypeName(part.string)
+    od
+  endif
+  result:MalValue init MalMkError("csound/at-rate: expected output type keyword or vector and opcode function")
+  if (strlen(selector) > 0 && fn.type == $MAL_BUILTIN_OPCODE_TYPE) ithen
+    found:i = 0
+    if (fn.length > 1) ithen
+      for index in [1 ... fn.length - 1] do
+        signature:MalValue init MalAt(fn, index)
+        if (strcmp(selector, signature.string) == 0) ithen
+          found = 1
+        endif
+      od
+    endif
+    if (found == 0) ithen
+      result init MalMkError(sprintf("csound/%s: unsupported outputs %s", fn.string, selector))
+    else
+      result init MalMkCsoundOpcode(fn.string, selector)
+      for index in [1 ... fn.length - 1] do
+        result init MalAppendValue(result, MalAt(fn, index))
+      od
+    endif
+  endif
+  xout result
+endop
+
+opcode MalCsoundArray(rate:MalValue, values:MalValue):MalValue
+  result:MalValue init MalMkError("csound/array: expected :i, :k, :a or :S and a vector")
+  if (rate.type == $MAL_KEYWORD_TYPE && strlen(rate.string) == 1 && \
+      strindex("ikaS", rate.string) >= 0 && values.type == $MAL_VECTOR_TYPE) ithen
+    arrayType:S init sprintf("%s[]", rate.string)
+    result init MalMkCsoundNode("array", $MAL_CSOUND_ARRAY_NODE, arrayType, values)
+    if (values.length > 0) ithen
+      for index in [0 ... values.length - 1] do
+        actual:S init MalCsoundTypes(MalAt(values, index))
+        if (MalCsoundTypeCost(actual, rate.string) < 0) ithen
+          result init MalMkError(sprintf("csound/array: element %d expected %s, got %s", \
+            index, rate.string, actual))
+          break
+        endif
+      od
+    endif
+  endif
+  xout result
+endop
+
+opcode MalCsoundArrayAt(array:MalValue, index:MalValue):MalValue
+  types:S init MalCsoundTypes(array)
+  result:MalValue init MalMkError("csound/aget: expected a one-dimensional array and an init-rate index")
+  if (strlen(types) == 3 && strcmp(strsub(types, 1), "[]") == 0 && \
+      strcmp(MalCsoundTypes(index), "i") == 0) ithen
+    if (index.type == $MAL_NUMBER_TYPE && (index.number < 0 || \
+        int(index.number) != index.number)) ithen
+      result init MalMkError("csound/aget: index must be a nonnegative integer")
+    elseif (array.number == $MAL_CSOUND_ARRAY_NODE && \
+            index.type == $MAL_NUMBER_TYPE && index.number >= array.length - 2) ithen
+      result init MalMkError("csound/aget: index out of bounds")
+    else
+      args:MalValue init MalMkList2(array, index)
+      result init MalMkCsoundNode("aget", $MAL_CSOUND_INDEX_NODE, strsub(types, 0, 1), args)
+    endif
+  endif
+  xout result
+endop
+
+opcode MalCsoundType(value:MalValue):MalValue
+  types:S init MalCsoundTypes(value)
+  if (strcmp(types, "invalid") == 0) ithen
+    result:MalValue init MalMkError("csound/type: expected a graph value, number or string")
+  elseif (strlen(types) == 0) ithen
+    result init MalMkValue($MAL_NIL_TYPE)
+  elseif (strindex(types, ",") < 0) ithen
+    result init MalCsoundTypeKeyword(types)
+  else
+    result init MalMkValue($MAL_VECTOR_TYPE)
+    parts:S[] init MalCsoundTypeList(types)
+    for index in [0 ... lenarray(parts) - 1] do
+      result init MalAppendValue(result, MalCsoundTypeKeyword(parts[index]))
+    od
+  endif
+  xout result
+endop
+
+opcode MalMkCsoundInstrument(name:S, defaults:MalValue):MalValue
+  instrument:MalValue init defaults
+  instrument.type = $MAL_CSOUND_INSTRUMENT_TYPE
+  instrument.string init name
+  xout instrument
+endop
+
+#include "src/csound-instruments.orc"
+#include "src/csound-render.orc"
+#include "src/csound-events.orc"
+#include "src/csound-opcodes.orc"

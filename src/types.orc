@@ -25,3 +25,8 @@ malAstNodes@global:MalValue[] init 0
 malAstNodeCount@global:i init 0
 malReaderTokens@global:S[] init 0
 malCsoundTemporaryCount@global:i init 0
+
+malCsoundNodeCount@global:i init 0
+malCsoundCacheIds@global:i[] init 0
+malCsoundCacheValues@global:MalCsoundRender[] init 0
+malCsoundCacheCount@global:i init 0
