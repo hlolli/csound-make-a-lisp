@@ -1,3 +1,7 @@
+;; This Source Code Form is subject to the terms of the Mozilla Public
+;; License, v. 2.0. If a copy of the MPL was not distributed with this
+;; file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 struct MalValue type:i, number:i, string:S, list:MalValue[], env:MalEnv[], metadata:MalValue[], length:i, isMacro:i, astRef:i
 
 struct MalTokens length:i, tokens:S[]

@@ -1,3 +1,7 @@
+;; This Source Code Form is subject to the terms of the Mozilla Public
+;; License, v. 2.0. If a copy of the MPL was not distributed with this
+;; file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 (load-file "../../../tests/selfhost/smoke.mal")
 (check "quasiquote" '(1 2 3 4) `(1 ~(+ 1 1) ~@(list 3 4)))
 (defmacro! unless (fn* (test yes no) (list 'if test no yes)))

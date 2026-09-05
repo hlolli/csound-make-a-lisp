@@ -1,3 +1,7 @@
+;; This Source Code Form is subject to the terms of the Mozilla Public
+;; License, v. 2.0. If a copy of the MPL was not distributed with this
+;; file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 declare EVAL_ENV(result:MalValue, nextEnv:MalEnv):(MalValue, MalEnv)
 declare MalEquals(left:MalValue, right:MalValue):(i)
 declare MalApply(fn:MalValue, args:MalValue):(MalValue)
