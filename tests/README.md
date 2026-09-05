@@ -15,3 +15,16 @@ Run a single checkpoint with:
 just smoke
 just reader
 ```
+
+Run the reference MAL interpreters inside Csound MAL with:
+
+```sh
+just --set csound "$CSOUND" selfhost
+```
+
+These checks cover reference Steps 1–4, 6–9, and A. They check printed results,
+closures, collections, atoms, tail calls, script arguments, and quote, macros,
+exceptions, and metadata where supported. The runner stops Csound on a timeout
+or memory limit. It fails if any required result is missing. See
+[SELF_HOSTING.md](../SELF_HOSTING.md)
+for setup and commands for a single script.

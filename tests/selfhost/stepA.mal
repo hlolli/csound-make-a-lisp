@@ -1,0 +1,8 @@
+(load-file "../../../tests/selfhost/smoke.mal")
+(check "quasiquote" '(1 2 3 4) `(1 ~(+ 1 1) ~@(list 3 4)))
+(defmacro! unless (fn* (test yes no) (list 'if test no yes)))
+(check "macro" 42 (unless false (+ 20 22) 0))
+(check "exception" "caught" (try* (throw "caught") (catch* error error)))
+(check "metadata" {:doc "answer"} (meta (with-meta (list 42) {:doc "answer"})))
+(check "host language" "Csound7-mal" *host-language*)
+(println "SELFHOST-STEPA-PASS")

@@ -92,5 +92,11 @@ harness-stepA:
 harness-csound:
     python3 mal/runtest.py --no-deferrable --no-optional tests/harness/csound_interop.mal -- tests/harness/run-csound-interop
 
+selfhost:
+    python3 tests/selfhost/check.py --csound "{{csound}}"
+
+selfhost-step-a:
+    python3 tests/selfhost/check.py --csound "{{csound}}" --steps A
+
 status:
     @git status --short

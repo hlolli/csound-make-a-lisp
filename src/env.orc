@@ -67,17 +67,25 @@ opcode MalEnvAllocateId():i
   xout id
 endop
 
+;; MAL evaluates at init, where Csound can detach shared arrays on writes.
+;; The member constructor lets snapshots share the value and outer arrays.
+opcode MalEnvSnapshot(env:MalEnv):MalEnv
+  result:MalEnv init env.keys, env.values, env.outer, env.length, env.id, \
+    env.persistent
+  xout result
+endop
+
 opcode MalEnvResolve(env:MalEnv):MalEnv
   if (env.id >= 0 && env.id < malEnvCount) ithen
-    stored:MalEnv init malEnvRegistry[env.id]
+    stored:MalEnv MalEnvSnapshot malEnvRegistry[env.id]
 
     if (stored.id == env.id) ithen
-      result:MalEnv init stored
+      result:MalEnv MalEnvSnapshot stored
     else
-      result:MalEnv init env
+      result:MalEnv MalEnvSnapshot env
     endif
   else
-    result:MalEnv init env
+    result:MalEnv MalEnvSnapshot env
   endif
 
   xout result

@@ -1,0 +1,4 @@
+(println "SELFHOST-BEGIN")
+(println (+ 20 22))
+(println (str "host=" *host-language*))
+(println "SELFHOST-END")

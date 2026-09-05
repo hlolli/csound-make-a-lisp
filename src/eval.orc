@@ -1600,10 +1600,12 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   evalEnv:MalEnv init env
   returnEnv:MalEnv init env
   recursiveInputEnv:MalEnv init env
-  transientEnvs:MalValue init MalMkValue($MAL_LIST_TYPE)
+  transientEnvIds:i[] init 0
+  transientEnvCount:i = 0
   done:i = 0
 
   while (done == 0) do
+    transientEnvId:i = -1
     hasDebug:i = MalEnvHas(evalEnv, "DEBUG-EVAL")
 
     if (hasDebug == 1) ithen
@@ -1681,8 +1683,7 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
 
               if (tryResult.type == $MAL_ERROR_TYPE) ithen
                 catchEnv:MalEnv init MalMkEnvWithOuter(evalEnv)
-                transientEnvs init MalAppendValue( \
-                  transientEnvs, MalMkNumber(catchEnv.id))
+                transientEnvId = catchEnv.id
                 catchValue:MalValue init MalErrorPayload(tryResult)
                 catchEnv init MalEnvSet( \
                   catchEnv, catchBinding.string, catchValue)
@@ -1749,8 +1750,7 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
 
       elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "let*") == 0) ithen
         letEnv:MalEnv init MalMkEnvWithOuter(evalEnv)
-        transientEnvs init MalAppendValue( \
-          transientEnvs, MalMkNumber(letEnv.id))
+        transientEnvId = letEnv.id
 
         if (workAst.length != 3) ithen
           result init MalMkError(sprintf("let*: expected 2 arguments, got %d", \
@@ -1848,8 +1848,7 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
               result init bindStatus
               done = 1
             else
-              transientEnvs init MalAppendValue( \
-                transientEnvs, MalMkNumber(callEnv.id))
+              transientEnvId = callEnv.id
               workAst init MalFunctionBody(fn)
               evalEnv init callEnv
             endif
@@ -1865,15 +1864,40 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
 
       done = 1
     endif
+
+    if (transientEnvId >= 0) ithen
+      transientCapacity:i = lenarray(transientEnvIds)
+
+      if (transientEnvCount >= transientCapacity) ithen
+        preservedEnvIds:i[] init transientEnvCount
+
+        if (transientEnvCount > 0) ithen
+          for copyIndex in [0 ... transientEnvCount - 1] do
+            preservedEnvIds[copyIndex] = transientEnvIds[copyIndex]
+          od
+        endif
+
+        newTransientCapacity:i = transientCapacity == 0 ? 16 : transientCapacity * 2
+        transientEnvIds init newTransientCapacity
+
+        if (transientEnvCount > 0) ithen
+          for copyIndex in [0 ... transientEnvCount - 1] do
+            transientEnvIds[copyIndex] = preservedEnvIds[copyIndex]
+          od
+        endif
+      endif
+
+      transientEnvIds[transientEnvCount] = transientEnvId
+      transientEnvCount += 1
+    endif
   od
 
   returnEnv init MalEnvResolve(returnEnv)
 
-  if (transientEnvs.length > 0) ithen
-    for releaseIndex in [0 ... transientEnvs.length - 1] do
-      reverseIndex:i = transientEnvs.length - releaseIndex - 1
-      envValue:MalValue init MalAt(transientEnvs, reverseIndex)
-      envId:i = envValue.number
+  if (transientEnvCount > 0) ithen
+    for releaseIndex in [0 ... transientEnvCount - 1] do
+      reverseIndex:i = transientEnvCount - releaseIndex - 1
+      envId:i = transientEnvIds[reverseIndex]
       MalEnvRelease(MalEnvHandle(envId))
     od
   endif

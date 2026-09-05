@@ -234,6 +234,65 @@ instr TEST_ENV
   ASSERT_ENV_VALUE(step2Env, "/", $MAL_BUILTIN_OPERATOR_TYPE, "/")
 endin
 
+instr TEST_ENV_SNAPSHOTS
+  prints "Testing environment snapshots\n"
+
+  env:MalEnv MalMkEnv
+  numbers:MalValue MalMkList2 MalMkNumber(1), MalMkNumber(2)
+  env MalEnvSet env, "numbers", numbers
+  snapshot:MalEnv MalEnvResolve env
+
+  ;; Inspect stored fields: MalEnvGet follows the registry ID to its live value.
+  snapshot.values[0] init MalMkList2(MalMkNumber(9), MalMkNumber(2))
+  current:MalEnv MalEnvResolve env
+  originalNumber:i init current.values[0].list[0].number
+
+  if (originalNumber != 1) ithen
+    prints "ENV snapshot, Assertion failed: nested write changed the registry\n"
+    exitnow(1)
+  endif
+
+  env MalEnvSet env, "numbers", MalMkList1(MalMkNumber(3))
+
+  ;; Reuse the lookup's UDO frames while keeping the old result alive.
+  for index in [0 ... 99] do
+    current MalEnvResolve env
+  od
+
+  currentNumber:i init current.values[0].list[0].number
+  snapshotFirst:i init snapshot.values[0].list[0].number
+  snapshotSecond:i init snapshot.values[0].list[1].number
+
+  if (currentNumber != 3 || snapshotFirst != 9 || snapshotSecond != 2) ithen
+    prints "ENV snapshot, Assertion failed: registry update changed an old result\n"
+    exitnow(1)
+  endif
+
+  child:MalEnv MalMkEnvWithOuter env
+  childSnapshot:MalEnv MalEnvResolve child
+  childSnapshot.outer[0] MalEnvHandle -1
+  currentChild:MalEnv MalEnvResolve child
+  parentId:i init currentChild.outer[0].id
+
+  if (parentId != env.id) ithen
+    prints "ENV snapshot, Assertion failed: outer write changed the registry\n"
+    exitnow(1)
+  endif
+
+  detached:MalEnv init snapshot.keys, snapshot.values, snapshot.outer, \
+    snapshot.length, -1, snapshot.persistent
+  detachedSnapshot:MalEnv MalEnvResolve detached
+  detachedSnapshot.values[0] init MalMkList2(MalMkNumber(9), MalMkNumber(8))
+  detachedSecond:i init detached.values[0].list[1].number
+
+  if (detachedSecond != 2) ithen
+    prints "ENV snapshot, Assertion failed: unregistered input changed\n"
+    exitnow(1)
+  endif
+
+  prints "ENV snapshot, Assertion success\n"
+endin
+
 instr TEST_METADATA
   prints "Testing metadata storage\n"
 
@@ -299,5 +358,6 @@ endin
 schedule("TEST_ERRORS", 0, 0)
 schedule("TEST_BUILTINS", 0, 0)
 schedule("TEST_ENV", 0, 0)
+schedule("TEST_ENV_SNAPSHOTS", 0, 0)
 schedule("TEST_METADATA", 0, 0)
 event_i("e", 0, 0)

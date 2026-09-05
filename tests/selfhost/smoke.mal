@@ -1,0 +1,18 @@
+(def! check (fn* (label expected actual)
+  (if (= expected actual) nil
+    (throw (str label ": expected " (pr-str expected) ", got " (pr-str actual))))))
+
+(check "arithmetic" 42 (+ 20 22))
+(def! make-adder (fn* (n) (fn* (x) (+ n x))))
+(check "closure" 42 ((make-adder 12) 30))
+(check "map" (list 2 3 4) (map (fn* (x) (+ x 1)) (list 1 2 3)))
+(check "apply" 42 (apply + (list 20 22)))
+(check "vector" [1 42] [1 (+ 20 22)])
+(check "map lookup" 42 (get {:answer (+ 20 22)} :answer))
+(def! counter (atom 40))
+(swap! counter + 2)
+(check "atom" 42 @counter)
+(def! sum-to (fn* (n acc) (if (= n 0) acc (sum-to (- n 1) (+ acc n)))))
+(check "tail calls" 55 (sum-to 10 0))
+(check "arguments" (list "first" "two words" "--gain=0.5" "") *ARGV*)
+(println "SELFHOST-COMMON-PASS")
