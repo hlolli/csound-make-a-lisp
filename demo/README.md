@@ -84,23 +84,29 @@ The four internal channels retain the source's stereo mix: front-right plus
 rear-right on the left output, front-left plus rear-left on the right output.
 The CsoundQt spectrogram and GUI setup have no role in this player.
 
-The six score sections live in [demo/stria](stria/), starting with
-[t0.mal](stria/t0.mal). Each note is a map with named fields, including
-`:start`, `:duration`, `:amplitude`, and `:carrier`. `play-note` puts those
-fields in Csound's order and fills the unused fields with zero. Reverb events
-also use names. All source values retain their original precision.
+Stria has three parts:
 
-`stria.mal` loads the sections in order. Smaller files keep the interpreter
-from holding the whole score while it evaluates each form. Loading the full
-named score can take a couple of minutes in the current MAL interpreter.
+- [stria/orc.mal](stria/orc.mal) defines the FM voice, reverb, and output stage.
+- [stria/score.edn](stria/score.edn) holds the duration, nine tables, and paths
+  to six section files, starting with [t0.edn](stria/t0.edn). All score files
+  contain plain EDN data.
+- [stria.mal](stria.mal) loads the orchestra, reads the EDN, and schedules it.
+
+Each note is a map with named fields, including `:start`, `:duration`,
+`:amplitude`, and `:carrier`. `play-note` puts those fields in Csound's order
+and fills the unused fields with zero. Reverb events also use names. All
+source values retain their original precision. The loader reads the score
+with `read-string` and `slurp`; it does not evaluate the score as MAL code.
+It reads one section at a time to limit memory use. Loading the full score
+can still take a couple of minutes in the current interpreter.
 
 The root `cljfmt.edn` teaches [cljfmt](https://github.com/weavejester/cljfmt)
 how to indent MAL's special forms. Format or check Stria from the repository
 root with:
 
 ```sh
-cljfmt fix --file-pattern '\.mal$' demo/stria.mal demo/stria
-cljfmt check --file-pattern '\.mal$' demo/stria.mal demo/stria
+cljfmt fix --file-pattern '\.(mal|edn)$' demo/stria.mal demo/stria
+cljfmt check --file-pattern '\.(mal|edn)$' demo/stria.mal demo/stria
 ```
 
 For the source's 48 kHz and 16 samples per control period:

@@ -1,0 +1,23 @@
+;; Stria, John Chowning. Score from Kevin Dahan’s Csound reconstruction.
+;; Times are seconds; carrier and modulator frequencies are Hz.
+;; Tables use Csound’s [number start size generator & arguments] order.
+{:duration 958
+ :tables [[1 0 16385 10 1]
+          [2 0 16385 7 0 4096 0.33 4096 1 4096 0.33 4096 0]
+          [3 0 16385 7 1 2094 0.543 3152 0.367 7383 0.2037 1284 0.0845 2471 0]
+          [4 0 16385 27 0 1 1500 0.4 2500 0.2 3220 0.15 4220 0.08 5464 0 16384 0]
+          [5 0 16385 7 0.6904 2525 1 3465 0.71 4004 0.255 1351 0.15 5039 0]
+          [6 0 16385 7 -0.5 3276 0.04 3276 0.08 3276 0.01 6552 0.03]
+          [7 0 16385 27
+           0 0 3000 0.35 3010 0.85 3100 1 6034 0.857
+           7415 0.44 8967 0.214 11296 0.107 16384 0]
+          [8 0 16385 27
+           0 0 2071 0.135 3279 0.270 3712 0.416 3889 0.827 4580 0.949
+           5270 0.998 6478 1 7253 0.916 8113 0.7 10093 0.365 11557 0.234 16384 0]
+          [9 0 16385 7 0 16384 1]]
+ :sections ["demo/stria/t0.edn"
+            "demo/stria/t286.edn"
+            "demo/stria/t466.edn"
+            "demo/stria/t610.edn"
+            "demo/stria/t754g.edn"
+            "demo/stria/end.edn"]}

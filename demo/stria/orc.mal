@@ -1,0 +1,97 @@
+;; Stria, John Chowning. Csound reconstruction by Kevin Dahan, 2007–2010.
+;; Source: CsoundQt/src/Examples/CsoundQt/Music/Chowning-Stria.csd.
+;; Loaded by demo/stria.mal; score data lives in score.edn.
+;;
+;; Preserve the reconstruction's FM voice, four-channel reverb, filter banks,
+;; stereo fold-down, function tables, and full 958-second score.
+;; The CsoundQt spectrogram and GUI setup do not affect the sound.
+(def! output-scale 0.000030517578125) ; 1 / 32768
+(def! k-linseg (csound/at-rate :k csound/linseg))
+(def! audio-bus (csound/at-rate :a csound/chnget))
+
+(csound/definst StriaVoice
+  [amplitude 0 carrier 0 mod-a 0 index-a-start 0 index-a-end 0
+   mod-b 0 index-b-start 0 index-b-end 0 attack 0 decay 0 skew 0
+   distance 0 reverb-send 0 unused17 0 unused18 0 unused19 0 unused20 0 unused21 0
+   front-left 0 front-right 0 rear-right 0 rear-left 0 unused26 0 unused27 0
+   amplitude-table 2 skew-table 6 index-a-table 2 index-b-table 4 end-flag 0]
+  (let* [middle (/ (- p3 (+ attack decay)) 2)
+         pointer (k-linseg 0 attack 0.25 middle 0.5 middle 0.75 decay 1)
+         envelope (* amplitude (csound/table pointer amplitude-table 1))
+         detune (+ 1 (* skew (csound/table pointer skew-table 1)))
+         change-a (* (* mod-a (- index-a-end index-a-start))
+                     (csound/table pointer index-a-table 1))
+         change-b (* (* mod-b (- index-b-end index-b-start))
+                     (csound/table pointer index-b-table 1))
+         modulation-a (csound/oscil (+ (* mod-a index-a-start) change-a)
+                                    (* mod-a detune) 1)
+         modulation-b (csound/oscil (+ (* mod-a index-b-start) change-b)
+                                    (* mod-b detune) 1)
+         signal (csound/oscil envelope
+                              (+ (+ (* carrier detune) modulation-a) modulation-b) 1)
+         dry (* signal distance)]
+    ;; The source uses mod-a for both starting deviations. Its p32 branch
+    ;; changes an unused local; the audible B range still uses p11 minus p10.
+    (csound/do
+      (csound/chnmix (* signal reverb-send) "stria-reverb")
+      (csound/chnmix (* dry front-left) "stria-front-left")
+      (csound/chnmix (* dry front-right) "stria-front-right")
+      (csound/chnmix (* dry rear-right) "stria-rear-right")
+      (csound/chnmix (* dry rear-left) "stria-rear-left"))))
+
+;; A factor of two compensates for the reconstruction's sample rate.
+;; The delay constants below equal the source's sample counts / 12800.
+(def! reverb-tap
+  (fn* (signal rate depth phase)
+    (let* [motion (csound/oscili (* 1000 depth) rate 1 phase)]
+      (csound/vdelay signal (* (+ 1000 motion) 0.078125) 10000))))
+
+(csound/definst StriaReverb [rate-start 1 rate-end 1 depth -1 unused7 0]
+  (let* [input (audio-bus "stria-reverb")
+         allpass-one (csound/alpass input 1.0109375 0.050546875)
+         allpass-two (csound/alpass allpass-one 0.3328125 0.016640625)
+         allpass-three (csound/alpass allpass-two 0.1046875 0.005234375)
+         comb-one (csound/comb allpass-three 8.0025 0.250078125)
+         comb-two (csound/comb allpass-three 7.735078125 0.286484375)
+         comb-three (csound/comb allpass-three 7.916015625 0.316640625)
+         comb-four (csound/comb allpass-three 8.693359375 0.347734375)
+         first-line (- (+ (- comb-one comb-two) comb-three) comb-four)
+         second-line (+ (+ (+ comb-one comb-two) comb-three) comb-four)
+         third-line (- (- (- comb-one comb-two) comb-three) comb-four)
+         fourth-line (- (- (+ comb-one comb-two) comb-three) comb-four)
+         rate (csound/line rate-start p3 rate-end)
+         envelope (k-linseg 1 (- p3 2) 1 2 0)]
+    (csound/do
+      (csound/chnmix (* envelope (reverb-tap first-line (* 0.0089 rate) depth 0.75))
+                     "stria-front-left")
+      (csound/chnmix (* envelope (reverb-tap second-line (* 0.0083 rate) depth 0.75))
+                     "stria-front-right")
+      (csound/chnmix (* envelope (reverb-tap third-line (* 0.0097 rate) depth 0))
+                     "stria-rear-right")
+      (csound/chnmix (* envelope (reverb-tap fourth-line (* 0.0101 rate) depth 0))
+                     "stria-rear-left")
+      (csound/chnclear "stria-reverb"))))
+
+(def! filtered-channel
+  (fn* (channel)
+    (csound/butterlp
+     (csound/butterlp
+      (csound/butterlp
+       (csound/butterlp (audio-bus channel) 11500) 11500) 11500) 11500)))
+
+;; Define the output last so it runs after the voices and reverb each block.
+(csound/definst StriaOutput []
+  (let* [pointer (k-linseg 0 427 0.1 77 0.35 1 0.45 33 0.45 1 0.35 4 0.45
+                           9 0.5 15 0.5 26 0.8 43 0.8 27 0.9 1 0.8 294 0.95)
+         envelope (+ 1 (* 18 (csound/tablei pointer 2 1)))
+         gain (* envelope output-scale)
+         front-left (filtered-channel "stria-front-left")
+         front-right (filtered-channel "stria-front-right")
+         rear-right (filtered-channel "stria-rear-right")
+         rear-left (filtered-channel "stria-rear-left")]
+    (csound/do
+      (csound/outs (* (+ front-right rear-right) gain)
+                   (* (+ front-left rear-left) gain))
+      (csound/chnclear "stria-front-left" "stria-front-right"
+                       "stria-rear-right" "stria-rear-left"))))
+
