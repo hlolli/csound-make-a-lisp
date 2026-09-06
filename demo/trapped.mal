@@ -1,0 +1,608 @@
+;; Trapped in Convert, Richard Boulanger.
+;; Written July 1979; Csound revision June 1986; SHARCsound revision July 1996.
+;; Transcribed from Csound's examples/trapped.csd.
+;; Run from this repository: ./play demo/trapped.mal
+;;
+;; The local a/k names follow the source to make the equations easy to compare.
+;; Parameters have names; unused score fields keep their original positions.
+;; Csound's original amplitudes stay inside the graph. Scale only the outputs.
+(def! output-scale 0.000030517578125) ; 1 / 32768
+(def! stereo-out
+  (fn* (left right)
+    (csound/outs (* left output-scale) (* right output-scale))))
+(def! audio-bus (csound/at-rate :a csound/chnget))
+(def! k-line (csound/at-rate :k csound/line))
+(def! k-linseg (csound/at-rate :k csound/linseg))
+(def! k-expseg (csound/at-rate :k csound/expseg))
+(def! k-expon (csound/at-rate :k csound/expon))
+(def! k-linen (csound/at-rate :k csound/linen))
+(def! k-oscil (csound/at-rate :k csound/oscil))
+(def! k-randh (csound/at-rate :k csound/randh))
+(def! k-randi (csound/at-rate :k csound/randi))
+(def! k-phasor (csound/at-rate :k csound/phasor))
+
+(csound/event "f" 1 0 8192 10 1)
+(csound/event "f" 2 0 512 10 10 8 0 6 0 4 0 1)
+(csound/event "f" 3 0 512 10 10 0 5 5 0 4 3 0 1)
+(csound/event "f" 4 0 2048 10 10 0 9 0 0 8 0 7 0 4 0 2 0 1)
+(csound/event "f" 5 0 2048 10 5 3 2 1 0)
+(csound/event "f" 6 0 2048 10 8 10 7 4 3 1)
+(csound/event "f" 7 0 2048 10 7 9 11 4 2 0 1 1)
+(csound/event "f" 8 0 2048 10 0 0 0 0 7 0 0 0 0 2 0 0 0 1 1)
+(csound/event "f" 9 0 2048 10 10 9 8 7 6 5 4 3 2 1)
+(csound/event "f" 10 0 2048 10 10 0 9 0 8 0 7 0 6 0 5)
+(csound/event "f" 11 0 2048 10 10 10 9 0 0 0 3 2 0 0 1)
+(csound/event "f" 12 0 2048 10 10 0 0 0 5 0 0 0 0 0 3)
+(csound/event "f" 13 0 2048 10 10 0 0 0 0 3 1)
+(csound/event "f" 14 0 512 9 1 3 0 3 1 0 9 0.333 180)
+(csound/event "f" 15 0 8192 9 1 1 90)
+(csound/event "f" 16 0 2048 9 1 3 0 3 1 0 6 1 0)
+(csound/event "f" 17 0 9 5 0.1 8 1)
+(csound/event "f" 18 0 17 5 0.1 10 1 6 0.4)
+(csound/event "f" 19 0 16 2 1 7 10 7 6 5 4 2 1 1 1 1 1 1 1 1)
+(csound/event "f" 20 0 16 -2 0 30 40 45 50 40 30 20 10 5 4 3 2 1 0 0 0)
+(csound/event "f" 21 0 16 -2 0 20 15 10 9 8 7 6 5 4 3 2 1 0 0)
+(csound/event "f" 22 0 9 -2 0.001 0.004 0.007 0.003 0.002 0.005 0.009 0.006)
+
+;; 1: Ivory
+(csound/definst TrappedIvory
+  [unused 0 pitch 0 amplitude 0 vibrato-rate 0 glide-delay 0 frequency-drop 0]
+  (let* [frequency (csound/cpspch pitch)
+         aglis (csound/expseg 1 glide-delay 1 (- p3 glide-delay) frequency-drop)
+         k1 (k-line 0 p3 5)
+         k2 (k-oscil k1 vibrato-rate 1)
+         k3 (k-linseg 0 (* p3 0.7) amplitude (* p3 0.3) 0)
+         a1 (csound/oscil k3 (* (+ frequency k2) aglis) 1)
+         k4 (k-linseg 0 (* p3 0.6) 6 (* p3 0.4) 0)
+         k5 (k-oscil k4 (* vibrato-rate 0.9) 1 1.4)
+         k6 (k-linseg 0 (* p3 0.9) amplitude (* p3 0.1) 0)
+         a3 (csound/oscil k6 (* (+ (+ frequency 0.009) k5) aglis) 9 0.2)
+         k7 (k-linseg 9 (* p3 0.7) 1 (* p3 0.3) 1)
+         k8 (k-oscil k7 (* vibrato-rate 1.2) 1 0.7)
+         k9 (k-linen amplitude (* p3 0.5) p3 (* p3 0.333))
+         a5 (csound/oscil k9 (* (+ (+ frequency 0.007) k8) aglis) 10 0.3)
+         k10 (k-expseg 1 (* p3 0.99) 3.1 (* p3 0.01) 3.1)
+         k11 (k-oscil k10 (* vibrato-rate 0.97) 1 0.6)
+         k12 (k-expseg 0.001 (* p3 0.8) amplitude (* p3 0.2) 0.001)
+         a7 (csound/oscil k12 (* (+ (+ frequency 0.005) k11) aglis) 11 0.5)
+         k13 (k-expseg 1 (* p3 0.4) 3 (* p3 0.6) 0.02)
+         k14 (k-oscil k13 (* vibrato-rate 0.99) 1 0.4)
+         k15 (k-expseg 0.001 (* p3 0.5) amplitude (* p3 0.1) (* amplitude 0.6) (* p3 0.2) (* amplitude 0.97) (* p3 0.2) 0.001)
+         a9 (csound/oscil k15 (* (+ (+ frequency 0.003) k14) aglis) 12 0.8)
+         k16 (k-expseg 4 (* p3 0.91) 1 (* p3 0.09) 1)
+         k17 (k-oscil k16 (* vibrato-rate 1.4) 1 0.2)
+         k18 (k-expseg 0.001 (* p3 0.6) amplitude (* p3 0.2) (* amplitude 0.8) (* p3 0.1) (* amplitude 0.98) (* p3 0.1) 0.001)
+         a11 (csound/oscil k18 (* (+ (+ frequency 0.001) k17) aglis) 13 1.3)]
+    (stereo-out (+ (+ a1 a3) a5) (+ (+ a7 a9) a11))))
+
+;; 2: Blue
+(csound/definst TrappedBlue
+  [unused 0 pitch 0 amplitude 0 reverb-send 0 lfo-rate 0 harmonics 0 sweep-rate 0]
+  (let* [frequency (csound/cpspch pitch)
+         k1 (k-randi 1 30)
+         k2 (k-linseg 0 (* p3 0.5) 1 (* p3 0.5) 0)
+         k3 (k-linseg 0.005 (* p3 0.71) 0.015 (* p3 0.29) 0.01)
+         k4 (k-oscil k2 lfo-rate 1 0.2)
+         k5 (+ k4 2)
+         ksweep (k-linseg harmonics (* p3 sweep-rate) 1 (* p3 (- p3 (* p3 sweep-rate))) 1)
+         kenv (k-expseg 0.001 (* p3 0.01) amplitude (* p3 0.99) 0.001)
+         asig (csound/gbuzz kenv (+ frequency k3) k5 ksweep k1 15)]
+    (csound/do
+      (stereo-out asig asig)
+      (csound/chnmix (* asig reverb-send) "trapped-reverb"))))
+
+;; 3: Violet
+(csound/definst TrappedViolet
+  [unused 0 pitch 0 amplitude 0 reverb-send 0 random-rate 0]
+  (let* [frequency (csound/cpspch pitch)
+         k3 (k-expseg 1 (* p3 0.5) 30 (* p3 0.5) 2)
+         k4 (k-expseg 10 (* p3 0.7) random-rate (* p3 0.3) 6)
+         k8 (k-linen amplitude (* p3 0.333) p3 (* p3 0.333))
+         k13 (k-line 0 p3 -1)
+         k14 (k-randh k3 k4 0.5)
+         a1 (csound/oscil k8 (+ (+ (+ frequency (* pitch 0.05)) k14) k13) 1 0.1)
+         k1 (k-expseg 1 (* p3 0.8) 6 (* p3 0.2) 1)
+         k6 (k-linseg 0.4 (* p3 0.9) (* random-rate 0.96) (* p3 0.1) 0)
+         k7 (k-linseg 8 (* p3 0.2) 10 (* p3 0.76) 2)
+         kenv2 (k-expseg 0.001 (* p3 0.4) (* amplitude 0.99) (* p3 0.6) 0.0001)
+         k15 (k-randh k6 k7)
+         a2 (csound/buzz kenv2 (+ (+ (+ frequency (* pitch 0.009)) k15) k13) k1 1 0.2)
+         kenv1 (k-linen amplitude (* p3 0.25) p3 (* p3 0.4))
+         k16 (k-randh (* k4 1.4) (* k7 2.1) 0.2)
+         a3 (csound/oscil kenv1 (+ (+ (+ frequency (* pitch 0.1)) k16) k13) 16 0.3)
+         amix (+ (+ a1 a2) a3)]
+    (csound/do
+      (stereo-out (+ a1 a3) (+ a2 a3))
+      (csound/chnmix (* amix reverb-send) "trapped-reverb"))))
+
+;; 4: Black
+(csound/definst TrappedBlack
+  [unused 0 pitch 0 amplitude 0 filter-start 0 filter-end 0 bandwidth-ratio 0 reverb-send 0]
+  (let* [frequency (csound/cpspch pitch)
+         k1 (k-expon filter-start p3 filter-end)
+         anoise (csound/rand 8000)
+         a1 (csound/reson anoise k1 (/ k1 bandwidth-ratio) 1)
+         k2 (k-oscil 0.6 11.3 1 0.1)
+         k3 (k-expseg 0.001 (* p3 0.001) amplitude (* p3 0.999) 0.001)
+         a2 (csound/oscil k3 (+ frequency k2) 15)]
+    (csound/do
+      (stereo-out (+ (* a1 0.8) a2) (+ (* a1 0.6) (* a2 0.7)))
+      (csound/chnmix (* a2 reverb-send) "trapped-reverb"))))
+
+;; 5: Green
+(csound/definst TrappedGreen
+  [unused 0 pitch 0 amplitude 0 reverb-send 0 pan-direction 0 carrier-ratio 0 modulator-ratio 0 index 0 random-rate 0]
+  (let* [frequency (csound/cpspch pitch)
+         k1 (k-line carrier-ratio p3 1)
+         k2 (k-line 1 p3 modulator-ratio)
+         k4 (k-expon 2 p3 random-rate)
+         k5 (k-linseg 0 (* p3 0.8) 8 (* p3 0.2) 8)
+         k7 (k-randh index k4)
+         k6 (k-oscil k4 k5 1 0.3)
+         kenv1 (k-linen amplitude 0.03 p3 0.2)
+         a1 (csound/foscil kenv1 (+ frequency k6) k1 k2 k7 1)
+         kenv2 (k-linen amplitude 0.1 p3 0.1)
+         a2 (csound/oscil kenv2 (* frequency 1.001) 1)
+         amix (+ a1 a2)
+         kpan (k-linseg (csound/int pan-direction) (* p3 0.7) (csound/frac pan-direction) (* p3 0.3) (csound/int pan-direction))]
+    (csound/do
+      (stereo-out (* amix kpan) (* amix (- 1 kpan)))
+      (csound/chnmix (* amix reverb-send) "trapped-reverb"))))
+
+;; 6: Copper
+(csound/definst TrappedCopper
+  [pulse-rate 0 filter-start 0 filter-end 0 bandwidth-ratio 0 reverb-send 0 amplitude 0]
+  (let* [table-length 8
+         k1 (k-phasor pulse-rate)
+         k2 (csound/table (* k1 table-length) 19)
+         anoise (csound/rand 8000)
+         k3 (k-expon filter-start p3 filter-end)
+         a1 (csound/reson anoise (* k3 k2) (/ k3 bandwidth-ratio) 1)
+         kenv (k-linen amplitude 0.01 p3 0.05)
+         asig (* a1 kenv)]
+    (csound/do
+      (stereo-out asig asig)
+      (csound/chnmix (* asig reverb-send) "trapped-reverb"))))
+
+;; 7: Pewter
+(csound/definst TrappedPewter
+  [amplitude 0 pitch 0 phase-start 0 phase-end 0 control-amplitude 0 control-table 0 wave-table 0 reverb-send 0]
+  (let* [table-length 512
+         frequency (csound/cpspch pitch)
+         a1 (csound/oscil 1 frequency wave-table)
+         k1 (k-linseg phase-start (* p3 0.5) phase-end (* p3 0.5) phase-start)
+         a3 (csound/oscili control-amplitude (+ frequency k1) control-table)
+         a4 (csound/phasor frequency)
+         a5 (csound/table (* (+ a4 a3) table-length) wave-table)
+         kenv (k-linen amplitude (* p3 0.4) p3 (* p3 0.5))
+         asig (* kenv (* (+ a1 a5) 0.2))]
+    (csound/do
+      (stereo-out asig asig)
+      (csound/chnmix (* asig reverb-send) "trapped-reverb"))))
+
+;; 8: Red
+(csound/definst TrappedRed
+  [amplitude 0 filter-start 0 filter-end 0 bandwidth-ratio 0 random-rate-one 0 random-rate-two 0 reverb-send 0]
+  (let* [table-length 16
+         k1 (k-expon filter-start p3 filter-end)
+         k2 (k-line random-rate-one p3 (* random-rate-one 0.93))
+         k3 (k-phasor k2)
+         k4 (csound/table (* k3 table-length) 20)
+         anoise (csound/rand 8000)
+         aflt1 (csound/reson anoise k1 (+ 20 (/ (* k4 k1) bandwidth-ratio)) 1)
+         k5 (k-linseg (* filter-end 0.9) (* p3 0.8) (* filter-start 1.4) (* p3 0.2) (* filter-start 1.4))
+         k6 (k-expon (* random-rate-two 0.97) p3 random-rate-two)
+         k7 (k-phasor k6)
+         k8 (csound/tablei (* k7 table-length) 21)
+         aflt2 (csound/reson anoise k5 (+ 30 (* (/ (* k8 k5) bandwidth-ratio) 0.9)) 1)
+         abal (csound/oscil 1000 1000 1)
+         a3 (csound/balance aflt1 abal)
+         a5 (csound/balance aflt2 abal)
+         k11 (k-linen amplitude 0.15 p3 0.5)
+         a3 (* a3 k11)
+         a5 (* a5 k11)
+         k9 (k-randh 1 k2)
+         aleft (+ (* (* a3 k9) 0.7) (* (* a5 k9) 0.3))
+         k10 (k-randh 1 k6)
+         aright (+ (* (* a3 k10) 0.3) (* (* a5 k10) 0.7))]
+    (csound/do
+      (stereo-out aleft aright)
+      (csound/chnmix (* a3 reverb-send) "trapped-reverb"))))
+
+;; 9: Sand
+(csound/definst TrappedSand
+  [delay-send 0 pitch 0 amplitude 0 reverb-send 0 random-amplitude 0 random-rate 0]
+  (let* [frequency (csound/cpspch pitch)
+         k2 (k-randh random-amplitude random-rate 0.1)
+         k3 (k-randh (* random-amplitude 0.98) (* random-rate 0.91) 0.2)
+         k4 (k-randh (* random-amplitude 1.2) (* random-rate 0.96) 0.3)
+         k5 (k-randh (* random-amplitude 0.9) (* random-rate 1.3))
+         kenv (k-linen amplitude (* p3 0.1) p3 (* p3 0.8))
+         a1 (csound/oscil kenv (+ frequency k2) 1 0.2)
+         a2 (csound/oscil (* kenv 0.91) (+ (+ frequency 0.004) k3) 2 0.3)
+         a3 (csound/oscil (* kenv 0.85) (+ (+ frequency 0.006) k4) 3 0.5)
+         a4 (csound/oscil (* kenv 0.95) (+ (+ frequency 0.009) k5) 4 0.8)
+         amix (+ (+ (+ a1 a2) a3) a4)]
+    (csound/do
+      (stereo-out (+ a1 a3) (+ a2 a4))
+      (csound/chnmix (* amix reverb-send) "trapped-reverb")
+      (csound/chnmix (* amix delay-send) "trapped-delay"))))
+
+;; 10: Taupe
+(csound/definst TrappedTaupe
+  [unused 0 pitch 0 amplitude 0 reverb-send 0 random-amplitude 0 random-rate 0]
+  (let* [frequency (csound/cpspch pitch)
+         k2 (k-randh random-amplitude random-rate 0.1)
+         k3 (k-randh (* random-amplitude 0.98) (* random-rate 0.91) 0.2)
+         k4 (k-randh (* random-amplitude 1.2) (* random-rate 0.96) 0.3)
+         k5 (k-randh (* random-amplitude 0.9) (* random-rate 1.3))
+         kenv (k-linen amplitude (* p3 0.1) p3 (* p3 0.8))
+         a1 (csound/oscil kenv (+ frequency k2) 1 0.2)
+         a2 (csound/oscil (* kenv 0.91) (+ (+ frequency 0.004) k3) 2 0.3)
+         a3 (csound/oscil (* kenv 0.85) (+ (+ frequency 0.006) k4) 3 0.5)
+         a4 (csound/oscil (* kenv 0.95) (+ (+ frequency 0.009) k5) 4 0.8)
+         amix (+ (+ (+ a1 a2) a3) a4)]
+    (csound/do
+      (stereo-out (+ a1 a3) (+ a2 a4))
+      (csound/chnmix (* amix reverb-send) "trapped-reverb"))))
+
+;; 11: Rust
+(csound/definst TrappedRust
+  [delay-send 0 pitch 0 amplitude 0 reverb-send 0]
+  (let* [frequency (csound/cpspch pitch)
+         k1 (k-expseg 1 (* p3 0.5) 40 (* p3 0.5) 2)
+         k2 (k-expseg 10 (* p3 0.72) 35 (* p3 0.28) 6)
+         k3 (k-linen amplitude (* p3 0.333) p3 (* p3 0.333))
+         k4 (k-randh k1 k2 0.5)
+         a4 (csound/oscil k3 (+ (+ frequency (* pitch 0.05)) k4) 1 0.1)
+         k5 (k-linseg 0.4 (* p3 0.9) 26 (* p3 0.1) 0)
+         k6 (k-linseg 8 (* p3 0.24) 20 (* p3 0.76) 2)
+         k7 (k-linen amplitude (* p3 0.5) p3 (* p3 0.46))
+         k8 (k-randh k5 k6 0.4)
+         a3 (csound/oscil k7 (+ (+ frequency (* pitch 0.03)) k8) 14 0.3)
+         k9 (k-expseg 1 (* p3 0.7) 50 (* p3 0.3) 2)
+         k10 (k-expseg 10 (* p3 0.3) 45 (* p3 0.7) 6)
+         k11 (k-linen amplitude (* p3 0.25) p3 (* p3 0.25))
+         k12 (k-randh k9 k10 0.5)
+         a2 (csound/oscil k11 (+ (+ frequency (* pitch 0.02)) k12) 1 0.1)
+         k13 (k-linseg 0.4 (* p3 0.6) 46 (* p3 0.4) 0)
+         k14 (k-linseg 18 (* p3 0.1) 50 (* p3 0.9) 2)
+         k15 (k-linen amplitude (* p3 0.2) p3 (* p3 0.3))
+         k16 (k-randh k13 k14 0.8)
+         a1 (csound/oscil k15 (+ (+ frequency (* pitch 0.01)) k16) 14 0.3)
+         amix (+ (+ (+ a1 a2) a3) a4)]
+    (csound/do
+      (stereo-out (+ a1 a3) (+ a2 a4))
+      (csound/chnmix (* amix reverb-send) "trapped-reverb")
+      (csound/chnmix (* amix delay-send) "trapped-delay"))))
+
+;; 12: Teal
+(csound/definst TrappedTeal
+  [unused 0 pitch 0 amplitude 0 filter-start 0 filter-peak 0 bandwidth-ratio 0 reverb-send 0]
+  (let* [frequency (csound/octpch pitch)
+         table-length 8
+         k1 (k-linseg 0 (* p3 0.8) 9 (* p3 0.2) 1)
+         k2 (k-phasor k1)
+         k3 (csound/table (* k2 table-length) 22)
+         k4 (k-expseg filter-start (* p3 0.7) filter-peak (* p3 0.3) (* filter-start 0.9))
+         anoise (csound/rand 8000)
+         aflt (csound/reson anoise k4 (/ k4 bandwidth-ratio) 1)
+         kenv1 (k-expseg 0.001 (* p3 0.1) amplitude (* p3 0.1) (* amplitude 0.5) (* p3 0.3) (* amplitude 0.8) (* p3 0.5) 0.001)
+         a3 (csound/oscil kenv1 (+ (csound/cpsoct (+ frequency k3)) (* aflt 0.8)) 1)]
+    (csound/do
+      (stereo-out a3 (+ (* a3 0.98) (* aflt 0.3)))
+      (csound/chnmix (* anoise reverb-send) "trapped-reverb"))))
+
+;; 13: Foam
+(csound/definst TrappedFoam
+  [unused 0 pitch 0 amplitude 0 vibrato-rate 0 glide 0]
+  (let* [frequency (csound/octpch pitch)
+         k1 (k-line 0 p3 glide)
+         k2 (k-oscil k1 vibrato-rate 1)
+         k3 (k-linseg 0 (* p3 0.7) amplitude (* p3 0.3) 1)
+         a1 (csound/oscil k3 (csound/cpsoct (+ frequency k2)) 1)
+         k4 (k-linseg 0 (* p3 0.6) (* glide 0.995) (* p3 0.4) 0)
+         k5 (k-oscil k4 (* vibrato-rate 0.9) 1 0.1)
+         k6 (k-linseg 0 (* p3 0.9) amplitude (* p3 0.1) 3)
+         a2 (csound/oscil k6 (csound/cpsoct (+ (+ frequency 0.009) k5)) 4 0.2)
+         k7 (k-linseg (* glide 0.985) (* p3 0.7) 0 (* p3 0.3) 0)
+         k8 (k-oscil k7 (* vibrato-rate 1.2) 1 0.7)
+         k9 (k-linen amplitude (* p3 0.5) p3 (* p3 0.333))
+         a3 (csound/oscil k6 (csound/cpsoct (+ (+ frequency 0.007) k8)) 5 0.5)
+         k10 (k-expseg 1 (* p3 0.8) glide (* p3 0.2) 4)
+         k11 (k-oscil k10 (* vibrato-rate 0.97) 1 0.6)
+         k12 (k-expseg 0.001 (* p3 0.99) (* amplitude 0.97) (* p3 0.01) (* amplitude 0.97))
+         a4 (csound/oscil k12 (csound/cpsoct (+ (+ frequency 0.005) k11)) 6 0.8)
+         k13 (k-expseg 0.002 (* p3 0.91) (* glide 0.99) (* p3 0.09) (* glide 0.99))
+         k14 (k-oscil k13 (* vibrato-rate 0.99) 1 0.4)
+         k15 (k-expseg 0.001 (* p3 0.5) amplitude (* p3 0.1) (* amplitude 0.6) (* p3 0.2) (* amplitude 0.97) (* p3 0.2) 0.001)
+         a5 (csound/oscil k15 (csound/cpsoct (+ (+ frequency 0.003) k14)) 7 0.9)
+         k16 (k-expseg (* glide 0.98) (* p3 0.81) 0.003 (* p3 0.19) 0.003)
+         k17 (k-oscil k16 (* vibrato-rate 1.4) 1 0.2)
+         k18 (k-expseg 0.001 (* p3 0.6) amplitude (* p3 0.2) (* amplitude 0.8) (* p3 0.1) (* amplitude 0.98) (* p3 0.1) 0.001)
+         a6 (csound/oscil k18 (csound/cpsoct (+ (+ frequency 0.001) k17)) 8 0.1)]
+    (stereo-out (+ (+ a1 a3) a5) (+ (+ a2 a4) a6))))
+
+;; 98: Smear
+(csound/definst TrappedSmear
+  []
+  (let* [delay-input (audio-bus "trapped-delay")
+         asig (csound/delay delay-input 0.08)]
+    (csound/do
+      (stereo-out asig asig)
+      (csound/chnclear "trapped-delay"))))
+
+;; 99: Swirl
+(csound/definst TrappedSwirl
+  [pan-rate 0]
+  (let* [reverb-input (audio-bus "trapped-reverb")
+         k1 (k-oscil 0.5 pan-rate 1)
+         k2 (+ 0.5 k1)
+         k3 (- k2 1)
+         asig (csound/reverb reverb-input 2.1)]
+    (csound/do
+      (stereo-out (* asig k2) (* asig k3))
+      (csound/chnclear "trapped-reverb"))))
+
+;; Section IV tempo: beat/BPM pairs from the source.
+;; 0/60, 40/60, 45/30, 49/40, 52/90, 55/100, 58/160,
+;; 59/200, 61/230, 65/270, 78/40. Csound ramps seconds per beat.
+;; Rows hold [beat start-seconds seconds-per-beat half-slope].
+;; Fractions are decimal constants because plain MAL division truncates.
+(def! final-tempo
+  [[0 0 1 0]
+   [40 40 1 0.1]
+   [45 47.5 2 -0.0625]
+   [49 54.5 1.5 -0.13888888888888892]
+   [52 57.75 0.6666666666666666 -0.011111111111111108]
+   [55 59.65 0.6 -0.0375]
+   [58 61.1125 0.375 -0.03749999999999998]
+   [59 61.449999999999996 0.3 -0.009782608695652173]
+   [61 62.010869565217384 0.2608695652173913 -0.004830917874396136]
+   [65 62.97705314009661 0.2222222222222222 0.04914529914529915]
+   [78 74.17149758454106 1.5 0]])
+
+(def! beat-seconds
+  (fn* (beat segments)
+    (if (if (> (count segments) 1) (>= beat (first (nth segments 1))) false)
+      (beat-seconds beat (rest segments))
+      (let* [segment (first segments)
+             delta (- beat (nth segment 0))]
+        (+ (nth segment 1)
+           (* delta (+ (nth segment 2) (* delta (nth segment 3)))))))))
+
+(def! voices
+  [nil TrappedIvory TrappedBlue TrappedViolet TrappedBlack TrappedGreen
+   TrappedCopper TrappedPewter TrappedRed TrappedSand TrappedTaupe TrappedRust
+   TrappedTeal TrappedFoam])
+;; Capture only the section offset and tempo, leaving the score out of the
+;; callback's local environment while MAL evaluates each note.
+(def! section-player
+  (fn* (offset tempo)
+    (fn* (note)
+      (let* [number (nth note 0)
+             voice (if (= number 98) TrappedSmear
+                     (if (= number 99) TrappedSwirl (nth voices number)))
+             beat (nth note 1)
+             start (beat-seconds beat tempo)
+             end (beat-seconds (+ beat (nth note 2)) tempo)]
+        (apply csound/event
+          (concat (list "i" voice (+ offset start) (- end start))
+                  (rest (rest (rest note)))))))))
+(def! play-section
+  (fn* (offset tempo notes) (map (section-player offset tempo) notes)))
+
+;; Note rows retain p1, p2, p3, and the source's remaining score fields.
+;; The empty timing instrument (100) becomes each section's explicit length.
+
+;; Section 1
+(play-section 0 [[0 0 1 0]]
+  '[[1 0.0 24.12 0 11.057 200 0.001 17.8 0.99]
+   [1 1.0 21.76 0 11.049 240 0.001 10.2 0.99]
+   [1 3.6 17.13 0 11.082 390 0.001 11.3 0.99]
+   [1 6.2 15.02 0 11.075 460 0.001 10.5 0.99]
+   [1 8.4 13.85 0 11.069 680 0.001 13.8 0.99]
+   [99 22.0 7.5 5]
+   [2 22.0 4 0 9.029 600 0.6 23 10 0.52]
+   [2 22.13 4 0 9.01 600 0.5 20 6 0.66]
+   [1 26.5 5.6 0 12.019 500 4.0 5.8 0.98]
+   [1 26.51 6.1 0 12.004 550 5.0 5.5 0.98]
+   [1 26.52 5.4 0 12.026 600 5.2 5.6 0.98]
+   [1 26.55 5 0 12.031 660 4.5 5.7 0.98]
+   [99 31.3 0.7 22]
+   [4 31.3 1 0 13.045 2200 6000 7000 30 0.5]
+   [99 32.0 4 11]
+   [2 32.0 4 0 14.107 900 0.4 19 13 0.21]
+   [2 32.14 4 0 11.023 750 0.7 21 9 0.19]
+   [2 32.19 4 0 11.029 589 0.97 20 10 0.22]
+   [4 35.0 1 0 12.029 1000 4600 6500 33 0.6]
+   [99 36.0 10 7]
+   [3 36.0 7.6 0 13.087 800 0.8 57]
+   [1 39.31 8.1 0 10.024 519 3.0 3.1 0.002]
+   [1 39.32 8 0 10.031 520 5.1 3.7 0.001]
+   [1 39.35 7.9 0 10.042 557 3.4 3.5 0.003]
+   [1 39.37 7.86 0 10.050 547 4.2 3.3 0.004]
+   [99 46.0 7.3 2]
+   [5 46.0 0.9 0 4.09 3500 0.2 0.1 3 10 12 27]
+   [5 49.2 1.1 0 3.07 4500 0.1 1.0 5 3 16 30]
+   [99 53.3 9.6 5]
+   [6 53.3 8.5 0.81 3000 17 10 0.6 1.6]
+   [98 62.9 15.1]
+   [99 62.9 15.1 3]
+   [9 62.9 2.9 0.4 4.113 600 0.2 6.2 320]
+   [9 62.93 2.85 0.43 4.115 640 0.23 6.1 300]
+   [9 67.1 7.9 0.2 5.004 700 0.4 4.5 289]
+   [9 67.14 7.78 0.17 5.007 700 0.43 4.4 280]])
+
+;; Section 2
+(play-section 78 [[0 0 1 0]]
+  '[[98 0 48.5]
+   [99 0 4.5 1]
+   [9 0 5 0.4 10.01 1200 0.2 28 39]
+   [9 0 5 0.3 9.119 1200 0.4 29 37]
+   [3 0.5 6.5 0 12.067 600 0.6 47]
+   [99 4.5 2 7]
+   [6 4.5 4.3 17 6000 9000 100 0.4 0.9]
+   [99 6.5 9.9 0.7]
+   [7 6.5 3.2 9999 5.023 0.2 0.7 0.6 2 3 0.12]
+   [7 8 1.9 9800 5.039 0.01 0.9 1 3 2 0.23]
+   [7 9 3.8 9900 10.001 0.99 0.1 0.3 3 2 0.12]
+   [3 9.1 5.5 0 10.017 900 0.5 67]
+   [7 9.2 2.5 9890 5.052 0.1 1.0 0.7 2 3 0.23]
+   [8 11 4.6 4 20 8000 590 2 9.9 0.6]
+   [8 15.5 3.1 3 50 4000 129 8 2.6 0.3]
+   [8 16.2 4.3 2 10000 9000 200 12 17.9 1]
+   [99 16.4 10.3 0.3]
+   [7 16.4 3.5 8000 5.019 0.2 0.7 0.5 2 3 0.1]
+   [7 19.3 6.4 8000 5.041 0.01 0.9 1 3 2 0.1]
+   [9 20.2 4 0.4 9.021 1000 0.2 4 100]
+   [9 21 4.2 0.4 9.099 1100 0.4 4 167]
+   [9 21.1 8 0.4 9.043 1000 0.6 4 210]
+   [9 21.25 5 0.4 9.062 1200 0.9 5 200]
+   [99 26.7 5.3 11]
+   [9 26.7 1.9 0.5 4.114 3100 0.1 5.9 300]
+   [9 29.1 2.1 0.1 5.013 2900 0.2 4.2 390]
+   [99 32 6.2 0.28]
+   [9 32 9.1 0.34 5.051 2300 0.5 3.8 420]
+   [9 32.1 9.0 0.4 5.0517 2500 0.4 4 430]
+   [2 34.2 5 0 9.029 1900 0.3 23 10 0.42]
+   [2 34.23 5 0 9.01 2100 0.2 20 6 0.29]
+   [2 36 5 0 13.027 3500 0.5 27 9 0.38]
+   [2 36.05 5 0 12.119 3399 0.1 21 3 0.30]
+   [2 36.12 5 0 13.018 3709 0.4 17 12 0.33]
+   [99 38.2 10.8 2]
+   [2 38.2 7.3 0 8.062 5900 0.4 19 13 0.26]
+   [2 38.4 7 0 7.077 4730 0.6 26 21 0.23]
+   [4 38.9 3.1 0 10.001 2600 2000 3000 46 0.3]
+   [4 39.7 2.3 0 9.0119 1200 1000 2000 50 0.2]])
+
+;; Section 3
+(play-section 127 [[0 0 1 0]]
+  '[[98 0 42]
+   [99 0 42 0.0618]
+   [9 0 7 0.6 11.031 1100 0.2 30 40]
+   [9 0.1 7 0.2 11.042 1100 0.9 26 37]
+   [9 0.3 6.2 0.9 11.049 1105 0.1 32 29]
+   [9 0.6 5.8 0.4 11.021 1110 0.6 41 34]
+   [11 3.7 8 0.2 5.02 2200 0.2]
+   [13 7.0 4.5 0.4 11.064 1500 40.0 7]
+   [9 9.3 9 0.8 7.098 1300 0.3 33 27]
+   [9 9.8 7 0.2 7.087 1400 0.7 39 31]
+   [2 10.9 4 0.2 8.113 5000 0.9 45 20 1]
+   [11 12 5 0.2 4.101 3300 0.3]
+   [2 12.9 5 0.2 9.108 5900 0.4 59 14 0.6]
+   [8 15 4.7 2.5 8600 8900 900 13 11.1 0.7]
+   [11 17.9 7 0.4 4.091 3000 0.1]
+   [9 22 7 0.6 10.031 1000 0.2 30 40]
+   [9 22.1 7 0.2 10.042 1000 0.9 26 37]
+   [9 22.3 6.2 0.9 10.049 1005 0.1 32 29]
+   [9 22.6 5.8 0.4 10.021 1010 0.6 41 34]
+   [11 25.2 5.3 0.3 5.111 2500 0.2]
+   [11 26.9 5.1 0.2 4.093 2330 0.1]
+   [13 27.1 4 0.4 12.064 2000 40 7]
+   [13 28.9 4 0.4 11.117 2000 30.0 5]
+   [9 29.3 9 0.8 8.098 1000 0.3 33 27]
+   [9 30.8 7 0.2 8.087 1200 0.7 39 31]
+   [9 31.2 7.2 0.9 8.071 1400 0.9 29 40]
+   [2 32.9 5 0.9 8.113 5000 0.8 45 20 1]
+   [8 33.1 7 2 5000 6000 1000 17 15 0.3]
+   [2 33.3 6 0.9 7.097 5100 0.5 51 18 0.3]
+   [11 34 5 0.3 4.111 2000 0.5]
+   [8 34.5 6 2 3000 100 500 8.3 9.8 0.1]
+   [2 34.9 6 0.9 9.108 2900 0.4 59 14 0.4]
+   [2 35 5 0.9 8.042 2800 0.6 39 20 0.3]
+   [11 36.1 5 0.5 3.119 1200 0.4]
+   [11 36.8 7 0.2 5.118 1800 0.4]
+   [11 38 6 0.2 4.031 2000 0.2]
+   [11 39 4 0.3 6.003 1300 0.1]
+   [99 42 3.6 8.3]
+   [4 42 1 9.6 13.061 3000 8000 20 10 0.9]
+   [4 42 0.99 9.6 13.013 3110 6000 30 6 0.3]
+   [4 42 1.01 9.6 12.119 2999 10000 25 15 0.7]
+   [5 43 1.1 9.6 3.106 2500 0.4 1.0 8 3 17 34]
+   [5 43.1 1 9.6 4.034 2500 0.2 0.1 2 7 19 29]
+   [99 45.6 4.9 3.2]
+   [5 45.6 3 3.2 4.022 2300 0.3 1.0 11 4 20 37]
+   [5 46.1 2.4 3.2 3.049 2400 0.2 0.1 5 8 19 27]
+   [99 50.5 5.5 8.3]
+   [4 50.5 0.7 11 11.059 3000 7000 40 9 0.9]
+   [4 50.5 0.7 11 10.038 3000 10000 20 20 0.7]
+   [4 50.5 0.71 11 13.077 3000 9500 25 5 0.8]
+   [4 50.52 0.64 11 12.016 3000 8500 18 14 0.5]
+   [5 51 1.5 11 4.011 2000 0.1 1.0 3 11 13 28]
+   [5 51 1.5 11 3.106 2000 0.4 0.1 7 5 15 34]])
+
+;; Section 4
+(play-section 183 final-tempo
+  '[[99 0 1 2.8]
+   [4 0 1 6.8 12.013 3700 9000 40 17 0.5]
+   [4 0.01 1 6.8 12.061 3501 8500 30 20 0.3]
+   [4 0.02 1 6.8 11.119 3399 7780 32 22 0.8]
+   [4 0.03 1 6.8 12.042 3010 8600 41 27 0.45]
+   [99 1 3.4 9.8]
+   [12 1 3 6.8 5.06 1000 100 7000 16 0.2]
+   [12 1.03 2.9 6.8 5.02 1000 60 6000 30 0.2]
+   [99 4.4 3.6 4.8]
+   [12 4.4 2.6 6.8 11.09 2000 1000 200 5 0.1]
+   [99 8 2.1 7]
+   [4 8 0.9 11 10.013 3000 9000 40 17 0.9]
+   [4 8.1 0.9 11 10.061 3001 8500 30 20 0.8]
+   [4 8.2 0.9 11 10.119 2999 7780 32 22 0.7]
+   [99 10.1 1.1 21]
+   [12 10.1 0.6 11 11.02 1000 1500 300 4 0.2]
+   [99 11.2 6.8 2]
+   [10 11.2 6 0 4.092 3000 0.3 6.9 200]
+   [10 11.2 10 0 4.113 3000 0.1 7.2 278]
+   [12 13 1.6 0.3 10.01 3000 2000 500 5.2 0.2]
+   [10 13 1.6 0.4 9.012 3000 0.3 21 31]
+   [4 15 0.7 0.4 13.023 5000 9000 40 17 0.9]
+   [4 15 0.7 0.4 13.081 5001 8500 30 20 0.3]
+   [4 15 0.7 0.4 13.019 4999 7780 32 22 0.7]
+   [4 15 0.7 0.4 13.079 4550 9699 50 30 0.5]
+   [4 15.7 1 0.4 9.013 1101 9000 40 17 0.9]
+   [4 15.7 1 0.4 10.051 1051 8500 30 20 0.6]
+   [4 15.7 1 0.4 7.119 1111 7780 32 22 0.2]
+   [4 15.7 1 0.4 8.099 1100 10000 100 27 0.8]
+   [12 17 2 0.4 9.02 3000 3000 1000 4 0.3]
+   [99 18 3 9.3]
+   [10 18 5 0 11.09 900 0.4 23 33]
+   [10 18.1 5 0 11.08 900 0.4 20 40]
+   [10 18.3 5 0 11.073 900 0.4 30 27]
+   [10 18.6 5 0 11.068 900 0.4 33 33]
+   [10 19 10 0 11.001 500 0.8 8 200]
+   [10 20 9 0 11.022 500 0.8 9 300]
+   [10 20.4 8.6 0 11.091 500 0.8 5 223]
+   [99 21 56 0.15]
+   [10 21 18 0 11.115 500 0.8 6.4 311]
+   [10 21.6 17.4 0 12.041 500 0.8 7 276]
+   [10 21.9 2.9 0 5.002 2000 0.3 4.1 200]
+   [10 25.3 3.5 0 5.031 2300 0.5 3.6 160]
+   [10 30.9 3.9 0 5.017 2500 0.7 3 100]
+   [10 36.3 6.1 0 4.097 1770 0.8 4 200]
+   [10 42 34.09 0 4.0017 6000 0.19 4.1 310]
+   [8 45 26.9 0.79 190 500 11 1.9 2.7 0.1]
+   [8 49 22.9 0.80 10000 8000 300 11 12.6 0.2]
+   [8 52 19.1 0.85 7000 10000 16 4.1 4.8 0.3]
+   [8 55 16.9 0.91 500 190 10 2.9 1.3 0.2]
+   [8 58 13.9 0.98 40 9000 379 33 19 0.1]
+   [8 60 12.9 0.99 3600 11000 19 17 22 0.3]
+   [8 61 11.9 1.01 2000 3000 30 4 18.8 0.2]
+   [99 77 23 0.09]
+   [4 77 1.7 0.3 13.079 850 9699 50 30 0.8]
+   [10 77.1 2.14 0 13.03 600 0.5 60 26]
+   [10 77.6 2.3 0 13.02 800 0.6 62 24]
+   [10 78.3 9.9 0 5.004 900 0.2 4.1 160]
+   [10 78.7 9.8 0 5.001 800 0.3 1.4 220]
+   [2 80.4 9 0 7.077 930 0.8 26 21 0.23]
+   [2 80.7 8 0 8.077 830 0.7 24 19 0.13]
+   [4 81.9 1.9 0.7 11.079 950 7699 40 20 0.7]
+   [4 82 2.8 0.5 10.079 850 5699 60 40 0.5]
+   [10 82.11 5.3 0 3.053 1800 0.1 4.0 210]
+   [10 82.14 3.8 0 4.048 1100 0.2 71 33]
+   [10 82.32 3.1 0 5.049 1000 0.2 68 27]
+   [10 82.06 2.9 0 5.051 900 0.2 72 31]
+   [10 84.04 9.9 0 4.003 1800 0.1 4.1 160]
+   [10 84.06 9.8 0 4.002 1900 0.3 1.4 220]
+   [10 84.618 9.8 0 5.005 900 0.4 4.1 180]])
+
+(csound/event "e" 290.17149758454104 0)

@@ -18,9 +18,10 @@ just reader
 
 The Csound interop checks cover signature matching, rate selection, multiple
 outputs, typed arrays, function tables, and instrument scheduling. They render
-eleven instruments, check that each produces stereo audio without clipping,
-and measure array gains, envelope shape, delay onset, reverb tails, and numeric
-precision:
+fourteen audio regions, check stereo output without clipping, and measure
+array gains, envelope shape, delay onset, reverb tails, and numeric precision.
+The shared-channel check adds two sends, reads before clearing, and checks
+that the channel falls silent when its sender stops:
 
 ```sh
 just --set csound "$CSOUND" csound-interop

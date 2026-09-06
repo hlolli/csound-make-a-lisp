@@ -42,8 +42,8 @@ envelope, and stereo reverb:
 ./play examples/subtractive.mal
 ```
 
-[demo/xanadu.mal](demo/xanadu.mal) transcribes Joseph T. Kung's Xanadu (short
-version). See [demo/README.md](demo/README.md) for playback and render commands.
+The [demos](demo/README.md) transcribe Xanadu, Trapped in Convert, and the
+CsoundQt reconstruction of Stria. Each keeps the source instruments and score.
 
 ## Instruments
 
@@ -61,7 +61,8 @@ version). See [demo/README.md](demo/README.md) for playback and render commands.
 Parameter pairs supply names and numeric defaults. Parameters map to Csound
 fields `p4` onward; `p2` and `p3` are available as the note's start and duration.
 An event may omit trailing parameters to use their defaults. The instrument
-name must be a Csound identifier. Its body must end in an output statement.
+name must be a Csound identifier. Its body must be a Csound statement with no
+outputs, such as `outs`, `chnmix`, or a `csound/do` sequence.
 
 Use `csound/source` to inspect orchestra text without defining an instrument:
 
@@ -75,18 +76,42 @@ A graph node keeps its identity when reused. The renderer emits each shared
 node once per instrument, so both channels above use the same oscillator.
 Rendering another instrument starts a new cache.
 
+Use `csound/do` to keep several statements in the graph. Plain MAL `do`
+evaluates its forms and returns only the last graph node. For example, a
+reverb instrument can read a shared audio channel, output the wet signal,
+then clear the channel for the next control period:
+
+```clojure
+(def! audio-bus (csound/at-rate :a csound/chnget))
+(csound/definst Send [frequency 440]
+  (csound/chnmix (csound/oscil 0.02 frequency) "reverb-send"))
+(csound/definst Return []
+  (let* [wet (csound/reverb (audio-bus "reverb-send") 2)]
+    (csound/do
+      (csound/outs wet wet)
+      (csound/chnclear "reverb-send"))))
+```
+
+Define senders before receivers so Csound runs them in that order each block.
+`chnmix` adds audio to a named channel; `chnclear` accepts one or more channel
+names. `csound/do` accepts only statements with no outputs, may nest, and
+preserves their order. An empty `csound/do` defines a silent body. Shared nodes,
+including statements, still render once; use separate mix calls for two sends.
+
 ## Rates and signatures
 
-Opcode names live under `csound/`. The catalog has 36 entries:
+Opcode names live under `csound/`. The catalog has 54 entries:
 
 | Family | Opcodes | Output selection |
 | --- | --- | --- |
-| Math and conversion | `abs`, `sqrt`, `sin`, `cos`, `tanh`, `exp`, `ampdb`, `cpsoct`, `dbamp`, `cpsmidinn`, `cpspch`, `octpch` | Infer from the input; the last four accept init or control only |
-| Oscillators | `poscil`, `oscili`, `phasor`, `vco2`, `pluck` | Default to audio; the first three also offer control outputs |
-| Envelopes | `linseg`, `expseg`, `expon`, `adsr`, `linen` | Default to audio; control outputs available |
+| Math and conversion | `abs`, `sqrt`, `sin`, `cos`, `tanh`, `exp`, `ampdb`, `cpsoct`, `int`, `frac`, `dbamp`, `cpsmidinn`, `cpspch`, `octpch` | Infer from the input; the last four accept init or control only |
+| Oscillators | `poscil`, `oscil`, `oscili`, `phasor`, `vco2`, `pluck`, `buzz`, `gbuzz`, `foscil` | Default to audio; the first four also offer control outputs |
+| Noise | `rand`, `randh`, `randi` | Default to audio; control outputs available |
+| Envelopes | `line`, `linseg`, `expseg`, `expon`, `adsr`, `linen` | Default to audio; control outputs available |
 | Filters and smoothing | `tone`, `butterlp`, `butterhp`, `reson`, `dcblock2`, `portk` | Audio, except `portk` which returns control |
-| Effects and output | `delay`, `vdelay`, `reverbsc`, `pan2`, `outs` | Audio delays, stereo reverb, stereo or array panning, and an output statement |
-| Function-table lookup | `tablei` | Infer init, control, or audio from the index |
+| Effects and output | `delay`, `vdelay`, `reverb`, `reverbsc`, `comb`, `alpass`, `balance`, `pan2`, `outs` | Audio effects, stereo reverb, stereo or array panning, and an output statement |
+| Channels | `chnget`, `chnmix`, `chnclear` | Reads default to control; init, audio, and string reads available; mix and clear return statements |
+| Function-table lookup | `table`, `tablei` | Infer init, control, or audio from the index |
 | Array queries | `sumarray`, `lenarray` | Sum uses the array's numeric rate; length defaults to init with a control option |
 
 `csound/type` reports `:i`, `:k`, `:a`, or `:S` for a scalar, a vector of type
@@ -118,6 +143,13 @@ Csound's argument units: `delay` uses seconds, while
 [vdelay](https://csound.com/docs/manual/vdelay.html) uses milliseconds for both
 its current and maximum delay. `oscili` currently accepts a numeric table ID;
 omitting it selects Csound's default sine table.
+
+The classic `buzz`, `gbuzz`, and `foscil` entries accept control inputs for
+amplitude and modulation, with init table and phase options. Noise entries
+also accept audio amplitude, but their frequency inputs remain control rate.
+`comb` and `alpass` take a control decay time and an init loop time in seconds.
+The catalog exposes these signatures; it does not yet cover every Csound
+overload of these opcodes.
 
 Scalar outputs use typed function calls in the generated source. This supports
 math functions such as `sin` and preserves the selected output rate even when

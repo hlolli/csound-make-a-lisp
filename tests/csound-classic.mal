@@ -1,0 +1,110 @@
+;; This Source Code Form is subject to the terms of the Mozilla Public
+;; License, v. 2.0. If a copy of the MPL was not distributed with this
+;; file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+(def! check (fn* (label expected actual)
+  (if (= expected actual)
+    (println "PASS" label)
+    (throw (str label ": expected " (pr-str expected) ", got " (pr-str actual))))))
+(def! check-type (fn* (label expected value) (check label expected (csound/type value))))
+(def! signal (csound/oscil 0.02 440))
+(def! control ((csound/at-rate :k csound/oscil) 1 2))
+(def! audio-bus (csound/at-rate :a csound/chnget))
+
+(map (fn* (entry)
+       (let* [label (first entry) opcode (nth entry 1)]
+         (do
+           (check-type (str label " init") :i (opcode 0.5))
+           (check-type (str label " control") :k (opcode control))
+           (check-type (str label " audio") :a (opcode signal)))))
+  [["int" csound/int] ["frac" csound/frac]])
+(check-type "oscil audio" :a signal)
+(check-type "oscil control" :k control)
+(check-type "line audio" :a (csound/line 0 1 1))
+(check-type "line control" :k ((csound/at-rate :k csound/line) 0 1 1))
+(check-type "rand audio" :a (csound/rand 0.02))
+(check-type "rand audio amplitude" :a (csound/rand signal 0.2))
+(map (fn* (entry)
+       (let* [label (first entry) opcode (nth entry 1)]
+         (do
+           (check-type (str label " audio") :a (opcode 1 20 0.5))
+           (check-type (str label " control") :k ((csound/at-rate :k opcode) 1 20)))))
+  [["randh" csound/randh] ["randi" csound/randi]])
+(check-type "table init" :i (csound/table 0 1))
+(check-type "table control" :k (csound/table control 1 1))
+(check-type "table audio" :a (csound/table signal 1 1 0 1))
+(check-type "buzz" :a (csound/buzz 0.02 440 5 1))
+(check-type "gbuzz" :a (csound/gbuzz 0.02 440 5 1 0.5 2))
+(check-type "foscil" :a (csound/foscil 0.02 440 1 2 3))
+(check-type "balance" :a (csound/balance signal signal))
+(check-type "reverb" :a (csound/reverb signal 0.2))
+(check-type "comb" :a (csound/comb signal 0.2 0.01))
+(check-type "alpass" :a (csound/alpass signal 0.2 0.01))
+(check-type "chnget default control" :k (csound/chnget "test"))
+(check-type "chnget audio" :a (audio-bus "test"))
+(check-type "chnget init" :i ((csound/at-rate :i csound/chnget) "test"))
+(check-type "chnget string" :S ((csound/at-rate :S csound/chnget) "test"))
+(check-type "chnmix statement" nil (csound/chnmix signal "test"))
+(check-type "chnclear multiple channels" nil (csound/chnclear "test" "other"))
+(check-type "empty sequence" nil (csound/do))
+(check-type "nested sequence" nil
+  (csound/do (csound/do (csound/chnmix signal "test")) (csound/chnclear "test")))
+(check "sequence rejects scalar" "csound/do: expected Csound statements with no outputs"
+  (try* (csound/do 1) (catch* e e)))
+(check "sequence rejects audio node" "csound/do: expected Csound statements with no outputs"
+  (try* (csound/do signal) (catch* e e)))
+(check "clear needs a channel" "csound/chnclear: no matching signature for ()"
+  (try* (csound/chnclear) (catch* e e)))
+(check "mix needs audio" "csound/chnmix: no matching signature for (k, S)"
+  (try* (csound/chnmix control "test") (catch* e e)))
+(check "bus name is a string" "csound/chnget: no matching signature for (i)"
+  (try* (audio-bus 1) (catch* e e)))
+(check "noise seed is init" "csound/randh: no matching signature for (i, i, k)"
+  (try* (csound/randh 1 20 control) (catch* e e)))
+(check "comb loop time is init" "csound/comb: no matching signature for (a, i, k)"
+  (try* (csound/comb signal 0.2 control) (catch* e e)))
+
+(csound/event "f" 1 0 8192 10 1)
+(csound/event "f" 2 0 8192 11 1)
+
+;; Two separate mix calls must add the same oscillator twice. The next
+;; instrument reads before clearing; both the sender and reader reuse nodes.
+(csound/definst ClassicSend []
+  (let* [tone (csound/oscil 0.02 440 1)]
+    (csound/do
+      (csound/chnmix tone "classic-send")
+      (csound/do (csound/chnmix tone "classic-send"))
+      (csound/outs tone tone))))
+(csound/definst ClassicReceive []
+  (let* [bus (audio-bus "classic-send")]
+    (csound/do
+      (csound/outs bus bus)
+      (csound/chnclear "classic-send"))))
+(csound/definst ClassicSynthesis []
+  (let* [ramp (csound/line 0.5 p3 1)
+         random ((csound/at-rate :k csound/randi) 0.2 20 0.2)
+         steps ((csound/at-rate :k csound/randh) 2 30 0.3)
+         envelope ((csound/at-rate :k csound/linen) 0.01 0.01 p3 0.01)
+         phase ((csound/at-rate :k csound/phasor) 3)
+         index (csound/table phase 1 1)
+         gain (csound/frac (+ 1 ramp))
+         harmonic (+ 3 (csound/int steps))
+         buzz (csound/buzz envelope (+ 440 steps) harmonic 1)
+         gbuzz (csound/gbuzz envelope 220 6 1 (+ 0.5 random) 2)
+         fm (csound/foscil envelope 110 1 2 (+ 2 index) 1)
+         noise (csound/rand 0.02 0.4)
+         balanced (csound/balance noise buzz)]
+    (csound/outs (+ buzz (* gain balanced)) (+ gbuzz fm))))
+(csound/definst ClassicEffects []
+  (let* [envelope ((csound/at-rate :k csound/linseg) 0.02 0.01 0.02 0.01 0)
+         impulse (csound/oscil envelope 440 1)
+         allpass (csound/alpass impulse 0.2 0.01)
+         comb (csound/comb allpass 0.2 0.02)]
+    (csound/outs comb (csound/reverb impulse 0.4))))
+
+(csound/event "i" ClassicSend 0 0.1)
+(csound/event "i" ClassicReceive 0 0.2)
+(csound/event "i" ClassicSynthesis 0.2 0.2)
+(csound/event "i" ClassicEffects 0.4 0.6)
+(csound/event "e" 1.01 0)
+(println "CSOUND-CLASSIC-PASS")

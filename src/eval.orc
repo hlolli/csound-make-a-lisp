@@ -984,6 +984,8 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
       result init MalCsoundInstrumentSource(MalAt(args, 0), MalAt(args, 1), MalAt(args, 2))
     endif
 
+  elseif (strcmp(fn.string, "csound/do") == 0) ithen
+    result init MalCsoundSequence(args)
   elseif (strcmp(fn.string, "csound/event") == 0) ithen
     result init MalCsoundEvent(args)
 
@@ -2044,6 +2046,7 @@ opcode MalMkCsoundEnv():MalEnv
   env init MalEnvSet(env, "csound/compile-inst", \
     MalMkBuiltin("csound/compile-inst"))
   env init MalEnvSet(env, "csound/event", MalMkBuiltin("csound/event"))
+  env init MalEnvSet(env, "csound/do", MalMkBuiltin("csound/do"))
   env init MalEnvSet(env, "csound/eval", MalMkBuiltin("csound/eval"))
   env init MalEnvSet(env, "csound/at-rate", MalMkBuiltin("csound/at-rate"))
   env init MalEnvSet(env, "csound/array", MalMkBuiltin("csound/array"))

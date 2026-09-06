@@ -79,6 +79,21 @@ opcode MalMkCsoundParam(index:i):MalValue
   xout MalMkCsoundNode(sprintf("p%d", index), $MAL_CSOUND_PARAM_NODE, "i", args)
 endop
 
+;; Keep statement order in the graph; MAL's do returns only its last value.
+opcode MalCsoundSequence(args:MalValue):MalValue
+  result:MalValue init MalMkCsoundNode("do", $MAL_CSOUND_SEQUENCE_NODE, "", args)
+  if (args.length > 0) ithen
+    for index in [0 ... args.length - 1] do
+      child:MalValue init MalAt(args, index)
+      if (child.type != $MAL_CSOUND_NODE_TYPE || strlen(MalCsoundTypes(child)) != 0) ithen
+        result init MalMkError("csound/do: expected Csound statements with no outputs")
+        break
+      endif
+    od
+  endif
+  xout result
+endop
+
 opcode MalIsCsoundNode(value:MalValue):i
   valueType:i = value.type
   result:i = valueType == $MAL_CSOUND_NODE_TYPE

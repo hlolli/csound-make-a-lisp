@@ -50,6 +50,11 @@ FIXTURES = (
         ("reverb", 0.70, 0.99),
         ("tables and precision", 1.01, 1.09),
     )),
+    RenderFixture("classic", 1.01, (
+        ("ordered bus sends", 0.01, 0.09),
+        ("classic synthesis", 0.21, 0.39),
+        ("classic reverb tail", 0.44, 0.50),
+    )),
 )
 
 
@@ -142,6 +147,18 @@ def check_catalog_audio(rate, channels):
             raise RuntimeError("catalog: table lookup or numeric precision changed the gain")
 
 
+def check_classic_audio(rate, channels):
+    for channel in channels:
+        # Direct output is 0.02; two bus sends add 0.04. Missing statements,
+        # duplicate oscillators, or clearing before the read changes this sum.
+        level = rms(section(channel, rate, 0.01, 0.09)) / 32768
+        if not 0.041 < level < 0.044:
+            raise RuntimeError(f"classic: bus sum has the wrong level {level}")
+        # A missing per-block clear accumulates old samples or leaves a tail.
+        if max(abs(sample) for sample in section(channel, rate, 0.11, 0.19)) > 1:
+            raise RuntimeError("classic: bus did not clear after the sender ended")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--csound", default=os.environ.get("CSOUND", "csound"))
@@ -164,6 +181,8 @@ def main():
                 check_regions(fixture, rate, channels)
                 if fixture.name == "catalog":
                     check_catalog_audio(rate, channels)
+                elif fixture.name == "classic":
+                    check_classic_audio(rate, channels)
                 instruments += len(fixture.regions)
     except (RuntimeError, OSError, wave.Error) as error:
         print(f"FAIL: {error}", file=sys.stderr)

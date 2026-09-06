@@ -19,7 +19,7 @@ opcode MalCsoundUnaryOpcode(name:S, rates:S):MalValue
 endop
 
 opcode MalCsoundInstallMathOpcodes(env:MalEnv):MalEnv
-  names:S[] fillarray "abs", "sqrt", "sin", "cos", "tanh", "exp", "ampdb", "cpsoct"
+  names:S[] fillarray "abs", "sqrt", "sin", "cos", "tanh", "exp", "ampdb", "cpsoct", "int", "frac"
   for index in [0 ... lenarray(names) - 1] do
     env init MalEnvSet(env, sprintf("csound/%s", names[index]), \
       MalCsoundUnaryOpcode(names[index], "i,k,a"))
@@ -47,6 +47,7 @@ opcode MalCsoundTableOscillator(name:S):MalValue
 endop
 
 opcode MalCsoundInstallOscillatorOpcodes(env:MalEnv):MalEnv
+  env init MalEnvSet(env, "csound/oscil", MalCsoundTableOscillator("oscil"))
   env init MalEnvSet(env, "csound/poscil", MalCsoundTableOscillator("poscil"))
   env init MalEnvSet(env, "csound/oscili", MalCsoundTableOscillator("oscili"))
 
@@ -63,6 +64,17 @@ opcode MalCsoundInstallOscillatorOpcodes(env:MalEnv):MalEnv
   fn init MalMkCsoundOpcode("pluck", "a")
   fn init MalAppendValue(fn, MalCsoundSignature("a", "k,k,i,i,i,i,i", 5, "", 0))
   env init MalEnvSet(env, "csound/pluck", fn)
+
+  ;; Classic harmonic and FM voices use control-rate modulation inputs.
+  fn init MalMkCsoundOpcode("buzz", "a")
+  fn init MalAppendValue(fn, MalCsoundSignature("a", "k,k,k,i,i", 4, "", 0))
+  env init MalEnvSet(env, "csound/buzz", fn)
+  fn init MalMkCsoundOpcode("gbuzz", "a")
+  fn init MalAppendValue(fn, MalCsoundSignature("a", "k,k,k,k,k,i,i", 6, "", 0))
+  env init MalEnvSet(env, "csound/gbuzz", fn)
+  fn init MalMkCsoundOpcode("foscil", "a")
+  fn init MalAppendValue(fn, MalCsoundSignature("a", "k,k,k,k,k,i,i", 5, "", 0))
+  env init MalEnvSet(env, "csound/foscil", fn)
   xout env
 endop
 
@@ -75,10 +87,13 @@ opcode MalCsoundInstallEnvelopeOpcodes(env:MalEnv):MalEnv
     env init MalEnvSet(env, sprintf("csound/%s", names[index]), fn)
   od
 
-  fn init MalMkCsoundOpcode("expon", "a")
-  fn init MalAppendValue(fn, MalCsoundSignature("a", "i,i,i", 3, "", 0))
-  fn init MalAppendValue(fn, MalCsoundSignature("k", "i,i,i", 3, "", 0))
-  env init MalEnvSet(env, "csound/expon", fn)
+  names init fillarray("line", "expon")
+  for index in [0 ... lenarray(names) - 1] do
+    fn init MalMkCsoundOpcode(names[index], "a")
+    fn init MalAppendValue(fn, MalCsoundSignature("a", "i,i,i", 3, "", 0))
+    fn init MalAppendValue(fn, MalCsoundSignature("k", "i,i,i", 3, "", 0))
+    env init MalEnvSet(env, sprintf("csound/%s", names[index]), fn)
+  od
 
   fn init MalMkCsoundOpcode("adsr", "a")
   fn init MalAppendValue(fn, MalCsoundSignature("a", "i,i,i,i,i", 4, "", 0))
@@ -147,17 +162,34 @@ opcode MalCsoundInstallEffectOpcodes(env:MalEnv):MalEnv
   fn init MalMkCsoundOpcode("outs", "")
   fn init MalAppendValue(fn, MalCsoundSignature("", "a,a", 2, "", 0))
   env init MalEnvSet(env, "csound/outs", fn)
+
+  fn init MalMkCsoundOpcode("balance", "a")
+  fn init MalAppendValue(fn, MalCsoundSignature("a", "a,a,i,i", 2, "", 0))
+  env init MalEnvSet(env, "csound/balance", fn)
+  fn init MalMkCsoundOpcode("reverb", "a")
+  fn init MalAppendValue(fn, MalCsoundSignature("a", "a,k,i", 2, "", 0))
+  env init MalEnvSet(env, "csound/reverb", fn)
+
+  names:S[] fillarray "comb", "alpass"
+  for index in [0 ... lenarray(names) - 1] do
+    fn init MalMkCsoundOpcode(names[index], "a")
+    fn init MalAppendValue(fn, MalCsoundSignature("a", "a,k,i,i,i", 3, "", 0))
+    env init MalEnvSet(env, sprintf("csound/%s", names[index]), fn)
+  od
   xout env
 endop
 
 opcode MalCsoundInstallTableOpcodes(env:MalEnv):MalEnv
-  fn:MalValue init MalMkCsoundOpcode("tablei", "")
+  names:S[] fillarray "table", "tablei"
   rates:S[] fillarray "i", "k", "a"
-  for index in [0 ... lenarray(rates) - 1] do
-    inputs:S init sprintf("%s,i,i,i,i", rates[index])
-    fn init MalAppendValue(fn, MalCsoundSignature(rates[index], inputs, 2, "", 0))
+  for nameIndex in [0 ... lenarray(names) - 1] do
+    fn:MalValue init MalMkCsoundOpcode(names[nameIndex], "")
+    for index in [0 ... lenarray(rates) - 1] do
+      inputs:S init sprintf("%s,i,i,i,i", rates[index])
+      fn init MalAppendValue(fn, MalCsoundSignature(rates[index], inputs, 2, "", 0))
+    od
+    env init MalEnvSet(env, sprintf("csound/%s", names[nameIndex]), fn)
   od
-  env init MalEnvSet(env, "csound/tablei", fn)
   xout env
 endop
 
@@ -185,6 +217,38 @@ opcode MalCsoundInstallArrayOpcodes(env:MalEnv):MalEnv
   xout env
 endop
 
+;; Noise accepts control frequency and control or audio amplitude.
+opcode MalCsoundInstallNoiseOpcodes(env:MalEnv):MalEnv
+  names:S[] fillarray "rand", "randh", "randi"
+  for index in [0 ... lenarray(names) - 1] do
+    fn:MalValue init MalMkCsoundOpcode(names[index], "a")
+    tail:S init index == 0 ? ",i,i,i" : ",k,i,i,i"
+    required:i = index == 0 ? 1 : 2
+    fn init MalAppendValue(fn, MalCsoundSignature("a", strcat("k", tail), required, "", 0))
+    fn init MalAppendValue(fn, MalCsoundSignature("a", strcat("a", tail), required, "", 0))
+    fn init MalAppendValue(fn, MalCsoundSignature("k", strcat("k", tail), required, "", 0))
+    env init MalEnvSet(env, sprintf("csound/%s", names[index]), fn)
+  od
+
+  xout env
+endop
+
+opcode MalCsoundInstallChannelOpcodes(env:MalEnv):MalEnv
+  fn:MalValue init MalMkCsoundOpcode("chnget", "k")
+  rates:S[] fillarray "i", "k", "a", "S"
+  for index in [0 ... lenarray(rates) - 1] do
+    fn init MalAppendValue(fn, MalCsoundSignature(rates[index], "S", 1, "", 0))
+  od
+  env init MalEnvSet(env, "csound/chnget", fn)
+  fn init MalMkCsoundOpcode("chnmix", "")
+  fn init MalAppendValue(fn, MalCsoundSignature("", "a,S", 2, "", 0))
+  env init MalEnvSet(env, "csound/chnmix", fn)
+  fn init MalMkCsoundOpcode("chnclear", "")
+  fn init MalAppendValue(fn, MalCsoundSignature("", "", 0, "S", 1))
+  env init MalEnvSet(env, "csound/chnclear", fn)
+  xout env
+endop
+
 opcode MalCsoundInstallOpcodes(env:MalEnv):MalEnv
   env init MalCsoundInstallMathOpcodes(env)
   env init MalCsoundInstallOscillatorOpcodes(env)
@@ -193,5 +257,7 @@ opcode MalCsoundInstallOpcodes(env:MalEnv):MalEnv
   env init MalCsoundInstallEffectOpcodes(env)
   env init MalCsoundInstallTableOpcodes(env)
   env init MalCsoundInstallArrayOpcodes(env)
+  env init MalCsoundInstallNoiseOpcodes(env)
+  env init MalCsoundInstallChannelOpcodes(env)
   xout env
 endop

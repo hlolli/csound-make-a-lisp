@@ -35,6 +35,7 @@
 #define MAL_CSOUND_ARRAY_NODE #4#
 #define MAL_CSOUND_PROJECTION_NODE #5#
 #define MAL_CSOUND_INDEX_NODE #6#
+#define MAL_CSOUND_SEQUENCE_NODE #7#
 
 // input inbox
 #define MAL_INPUT_EOF #-1#

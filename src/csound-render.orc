@@ -99,6 +99,13 @@ opcode MalCsoundRenderValue(value:MalValue):MalCsoundRender
           od
         endif
         result.expression init variable
+      elseif (value.number == $MAL_CSOUND_SEQUENCE_NODE) ithen
+        if (value.length > 2) ithen
+          for index in [2 ... value.length - 1] do
+            child:MalCsoundRender init MalCsoundRenderValue(MalAt(value, index))
+            result init MalCsoundAppendRender(result, child)
+          od
+        endif
       elseif (value.number == $MAL_CSOUND_CALL_NODE) ithen
         arguments:S init ""
         if (value.length > 2) ithen
