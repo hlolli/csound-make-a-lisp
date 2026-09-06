@@ -1,0 +1,157 @@
+;; This Source Code Form is subject to the terms of the Mozilla Public
+;; License, v. 2.0. If a copy of the MPL was not distributed with this
+;; file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+(def! check (fn* (label expected actual)
+  (if (= expected actual)
+    (println "PASS" label)
+    (throw (str label ": expected " (pr-str expected) ", got " (pr-str actual))))))
+(def! check-type (fn* (label expected value) (check label expected (csound/type value))))
+(def! control ((csound/at-rate :k csound/oscili) 1 2))
+(def! signal (csound/oscili 0.02 440))
+
+;; Shared unary signatures must infer each input rate independently.
+(map (fn* (entry)
+       (let* [label (first entry) opcode (nth entry 1)]
+         (do
+           (check-type (str label " init") :i (opcode 1))
+           (check-type (str label " control") :k (opcode control))
+           (check-type (str label " audio") :a (opcode signal)))))
+  [["abs" csound/abs] ["sqrt" csound/sqrt] ["sin" csound/sin]
+   ["cos" csound/cos] ["tanh" csound/tanh] ["ampdb" csound/ampdb]])
+(check-type "dbamp init" :i (csound/dbamp 0.02))
+(check-type "dbamp control" :k (csound/dbamp control))
+(check "dbamp rejects audio" "csound/dbamp: no matching signature for (a)"
+  (try* (csound/dbamp signal) (catch* e e)))
+
+(check-type "oscili default" :a signal)
+(check-type "oscili control" :k control)
+(check-type "oscili audio inputs" :a (csound/oscili signal signal))
+(check-type "oscili optional inputs" :a (csound/oscili 0.02 440 -1 0.25))
+(check "oscili phase is init" "csound/oscili: no matching signature for (i, i, i, k)"
+  (try* (csound/oscili 0.02 440 -1 control) (catch* e e)))
+(check-type "phasor default" :a (csound/phasor 440))
+(check-type "phasor audio frequency" :a (csound/phasor signal 0.25))
+(check-type "phasor control" :k ((csound/at-rate :k csound/phasor) 2))
+(check-type "vco2 default" :a (csound/vco2 0.02 440))
+(check-type "vco2 control options" :a (csound/vco2 0.02 440 18 control control 0.5))
+(check "vco2 mode is init" "csound/vco2: no matching signature for (i, i, k)"
+  (try* (csound/vco2 0.02 440 control) (catch* e e)))
+
+(check-type "expseg default" :a (csound/expseg 0.01 0.02 1 0.08 0.01))
+(check-type "expseg control" :k ((csound/at-rate :k csound/expseg) 0.01 0.1 1))
+(check "expseg requires pairs" "csound/expseg: no matching signature for (i, i, i, i)"
+  (try* (csound/expseg 0.01 0.02 1 0.08) (catch* e e)))
+(check-type "adsr default" :a (csound/adsr 0.01 0.02 0.5 0.01))
+(check-type "adsr control" :k ((csound/at-rate :k csound/adsr) 0.01 0.02 0.5 0.01 0))
+(check "adsr durations are init" "csound/adsr: no matching signature for (i, i, i, k)"
+  (try* (csound/adsr 0.01 0.02 0.5 control) (catch* e e)))
+(check-type "linen control input" :a (csound/linen control 0.01 0.1 0.01))
+(check-type "linen audio input" :a (csound/linen signal 0.01 0.1 0.01))
+(check-type "linen control output" :k ((csound/at-rate :k csound/linen) 1 0.01 0.1 0.01))
+(check "linen needs duration" "csound/linen: no matching signature for (i, i, i)"
+  (try* (csound/linen 1 0.01 0.1) (catch* e e)))
+
+(map (fn* (entry)
+       (let* [label (first entry) opcode (nth entry 1)]
+         (do
+           (check-type (str label " control cutoff") :a (opcode signal control))
+           (check-type (str label " audio cutoff") :a (opcode signal signal 0)))))
+  [["butterlp" csound/butterlp] ["butterhp" csound/butterhp]])
+(check-type "reson control inputs" :a (csound/reson signal 440 200))
+(check-type "reson audio inputs" :a (csound/reson signal signal signal 1 0))
+(check-type "dcblock2 default" :a (csound/dcblock2 signal))
+(check-type "dcblock2 optional inputs" :a (csound/dcblock2 signal 128 0))
+(check-type "portk default" :k (csound/portk 440 0.01))
+(check-type "portk optional input" :k (csound/portk control control 440))
+(check "portk rejects audio" "csound/portk: no matching signature for (a, i)"
+  (try* (csound/portk signal 0.01) (catch* e e)))
+
+(check-type "delay" :a (csound/delay signal 0.02 0))
+(check "delay time is init" "csound/delay: no matching signature for (a, k)"
+  (try* (csound/delay signal control) (catch* e e)))
+(check-type "vdelay control time" :a (csound/vdelay signal control 100))
+(check-type "vdelay audio time" :a (csound/vdelay signal signal 100 0))
+(check "vdelay maximum is init" "csound/vdelay: no matching signature for (a, i, k)"
+  (try* (csound/vdelay signal 20 control) (catch* e e)))
+(check-type "reverb stereo" [:a :a] (csound/reverbsc signal signal 0.7 10000))
+(check-type "reverb tuple input" [:a :a]
+  (csound/reverbsc (csound/pan2 signal 0.5) 0.7 10000 44100 0 0))
+(check "reverb feedback is control" "csound/reverbsc: no matching signature for (a, a, a, i)"
+  (try* (csound/reverbsc signal signal signal 10000) (catch* e e)))
+
+(def! init-array (csound/array :i [220 220]))
+(def! control-array (csound/array :k [control 2]))
+(def! audio-array (csound/array :a [signal signal]))
+(def! string-array (csound/array :S ["left" "right"]))
+(check-type "sumarray init" :i (csound/sumarray init-array))
+(check-type "sumarray control" :k (csound/sumarray control-array))
+(check-type "sumarray audio" :a (csound/sumarray audio-array))
+(check "sumarray rejects strings" "csound/sumarray: no matching signature for (S[])"
+  (try* (csound/sumarray string-array) (catch* e e)))
+(check "sumarray requires typed array" "csound/sumarray: no matching signature for (invalid)"
+  (try* (csound/sumarray [1 2]) (catch* e e)))
+(map (fn* (entry)
+       (let* [label (first entry) array (nth entry 1)]
+         (do
+           (check-type (str label " length init") :i (csound/lenarray array))
+           (check-type (str label " length control") :k
+             ((csound/at-rate :k csound/lenarray) array 1)))))
+  [["init" init-array] ["control" control-array]
+   ["audio" audio-array] ["string" string-array]])
+(check "lenarray dimension is init" "csound/lenarray: no matching signature for (i[], k)"
+  (try* (csound/lenarray init-array control) (catch* e e)))
+
+;; Each instrument occupies its own interval in the rendered WAV. The Python
+;; check measures these intervals, including the delay onset and reverb tail.
+(csound/definst CatalogOscillators []
+  (csound/outs
+    (csound/oscili 0.02 (csound/portk 440 0.01 440) -1 0.25)
+    (csound/vco2 0.02 220)))
+
+(csound/definst CatalogArrays []
+  (let* [frequency (/ (csound/sumarray init-array) (csound/lenarray init-array))
+         gain (/ 0.02 ((csound/at-rate :k csound/lenarray) string-array))
+         left (csound/oscili gain frequency)
+         right (csound/oscili gain (+ 220 (csound/sumarray control-array)))]
+    (csound/outs (csound/sumarray (csound/array :a [left left])) right)))
+
+(csound/definst CatalogEnvelopes []
+  (csound/outs
+    (csound/linen (csound/oscili 0.04 440) 0.02 p3 0.02)
+    (* (csound/oscili 0.04 440)
+       (* (csound/adsr 0.02 0.02 0.5 0.02)
+          ((csound/at-rate :k csound/expseg) 0.2 0.02 1 0.08 0.2)))))
+
+(csound/definst CatalogFilters []
+  (let* [saw (csound/vco2 0.02 440)]
+    (csound/outs
+      (csound/dcblock2 (csound/butterlp saw 3000) 128)
+      (csound/reson (csound/butterhp saw 100) 440 300 1))))
+
+(csound/definst CatalogMath []
+  (let* [phase (* (csound/phasor 440) 6.283185307179586)
+         amplitude (* (csound/ampdb (csound/dbamp 0.02))
+                      (csound/sqrt (csound/abs -1)))]
+    (csound/outs (* amplitude (csound/tanh (csound/sin phase)))
+                 (* amplitude (csound/cos phase)))))
+
+(csound/definst CatalogDelay []
+  (let* [tone (csound/oscili 0.02 440)]
+    (csound/outs (csound/delay tone 0.02)
+                 (csound/vdelay tone 20 100))))
+
+(csound/definst CatalogReverb []
+  (let* [tone (* (csound/oscili 0.2 440)
+                (csound/linseg 0 0.005 1 0.03 1 0.005 0))]
+    (csound/outs (csound/reverbsc tone tone 0.7 10000 44100 0 0))))
+
+(csound/event "i" CatalogOscillators 0 0.1)
+(csound/event "i" CatalogArrays 0.1 0.1)
+(csound/event "i" CatalogEnvelopes 0.2 0.1)
+(csound/event "i" CatalogFilters 0.3 0.1)
+(csound/event "i" CatalogMath 0.4 0.1)
+(csound/event "i" CatalogDelay 0.5 0.1)
+(csound/event "i" CatalogReverb 0.6 0.4)
+(csound/event "e" 1.01 0)
+(println "CSOUND-CATALOG-PASS")

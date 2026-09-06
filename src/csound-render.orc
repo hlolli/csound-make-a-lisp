@@ -127,7 +127,18 @@ opcode MalCsoundRenderValue(value:MalValue):MalCsoundRender
           od
           declarations strcat declarations, " "
         endif
-        statement:S init sprintf("  %s%s %s\n", declarations, value.string, arguments)
+        ;; Scalar math functions need expression syntax. The explicit type
+        ;; keeps the output signature selected by MAL when inputs can promote.
+        scalarType:S init ""
+        if (lenarray(types) == 1) ithen
+          scalarType init types[0]
+        endif
+        if (strlen(scalarType) == 1) ithen
+          statement:S init sprintf("  %s = %s:%s(%s)\n", \
+            expressions, value.string, scalarType, arguments)
+        else
+          statement init sprintf("  %s%s %s\n", declarations, value.string, arguments)
+        endif
         result.statements strcat result.statements, statement
         result.expression init expressions
       else
