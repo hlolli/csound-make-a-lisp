@@ -19,6 +19,9 @@ just reader
 `just harness-threading` checks the seven threading macros, argument order,
 lexical scope, skipped forms, and the order and number of evaluations.
 
+`just core-helpers` checks collection operations, function composition,
+nested updates, conditional bindings, and early return from reductions.
+
 The Csound interop checks cover signature matching, rate selection, multiple
 outputs, typed arrays, function tables, and instrument scheduling. They render
 fourteen audio regions, check stereo output without clipping, and measure

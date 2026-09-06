@@ -100,6 +100,9 @@ including statements, still render once; use separate mix calls for two sends.
 
 ## Threading macros
 
+Use the [core helpers](CORE.md) to compose functions, process collections,
+and update nested score data.
+
 MAL includes Clojure's seven [threading macros](https://clojure.org/guides/threading_macros):
 
 | Macro | Behavior |

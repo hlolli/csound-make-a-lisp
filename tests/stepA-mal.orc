@@ -156,8 +156,7 @@ instr TEST
     "meta: expected 1 arguments, got 0", env)
   env = ASSERT_REP_ENV("(with-meta [])", \
     "with-meta: expected 2 arguments, got 1", env)
-  env = ASSERT_REP_ENV("(seq {})", \
-    "seq: expected list, vector, string, or nil", env)
+  env = ASSERT_REP_ENV("(seq {})", "nil", env)
   env = ASSERT_REP_ENV("(conj [])", \
     "conj: expected at least 2 arguments, got 1", env)
   env = ASSERT_REP_ENV("(conj {} 1)", \

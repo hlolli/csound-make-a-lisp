@@ -6,6 +6,7 @@ declare EVAL_ENV(result:MalValue, nextEnv:MalEnv):(MalValue, MalEnv)
 declare MalEquals(left:MalValue, right:MalValue):(i)
 declare MalApply(fn:MalValue, args:MalValue):(MalValue)
 declare MalQuasiquote(ast:MalValue):(MalValue)
+declare MalEvalSourceEnv(source:S, env:MalEnv):(MalValue, MalEnv)
 
 opcode MalApplyBuiltinOperator(fn:MalValue, args:MalValue):MalValue
   result:MalValue init MalMkValue($MAL_NUMBER_TYPE)
@@ -314,6 +315,20 @@ opcode MalSeq(value:MalValue):MalValue
         result init MalCopySequenceAs(value, $MAL_LIST_TYPE)
       endif
 
+    case $MAL_HASH_MAP_TYPE
+      pairCount:i = int(value.length / 2)
+      if (pairCount > 0) ithen
+        entries:MalValue[] init pairCount
+        for index in [0 ... pairCount - 1] do
+          entry:MalValue init MalMkList2(MalAt(value, index * 2), MalAt(value, index * 2 + 1))
+          entry.type = $MAL_VECTOR_TYPE
+          entries[index] init entry
+        od
+        result init MalMkValue($MAL_LIST_TYPE)
+        result.list init entries
+        result.length = pairCount
+      endif
+
     case $MAL_STRING_TYPE
       characterCount:i = strlen(value.string)
 
@@ -331,7 +346,7 @@ opcode MalSeq(value:MalValue):MalValue
       endif
 
     default
-      result init MalMkError("seq: expected list, vector, string, or nil")
+      result init MalMkError("seq: expected list, vector, map, string, or nil")
   endsw
 
   xout result
@@ -470,11 +485,16 @@ opcode MalEquals(left:MalValue, right:MalValue):i
 
       case $MAL_ATOM_TYPE
         result = left.number == right.number
+
+      case $MAL_REDUCED_TYPE
+        result = left.number == right.number
     endsw
   endif
 
   xout result
 endop
+
+#include "src/core.orc"
 
 opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
   result:MalValue init MalMkValue($MAL_NIL_TYPE)
@@ -1074,8 +1094,10 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
     else
       atom:MalValue init MalAt(args, 0)
 
-      if (atom.type != $MAL_ATOM_TYPE) ithen
-        result init MalMkError("deref: expected atom argument")
+      if (atom.type == $MAL_REDUCED_TYPE) ithen
+        result init MalAt(atom, 0)
+      elseif (atom.type != $MAL_ATOM_TYPE) ithen
+        result init MalMkError("deref: expected atom or reduced value")
       else
         result init MalAtomValue(atom)
       endif
@@ -1158,7 +1180,7 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
     result init MalMkValue($MAL_NIL_TYPE)
 
   else
-    result init MalMkError(sprintf("unknown builtin '%s'", fn.string))
+    result init MalApplyCoreBuiltin(fn, args)
   endif
 
   xout result
@@ -2062,6 +2084,7 @@ opcode MalMkStepAEnv():MalEnv
     prints "host language bootstrap failed: %s\n", result.string
   endif
 
+  env init MalInstallCoreHelpers(env)
   env init MalInstallThreadingMacros(env)
   xout env
 endop

@@ -27,6 +27,7 @@
 #define MAL_ATOM_TYPE #21#
 #define MAL_CSOUND_INSTRUMENT_TYPE #22#
 #define MAL_CSOUND_NODE_TYPE #23#
+#define MAL_REDUCED_TYPE #24#
 
 // Csound graph node kinds
 #define MAL_CSOUND_PARAM_NODE #1#
