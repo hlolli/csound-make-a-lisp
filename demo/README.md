@@ -1,7 +1,8 @@
 # Demos
 
-Use the Csound build described in [INTEROP.md](../INTEROP.md), with `CSOUND`
-and `OPCODE7DIR64` set to that build. Run commands from the repository root.
+Link the Csound build described in [INTEROP.md](../INTEROP.md) as
+`.csound-build` once. The launchers then select the executable and its opcode
+modules. Run commands from the repository root.
 
 ## Xanadu
 
@@ -23,10 +24,11 @@ The host uses `0dbfs = 1`, so the gains scale the original amplitudes by
 voice keeps the original equations and table lookup.
 
 The usual player uses 44.1 kHz and 32 samples per control period. To render
-with the source CSD's 48 kHz and 128 samples per control period:
+with the source CSD's 48 kHz and 128 samples per control period using that build:
 
 ```sh
-"$CSOUND" -d -m0 -W -f -o /tmp/xanadu.wav \
+env OPCODE7DIR64="$PWD/.csound-build" ./.csound-build/csound \
+  -d -m0 -W -f -o /tmp/xanadu.wav \
   --sample-rate=48000 --ksmps=128 \
   --orc src/play.orc -- demo/xanadu.mal
 ```

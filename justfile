@@ -13,7 +13,10 @@ default:
 version:
     @{{csound}} --version
 
-test: smoke reader eval step3 step4 step5 step6 step7 step8 step9 step-a script-args unit harness-reader harness-eval harness-env harness-step4 harness-step5 harness-step6 harness-step7 harness-step8 harness-step9 harness-stepA harness-csound csound-interop
+test: launchers smoke reader eval step3 step4 step5 step6 step7 step8 step9 step-a script-args unit harness-reader harness-eval harness-env harness-step4 harness-step5 harness-step6 harness-step7 harness-step8 harness-step9 harness-stepA harness-csound csound-interop
+
+launchers:
+    python3 tests/check-launchers.py
 
 smoke:
     {{csound}} {{csound_flags}} tests/step0-repl.orc

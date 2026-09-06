@@ -6,11 +6,7 @@
 set -eu
 
 root=$(CDPATH= cd "$(dirname "$0")" && pwd)
-csound_bin=${CSOUND:-csound}
-case "$csound_bin" in
-  /*) ;;
-  */*) csound_bin=$PWD/$csound_bin ;;
-esac
+. "$root/src/csound-env.sh"
 if [ "$#" -eq 0 ]; then
   echo "usage: $0 SCRIPT [ARG ...]" >&2
   exit 2
@@ -23,6 +19,6 @@ shift
 
 # The reference interpreter loads env.mal and core.mal relative to this directory.
 cd "$root/mal/impls/mal"
-exec "$csound_bin" -n -d -m128 "--env:INCDIR=$root" \
+exec "$CSOUND" -n -d -m128 "--env:INCDIR=$root" \
   --orc "$root/src/run.orc" -- "$root/mal/impls/mal/stepA_mal.mal" \
   "$script" "$@"

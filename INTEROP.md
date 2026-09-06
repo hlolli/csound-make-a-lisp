@@ -8,7 +8,21 @@ the resulting instruments during performance.
 
 Install Csound 7.
 
-Select your Csound build and its opcode modules:
+For `./play`, `./run`, and `./run-selfhost`, link the build directory once from
+the repository root:
+
+```sh
+ln -s /path/to/csound/build .csound-build
+./play demo/xanadu.mal
+```
+
+The launchers use that directory's `csound` executable and opcode modules.
+Git ignores the link, so each checkout can select its own build. An explicit
+`CSOUND` environment variable takes precedence; `OPCODE7DIR64` can override
+the module directory. Without `CSOUND` or the link, the launchers use `csound`
+from `PATH`.
+
+To select a build for direct Csound commands and the test suite:
 
 ```sh
 export CSOUND=/path/to/csound/build/csound

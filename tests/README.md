@@ -26,6 +26,9 @@ precision:
 just --set csound "$CSOUND" csound-interop
 ```
 
+`just launchers` checks local build selection, environment overrides, and
+argument handling without starting Csound or opening an audio device.
+
 `just test` includes this render check and the interactive interop harness.
 The render check needs no reference MAL checkout or audio device. See
 [INTEROP.md](../INTEROP.md) for the API and required Csound build.
