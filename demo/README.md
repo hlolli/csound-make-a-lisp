@@ -84,6 +84,25 @@ The four internal channels retain the source's stereo mix: front-right plus
 rear-right on the left output, front-left plus rear-left on the right output.
 The CsoundQt spectrogram and GUI setup have no role in this player.
 
+The six score sections live in [demo/stria](stria/), starting with
+[t0.mal](stria/t0.mal). Each note is a map with named fields, including
+`:start`, `:duration`, `:amplitude`, and `:carrier`. `play-note` puts those
+fields in Csound's order and fills the unused fields with zero. Reverb events
+also use names. All source values retain their original precision.
+
+`stria.mal` loads the sections in order. Smaller files keep the interpreter
+from holding the whole score while it evaluates each form. Loading the full
+named score can take a couple of minutes in the current MAL interpreter.
+
+The root `cljfmt.edn` teaches [cljfmt](https://github.com/weavejester/cljfmt)
+how to indent MAL's special forms. Format or check Stria from the repository
+root with:
+
+```sh
+cljfmt fix --file-pattern '\.mal$' demo/stria.mal demo/stria
+cljfmt check --file-pattern '\.mal$' demo/stria.mal demo/stria
+```
+
 For the source's 48 kHz and 16 samples per control period:
 
 ```sh

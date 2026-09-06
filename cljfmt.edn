@@ -1,0 +1,5 @@
+;; Format MAL's special forms like their Clojure counterparts.
+{:extra-indents {def! [[:inner 0]]
+                 fn* [[:inner 0]]
+                 let* [[:block 1]]
+                 csound/definst [[:inner 0]]}}
