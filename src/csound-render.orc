@@ -42,7 +42,7 @@ opcode MalCsoundRenderValue(value:MalValue):MalCsoundRender
   result:MalCsoundRender init "", "", 0, ""
   cached:i = 0
   if (value.type == $MAL_NUMBER_TYPE) ithen
-    result.expression init MalPrintNumber(value.number)
+    result.expression init MalCsoundNumber(value.number)
     result.outputs = 1
   elseif (value.type == $MAL_STRING_TYPE) ithen
     result.expression init pr_str_with_readability(value, 1)

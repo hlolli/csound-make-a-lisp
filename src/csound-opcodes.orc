@@ -19,13 +19,15 @@ opcode MalCsoundUnaryOpcode(name:S, rates:S):MalValue
 endop
 
 opcode MalCsoundInstallMathOpcodes(env:MalEnv):MalEnv
-  names:S[] fillarray "abs", "sqrt", "sin", "cos", "tanh", "ampdb"
+  names:S[] fillarray "abs", "sqrt", "sin", "cos", "tanh", "exp", "ampdb", "cpsoct"
   for index in [0 ... lenarray(names) - 1] do
     env init MalEnvSet(env, sprintf("csound/%s", names[index]), \
       MalCsoundUnaryOpcode(names[index], "i,k,a"))
   od
   env init MalEnvSet(env, "csound/dbamp", MalCsoundUnaryOpcode("dbamp", "i,k"))
   env init MalEnvSet(env, "csound/cpsmidinn", MalCsoundUnaryOpcode("cpsmidinn", "i,k"))
+  env init MalEnvSet(env, "csound/cpspch", MalCsoundUnaryOpcode("cpspch", "i,k"))
+  env init MalEnvSet(env, "csound/octpch", MalCsoundUnaryOpcode("octpch", "i,k"))
   xout env
 endop
 
@@ -72,6 +74,11 @@ opcode MalCsoundInstallEnvelopeOpcodes(env:MalEnv):MalEnv
     fn init MalAppendValue(fn, MalCsoundSignature("k", "i", 1, "i,i", 1))
     env init MalEnvSet(env, sprintf("csound/%s", names[index]), fn)
   od
+
+  fn init MalMkCsoundOpcode("expon", "a")
+  fn init MalAppendValue(fn, MalCsoundSignature("a", "i,i,i", 3, "", 0))
+  fn init MalAppendValue(fn, MalCsoundSignature("k", "i,i,i", 3, "", 0))
+  env init MalEnvSet(env, "csound/expon", fn)
 
   fn init MalMkCsoundOpcode("adsr", "a")
   fn init MalAppendValue(fn, MalCsoundSignature("a", "i,i,i,i,i", 4, "", 0))
@@ -143,6 +150,17 @@ opcode MalCsoundInstallEffectOpcodes(env:MalEnv):MalEnv
   xout env
 endop
 
+opcode MalCsoundInstallTableOpcodes(env:MalEnv):MalEnv
+  fn:MalValue init MalMkCsoundOpcode("tablei", "")
+  rates:S[] fillarray "i", "k", "a"
+  for index in [0 ... lenarray(rates) - 1] do
+    inputs:S init sprintf("%s,i,i,i,i", rates[index])
+    fn init MalAppendValue(fn, MalCsoundSignature(rates[index], inputs, 2, "", 0))
+  od
+  env init MalEnvSet(env, "csound/tablei", fn)
+  xout env
+endop
+
 opcode MalCsoundInstallArrayOpcodes(env:MalEnv):MalEnv
   fn:MalValue init MalMkCsoundOpcode("sumarray", "")
   rates:S[] fillarray "i", "k", "a"
@@ -173,6 +191,7 @@ opcode MalCsoundInstallOpcodes(env:MalEnv):MalEnv
   env init MalCsoundInstallEnvelopeOpcodes(env)
   env init MalCsoundInstallFilterOpcodes(env)
   env init MalCsoundInstallEffectOpcodes(env)
+  env init MalCsoundInstallTableOpcodes(env)
   env init MalCsoundInstallArrayOpcodes(env)
   xout env
 endop

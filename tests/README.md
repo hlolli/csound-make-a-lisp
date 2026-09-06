@@ -17,9 +17,10 @@ just reader
 ```
 
 The Csound interop checks cover signature matching, rate selection, multiple
-outputs, typed arrays, and instrument scheduling. They also render ten
-instruments, check that each produces stereo audio without clipping, and
-measure array gains, envelope shape, delay onset, and reverb tails:
+outputs, typed arrays, function tables, and instrument scheduling. They render
+eleven instruments, check that each produces stereo audio without clipping,
+and measure array gains, envelope shape, delay onset, reverb tails, and numeric
+precision:
 
 ```sh
 just --set csound "$CSOUND" csound-interop

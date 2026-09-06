@@ -7,6 +7,11 @@
 declare MalCsoundRenderValue(value:MalValue):(MalCsoundRender)
 declare MalArityError(name:S, expected:i, actual:i):(MalValue)
 
+opcode MalCsoundNumber(number:i):S
+  ;; Source and score fields need full double precision; REPL printing rounds.
+  xout sprintf("%.17g", number)
+endop
+
 opcode MalCsoundTypes(value:MalValue):S
   result:S init "invalid"
   if (value.type == $MAL_NUMBER_TYPE) ithen

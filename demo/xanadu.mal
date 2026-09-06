@@ -1,0 +1,111 @@
+;; Xanadu (short version), Joseph T. Kung, 12 December 1988.
+;; Transcribed from Csound's examples/xanadu.csd.
+;; Run from this repository: ./play demo/xanadu.mal
+
+;; The original uses Csound's 32768 full scale. This host uses 1.
+(def! pluck-gain 0.06103515625)     ; 2000 / 32768
+(def! fm-gain 0.030517578125)       ; 1000 / 32768
+(def! pitch-shift 0.00666667)
+(def! control-oscili (csound/at-rate :k csound/oscili))
+
+;; Sine, cosine, and the unscaled log of the Bessel function I0(x), x = 0..20.
+(csound/event "f" 1 0 65536 10 1)
+(csound/event "f" 2 0 65536 11 1)
+(csound/event "f" 3 0 65536 -12 20)
+
+;; All three strings share the same excitation table. Only the center string
+;; has vibrato; the outer strings sit eight cents above and below the note.
+(def! plucked-strings
+  (fn* (pitch amplitude)
+    (let* [frequency (csound/cpspch pitch)
+           octave (csound/octpch pitch)
+           vibrato (control-oscili 0.008333333333333333 (/ frequency 50) 1)]
+      [(csound/pluck amplitude (csound/cpsoct (+ octave vibrato)) 1000 1 1)
+       (csound/pluck amplitude (csound/cpsoct (+ octave pitch-shift)) 1000 1 1)
+       (csound/pluck amplitude (csound/cpsoct (- octave pitch-shift)) 1000 1 1)])))
+
+;; Instrument 1: moving taps from 0.1 to 1 second and back, plus fixed echoes.
+;; There is no feedback, so each tap can use its own delay line. vdelay uses
+;; milliseconds and linear interpolation, matching the original deltapi taps.
+(csound/definst XanaduMovingPluck [pitch 8.06]
+  (let* [strings (plucked-strings pitch pluck-gain)
+         center (nth strings 0)
+         rising (csound/expon 0.1 p3 1)
+         falling (csound/expon 1 p3 0.1)
+         left-tap (csound/vdelay center (* rising 1000) 2000)
+         right-tap (csound/vdelay center (* falling 1000) 2000)]
+    (csound/outs
+      (+ (+ (nth strings 1) left-tap) (csound/delay center 2))
+      (+ (+ (nth strings 2) right-tap) (csound/delay center 1.1)))))
+
+;; Instrument 2: the same chorus at half the level, with 100 and 200 ms taps.
+(csound/definst XanaduFixedPluck [pitch 8.02]
+  (let* [strings (plucked-strings pitch (* pluck-gain 0.5))
+         center (nth strings 0)]
+    (csound/outs
+      (+ (nth strings 1) (csound/delay center 0.1))
+      (+ (nth strings 2) (csound/delay center 0.2)))))
+
+;; Instrument 3: Kung's FM voice, with changing modulation index and ratio.
+(csound/definst XanaduFM [pitch 7.06 ratio-start 2 ratio-end 0.2]
+  (let* [frequency (csound/cpspch pitch)
+         octave (csound/octpch pitch)
+         third (/ p3 3)
+         envelope (csound/linseg 0 third 1 third 1 third 0)
+         index (csound/linseg 0 third 5 third 3 third 0)
+         ratio (csound/linseg ratio-start p3 ratio-end)
+         a1 (/ (* index (- ratio (/ 1 ratio))) 2)
+         a2 (/ (* index (+ ratio (/ 1 ratio))) 2)
+         table-index (csound/abs (/ (* a1 2) 20))
+         normalization (csound/tablei table-index 3 1)
+         cosine (csound/oscili a1 frequency 2)
+         amplitude (csound/exp (+ (* -0.5 normalization) cosine))
+         modulation (csound/oscili (* a2 frequency) frequency 2)
+         gain (* (* fm-gain envelope) amplitude)]
+    (csound/outs
+      (csound/oscili gain (+ modulation (csound/cpsoct (+ octave pitch-shift))) 1)
+      (csound/oscili gain (+ modulation (csound/cpsoct (- octave pitch-shift))) 1))))
+
+;; Each section has six sustained FM notes and six plucked notes, strummed
+;; 0.1 seconds apart. Pitches retain Csound's octave.pitch-class notation.
+;; Repeated pitches and the wide octave spacing are part of the source score.
+(def! sections
+  [{:start 0 :ratio [2 0.2] :pluck XanaduMovingPluck
+    :fm [7.06 8.01 8.06 8.10 8.11 9.04]
+    :strings [8.06 9.01 9.06 9.10 9.11 10.04]}       ; F#7addB
+   {:start 7.5 :ratio [1.7 0.5] :pluck XanaduFixedPluck
+    :fm [6.02 6.09 7.02 7.06 6.11 7.04]
+    :strings [8.02 8.09 9.02 9.06 9.11 10.04]}      ; D6add9
+   {:start 15 :ratio [1.4 0.8] :pluck XanaduFixedPluck
+    :fm [7.11 8.06 8.11 9.03 8.11 9.04]
+    :strings [8.11 9.06 9.11 10.03 9.11 10.04]}     ; Bmajadd11
+   {:start 22.5 :ratio [1.1 1.1] :pluck XanaduFixedPluck
+    :fm [6.09 7.04 8.09 8.01 7.11 8.04]
+    :strings [8.09 9.04 10.09 10.01 9.11 10.04]}    ; Amajadd9
+   {:start 30 :ratio [0.8 1.4] :pluck XanaduFixedPluck
+    :fm [6.11 7.06 7.11 8.03 7.11 8.04]
+    :strings [8.11 9.06 9.11 10.03 9.11 10.04]}     ; Bmajadd11
+   {:start 37.5 :ratio [0.5 1.7] :pluck XanaduFixedPluck
+    :fm [5.07 6.02 6.07 6.11 6.11 7.04]
+    :strings [8.07 9.02 9.07 9.11 9.11 10.04]}      ; Gmaj6
+   {:start 45 :ratio [0.2 2] :pluck XanaduMovingPluck
+    :fm [7.06 8.01 8.06 8.10 8.11 9.04]
+    :strings [9.06 10.01 10.06 10.10 10.11 11.04]}]) ; F#7addB
+
+(def! play-section
+  (fn* (section)
+    (let* [start (get section :start)
+           ratio (get section :ratio)
+           strings (get section :strings)]
+      (do
+        (map (fn* (pitch)
+               (csound/event "i" XanaduFM start 15 pitch
+                 (nth ratio 0) (nth ratio 1)))
+          (get section :fm))
+        (map (fn* (string)
+               (csound/event "i" (get section :pluck) (+ start (* string 0.1))
+                 10 (nth strings string)))
+          [0 1 2 3 4 5])))))
+
+(map play-section sections)
+(csound/event "e" 60 0)

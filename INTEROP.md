@@ -28,6 +28,9 @@ envelope, and stereo reverb:
 ./play examples/subtractive.mal
 ```
 
+[demo/xanadu.mal](demo/xanadu.mal) transcribes Joseph T. Kung's Xanadu (short
+version). See [demo/README.md](demo/README.md) for playback and render commands.
+
 ## Instruments
 
 ```clojure
@@ -60,15 +63,16 @@ Rendering another instrument starts a new cache.
 
 ## Rates and signatures
 
-Opcode names live under `csound/`. The catalog has 30 entries:
+Opcode names live under `csound/`. The catalog has 36 entries:
 
 | Family | Opcodes | Output selection |
 | --- | --- | --- |
-| Math and conversion | `abs`, `sqrt`, `sin`, `cos`, `tanh`, `ampdb`, `dbamp`, `cpsmidinn` | Infer from the input; `dbamp` and `cpsmidinn` accept init or control only |
+| Math and conversion | `abs`, `sqrt`, `sin`, `cos`, `tanh`, `exp`, `ampdb`, `cpsoct`, `dbamp`, `cpsmidinn`, `cpspch`, `octpch` | Infer from the input; the last four accept init or control only |
 | Oscillators | `poscil`, `oscili`, `phasor`, `vco2`, `pluck` | Default to audio; the first three also offer control outputs |
-| Envelopes | `linseg`, `expseg`, `adsr`, `linen` | Default to audio; control outputs available |
+| Envelopes | `linseg`, `expseg`, `expon`, `adsr`, `linen` | Default to audio; control outputs available |
 | Filters and smoothing | `tone`, `butterlp`, `butterhp`, `reson`, `dcblock2`, `portk` | Audio, except `portk` which returns control |
 | Effects and output | `delay`, `vdelay`, `reverbsc`, `pan2`, `outs` | Audio delays, stereo reverb, stereo or array panning, and an output statement |
+| Function-table lookup | `tablei` | Infer init, control, or audio from the index |
 | Array queries | `sumarray`, `lenarray` | Sum uses the array's numeric rate; length defaults to init with a control option |
 
 `csound/type` reports `:i`, `:k`, `:a`, or `:S` for a scalar, a vector of type
@@ -82,6 +86,10 @@ Numbers have init rate; strings have type `:S`.
 (csound/type (+ modulation 440))            ; :k
 (csound/type (csound/poscil 0.02 440))       ; :a
 ```
+
+Arithmetic with a graph operand runs in Csound. Plain MAL division truncates,
+so use decimal constants for fractions outside a graph. Generated Csound
+source and event fields retain full double precision.
 
 `csound/at-rate` selects an opcode's output signature. Calls match the input
 types and prefer exact matches over init-to-control promotion. They reject
@@ -100,6 +108,25 @@ omitting it selects Csound's default sine table.
 Scalar outputs use typed function calls in the generated source. This supports
 math functions such as `sin` and preserves the selected output rate even when
 an input can promote from init to control.
+
+## Function tables
+
+Numeric `f` events create tables with Csound's GEN routines. Schedule them
+before notes that read the tables:
+
+```clojure
+(csound/event "f" 1 0 65536 10 1)     ; sine
+(csound/event "f" 2 0 65536 11 1)     ; cosine
+(csound/event "f" 3 0 65536 -12 20)   ; unscaled log of I0(x)
+(csound/oscili 0.02 440 1)
+(csound/tablei (csound/phasor 440) 2 1)
+```
+
+The fields are table number, time, size, GEN number, then GEN arguments.
+A negative GEN number skips normalization. The bridge checks numeric field
+types; Csound checks each GEN routine's arguments. String arguments and
+abbreviated `f0` events are not supported yet. `tablei` accepts optional index
+mode, offset, and wrap arguments after the index and table number.
 
 ## Multiple outputs and arrays
 

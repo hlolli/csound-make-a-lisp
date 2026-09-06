@@ -12,7 +12,7 @@ opcode MalScheduleCsoundInstrument(instrument:MalValue, args:MalValue, \
       instrument.string, instrument.length, args.length))
   else
     scoreLine:S init sprintf("i \"%s\" %s %s", instrument.string, \
-      MalPrintNumber(start), MalPrintNumber(duration))
+      MalCsoundNumber(start), MalCsoundNumber(duration))
 
     if (instrument.length > 0) ithen
       for index in [0 ... instrument.length - 1] do
@@ -28,7 +28,7 @@ opcode MalScheduleCsoundInstrument(instrument:MalValue, args:MalValue, \
           break
         endif
 
-        scoreArgument:S init sprintf(" %s", MalPrintNumber(argument.number))
+        scoreArgument:S init sprintf(" %s", MalCsoundNumber(argument.number))
         scoreLine strcat scoreLine, scoreArgument
       od
     endif
@@ -77,6 +77,25 @@ opcode MalCsoundEvent(args:MalValue):MalValue
 
           result init MalScheduleCsoundInstrument(instrument, instrumentArgs, \
             start.number, duration.number)
+        endif
+      endif
+    elseif (strcmp(eventType.string, "f") == 0) ithen
+      if (args.length < 5) ithen
+        result init MalMkError("csound/event: table events need number, time, size, and GEN routine")
+      else
+        result init MalMkValue($MAL_NIL_TYPE)
+        scoreLine:S init "f"
+        for index in [1 ... args.length - 1] do
+          argument:MalValue init MalAt(args, index)
+          if (argument.type != $MAL_NUMBER_TYPE) ithen
+            result init MalMkError("csound/event: table event arguments must be numbers")
+            break
+          endif
+          scoreArgument:S init sprintf(" %s", MalCsoundNumber(argument.number))
+          scoreLine strcat scoreLine, scoreArgument
+        od
+        if (result.type != $MAL_ERROR_TYPE) ithen
+          scoreline_i scoreLine
         endif
       endif
     elseif (strcmp(eventType.string, "e") == 0) ithen

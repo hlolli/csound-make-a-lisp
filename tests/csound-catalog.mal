@@ -18,7 +18,15 @@
            (check-type (str label " control") :k (opcode control))
            (check-type (str label " audio") :a (opcode signal)))))
   [["abs" csound/abs] ["sqrt" csound/sqrt] ["sin" csound/sin]
-   ["cos" csound/cos] ["tanh" csound/tanh] ["ampdb" csound/ampdb]])
+   ["cos" csound/cos] ["tanh" csound/tanh] ["ampdb" csound/ampdb]
+   ["exp" csound/exp] ["cpsoct" csound/cpsoct]])
+(map (fn* (entry)
+       (do
+         (check-type (str (first entry) " init") :i ((nth entry 1) 8))
+         (check-type (str (first entry) " control") :k ((nth entry 1) control))))
+  [["cpspch" csound/cpspch] ["octpch" csound/octpch]])
+(check "cpspch rejects audio" "csound/cpspch: no matching signature for (a)"
+  (try* (csound/cpspch signal) (catch* e e)))
 (check-type "dbamp init" :i (csound/dbamp 0.02))
 (check-type "dbamp control" :k (csound/dbamp control))
 (check "dbamp rejects audio" "csound/dbamp: no matching signature for (a)"
@@ -39,6 +47,10 @@
   (try* (csound/vco2 0.02 440 control) (catch* e e)))
 
 (check-type "expseg default" :a (csound/expseg 0.01 0.02 1 0.08 0.01))
+(check-type "expon default" :a (csound/expon 0.1 1 1))
+(check-type "expon control" :k ((csound/at-rate :k csound/expon) 0.1 1 1))
+(check "expon duration is init" "csound/expon: no matching signature for (i, k, i)"
+  (try* (csound/expon 0.1 control 1) (catch* e e)))
 (check-type "expseg control" :k ((csound/at-rate :k csound/expseg) 0.01 0.1 1))
 (check "expseg requires pairs" "csound/expseg: no matching signature for (i, i, i, i)"
   (try* (csound/expseg 0.01 0.02 1 0.08) (catch* e e)))
@@ -102,6 +114,19 @@
 (check "lenarray dimension is init" "csound/lenarray: no matching signature for (i[], k)"
   (try* (csound/lenarray init-array control) (catch* e e)))
 
+(check "cosine table event" nil (csound/event "f" 100 0 65536 11 1))
+(check "unnormalized table event" nil
+  (csound/event "f" 101 0 2 -2 0.030517578125 0.030517578125))
+(check "table event needs GEN" "csound/event: table events need number, time, size, and GEN routine"
+  (try* (csound/event "f" 102 0 2) (catch* e e)))
+(check "table event rejects non-numeric fields" "csound/event: table event arguments must be numbers"
+  (try* (csound/event "f" 102 0 2 -2 "bad") (catch* e e)))
+(check-type "tablei init" :i (csound/tablei 0 100))
+(check-type "tablei control" :k (csound/tablei control 100 1))
+(check-type "tablei audio" :a (csound/tablei signal 100 1 0 0))
+(check "tablei table number is init" "csound/tablei: no matching signature for (i, k)"
+  (try* (csound/tablei 0 control) (catch* e e)))
+
 ;; Each instrument occupies its own interval in the rendered WAV. The Python
 ;; check measures these intervals, including the delay onset and reverb tail.
 (csound/definst CatalogOscillators []
@@ -146,6 +171,16 @@
                 (csound/linseg 0 0.005 1 0.03 1 0.005 0))]
     (csound/outs (csound/reverbsc tone tone 0.7 10000 44100 0 0))))
 
+(csound/definst CatalogTables []
+  ;; 1000/32768 is exact in binary. Amplify rounding errors so the render
+  ;; catches loss of precision in both table events and graph constants.
+  (let* [exact (/ (csound/sqrt 1000000) 32768)
+         table-error (* (- (csound/tablei 0 101) exact) 1000000)
+         literal-error (* (- 0.030517578125 exact) 1000000)
+         cosine (csound/tablei (csound/phasor 440) 100 1)]
+    (csound/outs (* (+ 0.02 table-error) cosine)
+                 (* (+ 0.02 literal-error) cosine))))
+
 (csound/event "i" CatalogOscillators 0 0.1)
 (csound/event "i" CatalogArrays 0.1 0.1)
 (csound/event "i" CatalogEnvelopes 0.2 0.1)
@@ -153,5 +188,6 @@
 (csound/event "i" CatalogMath 0.4 0.1)
 (csound/event "i" CatalogDelay 0.5 0.1)
 (csound/event "i" CatalogReverb 0.6 0.4)
-(csound/event "e" 1.01 0)
+(csound/event "i" CatalogTables 1 0.1)
+(csound/event "e" 1.11 0)
 (println "CSOUND-CATALOG-PASS")

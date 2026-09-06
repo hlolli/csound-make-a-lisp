@@ -40,7 +40,7 @@ FIXTURES = (
         ("tuple outputs", 0.05, 0.10),
         ("typed arrays", 0.10, 0.15),
     )),
-    RenderFixture("catalog", 1.01, (
+    RenderFixture("catalog", 1.11, (
         ("oscillators", 0.01, 0.09),
         ("array reductions", 0.11, 0.19),
         ("envelopes", 0.22, 0.28),
@@ -48,6 +48,7 @@ FIXTURES = (
         ("math", 0.41, 0.49),
         ("delay", 0.525, 0.595),
         ("reverb", 0.70, 0.99),
+        ("tables and precision", 1.01, 1.09),
     )),
 )
 
@@ -134,6 +135,11 @@ def check_catalog_audio(rate, channels):
     wet_right = section(right, rate, 0.70, 0.99)
     if max(abs(a - b) for a, b in zip(wet_left, wet_right)) <= 10:
         raise RuntimeError("catalog: reverb outputs lost their stereo separation")
+
+    for channel in channels:
+        table_level = rms(section(channel, rate, 1.01, 1.09)) / 32768
+        if not 0.013 < table_level < 0.015:
+            raise RuntimeError("catalog: table lookup or numeric precision changed the gain")
 
 
 def main():
