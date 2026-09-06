@@ -19,6 +19,7 @@ malEmptyEnvs@global:MalEnv[] init 0
 malEmptyStrings@global:S[] init 0
 malAtomValues@global:MalValue[] init 0
 malAtomCount@global:i init 0
+malGensymCount@global:i init 0
 malFunctionDefinitions@global:MalValue[] init 0
 malFunctionCount@global:i init 0
 malAstNodes@global:MalValue[] init 0

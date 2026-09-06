@@ -1,0 +1,150 @@
+;; This Source Code Form is subject to the terms of the Mozilla Public
+;; License, v. 2.0. If a copy of the MPL was not distributed with this
+;; file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+;; All seven operators are macros and accept an empty chain.
+(map macro? [-> ->> as-> some-> some->> cond-> cond->>])
+;=>(true true true true true true true)
+(list (-> 7) (->> 7) (as-> 7 x) (some-> 7) (some->> 7) (cond-> 7) (cond->> 7))
+;=>(7 7 7 7 7 7 7)
+(list (-> nil) (->> false) (as-> false x) (some-> nil) (some->> false) (cond-> nil) (cond->> false))
+;=>(nil false false nil false nil false)
+
+;; Argument order, bare functions, nested chains, and local functions.
+(-> 5 (- 2) (* 4))
+;=>12
+(->> 5 (- 20) (* 4))
+;=>60
+(-> [1 2 3] rest first)
+;=>2
+(->> [1 2 3] (map (fn* (x) (* x 2))) rest first)
+;=>4
+(let* [f (fn* (x) (+ x 1))] (-> 2 f (->> (- 10))))
+;=>7
+(apply -> '(x (f 1 2) g))
+;=>(g (f x 1 2))
+(apply ->> '(x (f 1 2) g))
+;=>(g (f 1 2 x))
+(meta (apply -> (list 1 (with-meta '(+ 2) {:threaded true}))))
+;=>{:threaded true}
+(meta (apply ->> (list 1 (with-meta '(+ 2) {:threaded true}))))
+;=>{:threaded true}
+
+;; as-> can place or reuse the value anywhere, with a fresh lexical binding.
+(as-> 2 x (+ x x) (- 10 x) (list 0 x 9))
+;=>(0 6 9)
+(let* [x 20] (list (as-> 2 x (+ x 3)) x))
+;=>(5 20)
+(as-> 1 as-> (+ as-> 2))
+;=>3
+(as-> 1 x (fn* () x) (x))
+;=>1
+(let* [f (as-> 3 x (fn* () x))] (f))
+;=>3
+
+;; some-> stops on nil, but continues through false and other values.
+(some-> nil missing)
+;=>nil
+(some->> nil missing)
+;=>nil
+(some-> {:a {:b 7}} (get :a) (get :b) (+ 2))
+;=>9
+(some-> {:a nil} (get :a) missing)
+;=>nil
+(some->> [1 2 3] (map (fn* (x) (* x 3))) first)
+;=>3
+(list (some-> false not) (some->> false not) (some-> 0 (+ 1)))
+;=>(true true 1)
+(let* [nil? (fn* (x) true)] (some-> 2 (+ 3)))
+;=>5
+
+;; cond-> checks every test, leaves false branches unevaluated, and keeps nil results.
+(cond-> 2 false missing true (+ 3) nil missing true (* 4))
+;=>20
+(cond->> 2 false missing true (- 10) true (- 20))
+;=>12
+(cond-> nil false missing true (list 1))
+;=>(nil 1)
+(cond->> nil false missing true (list 1))
+;=>(1 nil)
+(cond-> 2 true ((fn* (x) nil)) true (list 3))
+;=>(nil 3)
+(cond-> 2 true ((fn* (x) false)) true not)
+;=>true
+(let* [x 10] (cond-> 1 (= x 10) (+ 2) (= x 10) (* 3)))
+;=>9
+
+;; Initial values and steps run once; conditional tests retain their order.
+(def! visits (atom []))
+(def! visit (fn* (label value) (do (swap! visits (fn* (xs) (conj xs label))) value)))
+(-> (visit :start 2) (+ (visit :first 3)) (* (visit :last 4)))
+;=>20
+@visits
+;=>[:start :first :last]
+(reset! visits [])
+(->> (visit :start 2) (visit :step))
+;=>2
+@visits
+;=>[:start :step]
+(reset! visits [])
+(as-> (visit :start 2) x (+ x x) (visit :last x))
+;=>4
+@visits
+;=>[:start :last]
+(reset! visits [])
+(some-> (visit :start 2) ((fn* (x) (visit :nil nil))) ((fn* (x) (visit :skipped x))))
+;=>nil
+@visits
+;=>[:start :nil]
+(reset! visits [])
+(some->> (visit :start false) (visit :step) ((fn* (x) (visit :nil nil))) (visit :skipped))
+;=>nil
+@visits
+;=>[:start :step :nil]
+(reset! visits [])
+(cond-> (visit :start 2) (visit :a false) (+ (visit :skipped 99)) (visit :b true) (+ (visit :step 3)) (visit :c true) (* 4))
+;=>20
+@visits
+;=>[:start :a :b :step :c]
+(reset! visits [])
+(cond->> (visit :start 2) (visit :a true) (- 10) (visit :b false) missing (visit :c true) (- 20))
+;=>12
+@visits
+;=>[:start :a :b :c]
+
+;; Invalid forms fail during expansion, before the initial value runs.
+(reset! visits [])
+(try* (cond-> (visit :start 1) true (+ 1) false) (catch* e e))
+;=>"conditional threading requires test/form pairs"
+(try* (cond->> (visit :start 1) true) (catch* e e))
+;=>"conditional threading requires test/form pairs"
+@visits
+;=>[]
+(try* (as-> 1 :bad (+ 1 2)) (catch* e e))
+;=>"as->: binding name must be a symbol"
+(try* (->) (catch* e e))
+;=>"fn*: expected at least 1 arguments, got 0"
+(try* (->>) (catch* e e))
+;=>"fn*: expected at least 1 arguments, got 0"
+(try* (as-> 1) (catch* e e))
+;=>"fn*: expected at least 2 arguments, got 1"
+(try* (apply (fn* (x) x) []) (catch* e e))
+;=>"fn*: expected 1 arguments, got 0"
+
+;; Fresh symbols keep generated bindings separate across expansions.
+(symbol? (gensym))
+;=>true
+(= (gensym) (gensym))
+;=>false
+(= (gensym "value-") (gensym "value-"))
+;=>false
+(let* [value 10 name 20 forms 30] (some-> 1 (+ value) (+ name) (+ forms)))
+;=>61
+(let* [value 10 name 20 forms 30] (cond-> 1 true (+ value) true (+ name) true (+ forms)))
+;=>61
+(some-> 1 (some-> (+ 2)) (cond-> true (* 3)))
+;=>9
+(try* (gensym 1) (catch* e e))
+;=>"gensym: prefix must be a string"
+(try* (gensym "x" "y") (catch* e e))
+;=>"gensym: expected zero or one argument"

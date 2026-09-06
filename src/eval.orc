@@ -555,6 +555,30 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
       endif
     endif
 
+  elseif (strcmp(fn.string, "gensym") == 0) ithen
+    if (args.length > 1) ithen
+      result init MalMkError("gensym: expected zero or one argument")
+    else
+      prefix:S init "G__"
+      valid:i = 1
+
+      if (args.length == 1) ithen
+        value:MalValue init MalAt(args, 0)
+        if (value.type != $MAL_STRING_TYPE) ithen
+          valid = 0
+        else
+          prefix = value.string
+        endif
+      endif
+
+      if (valid == 0) ithen
+        result init MalMkError("gensym: prefix must be a string")
+      else
+        malGensymCount += 1
+        result init MalMkSymbol(sprintf("%s%.0f", prefix, malGensymCount))
+      endif
+    endif
+
   elseif (strcmp(fn.string, "keyword") == 0) ithen
     if (args.length != 1) ithen
       result init MalArityError(fn.string, 1, args.length)
@@ -1959,6 +1983,8 @@ opcode MalEvalSourceEnv(source:S, env:MalEnv):(MalValue, MalEnv)
   xout result, currentEnv
 endop
 
+#include "src/threading.orc"
+
 opcode MalMkStep6Env():MalEnv
   env:MalEnv init MalMkStep2Env()
   env init MalEnvSet(env, "*ARGV*", MalMkValue($MAL_LIST_TYPE))
@@ -2018,6 +2044,7 @@ endop
 
 opcode MalMkStepAEnv():MalEnv
   env:MalEnv init MalMkStep9Env()
+  env init MalEnvSet(env, "gensym", MalMkBuiltin("gensym"))
   env init MalEnvSet(env, "meta", MalMkBuiltin("meta"))
   env init MalEnvSet(env, "with-meta", MalMkBuiltin("with-meta"))
   env init MalEnvSet(env, "string?", MalMkBuiltin("string?"))
@@ -2035,6 +2062,7 @@ opcode MalMkStepAEnv():MalEnv
     prints "host language bootstrap failed: %s\n", result.string
   endif
 
+  env init MalInstallThreadingMacros(env)
   xout env
 endop
 

@@ -74,10 +74,11 @@
 
 (def! filtered-channel
   (fn* (channel)
-    (csound/butterlp
-     (csound/butterlp
-      (csound/butterlp
-       (csound/butterlp (audio-bus channel) 11500) 11500) 11500) 11500)))
+    (-> (audio-bus channel)
+        (csound/butterlp 11500)
+        (csound/butterlp 11500)
+        (csound/butterlp 11500)
+        (csound/butterlp 11500))))
 
 ;; Define the output last so it runs after the voices and reverb each block.
 (csound/definst StriaOutput []

@@ -238,6 +238,33 @@ instr TEST_ENV
   ASSERT_ENV_VALUE(step2Env, "/", $MAL_BUILTIN_OPERATOR_TYPE, "/")
 endin
 
+instr TEST_ENV_RELEASE
+  parent:MalEnv MalMkEnv
+  parent MalEnvSet parent, "kept", MalMkNumber(7)
+  child:MalEnv MalMkEnvWithOuter parent
+  freeCount:i = malEnvFreeCount
+
+  MalEnvRelease(MalEnvHandle(-1))
+  MalEnvRelease(MalEnvHandle(malEnvCount))
+  MalEnvRelease(parent)
+
+  if (malEnvFreeCount != freeCount) ithen
+    prints "ENV release, Assertion failed: released an invalid or retained environment\n"
+    exitnow(1)
+  endif
+
+  MalEnvRelease(child)
+  MalEnvRelease(child)
+  kept:MalValue MalEnvGet parent, "kept"
+
+  if (malEnvFreeCount != freeCount + 1 || kept.number != 7) ithen
+    prints "ENV release, Assertion failed: released a child twice or changed its parent\n"
+    exitnow(1)
+  endif
+
+  prints "ENV release, Assertion success\n"
+endin
+
 instr TEST_ENV_SNAPSHOTS
   prints "Testing environment snapshots\n"
 
@@ -362,6 +389,7 @@ endin
 schedule("TEST_ERRORS", 0, 0)
 schedule("TEST_BUILTINS", 0, 0)
 schedule("TEST_ENV", 0, 0)
+schedule("TEST_ENV_RELEASE", 0, 0)
 schedule("TEST_ENV_SNAPSHOTS", 0, 0)
 schedule("TEST_METADATA", 0, 0)
 event_i("e", 0, 0)

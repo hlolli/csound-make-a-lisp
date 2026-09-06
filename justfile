@@ -13,7 +13,7 @@ default:
 version:
     @{{csound}} --version
 
-test: launchers smoke reader eval step3 step4 step5 step6 step7 step8 step9 step-a script-args unit harness-reader harness-eval harness-env harness-step4 harness-step5 harness-step6 harness-step7 harness-step8 harness-step9 harness-stepA harness-csound csound-interop
+test: launchers smoke reader eval step3 step4 step5 step6 step7 step8 step9 step-a script-args unit harness-reader harness-eval harness-env harness-step4 harness-step5 harness-step6 harness-step7 harness-step8 harness-step9 harness-stepA harness-threading harness-csound csound-interop
 
 launchers:
     python3 tests/check-launchers.py
@@ -95,6 +95,9 @@ harness-step9:
 
 harness-stepA:
     python3 mal/runtest.py --test-timeout 120 --deferrable --optional tests/harness/stepA_mal.mal -- tests/harness/run-stepA-mal
+
+harness-threading:
+    python3 mal/runtest.py --test-timeout 120 --no-deferrable --no-optional tests/harness/threading.mal -- tests/harness/run-stepA-mal
 
 harness-csound:
     python3 mal/runtest.py --no-deferrable --no-optional tests/harness/csound_interop.mal -- tests/harness/run-csound-interop

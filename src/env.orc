@@ -124,11 +124,14 @@ endop
 opcode MalEnvRelease(env:MalEnv):void
   resolved:MalEnv MalEnvResolve env
 
-  if (resolved.id > 0 && resolved.persistent == 0 && \
-      malEnvRegistry[resolved.id].id == resolved.id) ithen
-    releasedId:i = resolved.id
-    malEnvRegistry[releasedId] MalEnvHandle -1
-    MalEnvPushFreeId(releasedId)
+  ;; Csound evaluates && operands eagerly, so guard the registry read first.
+  if (resolved.id > 0 && resolved.id < malEnvCount && \
+      resolved.persistent == 0) ithen
+    if (malEnvRegistry[resolved.id].id == resolved.id) ithen
+      releasedId:i = resolved.id
+      malEnvRegistry[releasedId] MalEnvHandle -1
+      MalEnvPushFreeId(releasedId)
+    endif
   endif
 endop
 

@@ -98,6 +98,43 @@ names. `csound/do` accepts only statements with no outputs, may nest, and
 preserves their order. An empty `csound/do` defines a silent body. Shared nodes,
 including statements, still render once; use separate mix calls for two sends.
 
+## Threading macros
+
+MAL includes Clojure's seven [threading macros](https://clojure.org/guides/threading_macros):
+
+| Macro | Behavior |
+| --- | --- |
+| `->` | Pass each result as the first argument of the next form. |
+| `->>` | Pass each result as the last argument. |
+| `as->` | Bind each result to a name used in the next form. |
+| `some->` | Thread first; stop when a result is `nil`. |
+| `some->>` | Thread last; stop when a result is `nil`. |
+| `cond->` | Thread first through forms whose paired tests are true. |
+| `cond->>` | Thread last through forms whose paired tests are true. |
+
+Use them with ordinary MAL values or Csound graphs:
+
+```clojure
+(-> (csound/poscil 0.02 440)
+    (csound/butterlp 4000)
+    (csound/butterlp 4000))
+
+(->> [1 2 3]
+     (map (fn* (x) (* x 2)))
+     first)
+
+(as-> 5 x
+  (- 20 x)
+  (* x 2))
+```
+
+`some->` and `some->>` continue through `false`. `cond->` and `cond->>`
+evaluate every test in order, skipping forms whose tests are false or `nil`.
+A chain with no forms returns its initial value.
+
+`gensym` creates fresh symbols for macro bindings. It accepts an optional
+string prefix: `(gensym "value-")`.
+
 ## Rates and signatures
 
 Opcode names live under `csound/`. The catalog has 54 entries:
