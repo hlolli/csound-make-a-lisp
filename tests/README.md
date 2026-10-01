@@ -16,11 +16,26 @@ just smoke
 just reader
 ```
 
+`just bundle-check` builds the versioned include file in a temporary directory
+and checks it without the library source tree. It covers nested includes,
+embedded strings, repeatable builds, repeated inclusion, Step A, core helpers,
+file loading, and the audio interop checks. To choose a Csound build, run
+`just --set csound /path/to/csound bundle-check`.
+
+`just release-check` runs the packaging checks without Csound. It checks version
+names, the bundle header and filename, release-note links, and the fallback
+when Llama is missing, fails, or returns a bad reply. The release workflow runs
+these checks before publishing.
+
 `just harness-threading` checks the seven threading macros, argument order,
 lexical scope, skipped forms, and the order and number of evaluations.
 
 `just core-helpers` checks collection operations, function composition,
 nested updates, conditional bindings, and early return from reductions.
+
+`just file-loading` checks repeated reads from one call site, empty files,
+long lines, filenames with spaces and Unicode, and nested `load-file` calls.
+It runs without the reference MAL checkout and forms part of `just test`.
 
 The Csound interop checks cover signature matching, rate selection, multiple
 outputs, typed arrays, function tables, and instrument scheduling. They render

@@ -13,7 +13,17 @@ default:
 version:
     @{{csound}} --version
 
-test: launchers smoke reader eval step3 step4 step5 step6 step7 step8 step9 step-a script-args unit core-helpers harness-reader harness-eval harness-env harness-step4 harness-step5 harness-step6 harness-step7 harness-step8 harness-step9 harness-stepA harness-threading harness-csound csound-interop
+build:
+    python3 tools/bundle.py
+
+bundle-check:
+    python3 tests/check-bundle.py --csound "{{csound}}"
+
+release-check:
+    python3 tests/check-bundle.py --build-only
+    python3 tests/check-release.py
+
+test: launchers bundle-check release-check smoke reader eval step3 step4 step5 step6 file-loading step7 step8 step9 step-a script-args unit core-helpers harness-reader harness-eval harness-env harness-step4 harness-step5 harness-step6 harness-step7 harness-step8 harness-step9 harness-stepA harness-threading harness-csound csound-interop
 
 launchers:
     python3 tests/check-launchers.py
@@ -47,6 +57,9 @@ step5:
 
 step6:
     {{csound}} {{csound_flags}} tests/step6-file.orc
+
+file-loading:
+    python3 tests/check-file-loading.py --csound "{{csound}}"
 
 step7:
     {{csound}} {{csound_flags}} tests/step7-quote.orc

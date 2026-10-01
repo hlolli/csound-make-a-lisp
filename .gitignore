@@ -10,3 +10,5 @@ deleteme*
 /result
 /paper
 /tmp*.orc
+/dist/
+__pycache__/
