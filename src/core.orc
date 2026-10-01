@@ -64,6 +64,8 @@ opcode MalCoreAssoc(collection:MalValue, key:MalValue, value:MalValue):MalValue
       result init collection
       result.list init values
       result.length = size
+      ;; Read the replacement array even if the input refers to a quoted AST.
+      result.astRef = 0
     endif
   endif
   xout result
@@ -506,9 +508,11 @@ opcode MalInstallCoreHelpers(env:MalEnv):MalEnv
           (if (= (count functions) 1) (first functions)
               (let* [ordered (reverse functions)]
                 (fn* (& args)
-                  (reduce (fn* (value f) (f value))
-                          (apply (first ordered) args)
-                          (rest ordered))))))))
+                  ;; Keep reduced values as data so every function runs.
+                  (first
+                    (reduce (fn* (value f) (list (f (first value))))
+                            (list (apply (first ordered) args))
+                            (rest ordered)))))))))
   (def! juxt
     (fn* (f & functions)
       (let* [all (cons f functions)]
@@ -532,7 +536,8 @@ opcode MalInstallCoreHelpers(env:MalEnv):MalEnv
     (fn* (bindings then else nil-only?)
       (if (and (vector? bindings) (= (count bindings) 2) (symbol? (first bindings)))
         (let* [name (gensym)
-               body (list (list 'fn* (list (first bindings)) then) name)]
+               body (list (list 'fn* (list name)
+                                (list 'let* (list (first bindings) name) then)) name)]
           (list 'let* (list name (nth bindings 1))
                 (if nil-only?
                   (list 'if (list nil? name) else body)

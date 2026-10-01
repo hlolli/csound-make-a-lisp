@@ -214,6 +214,9 @@ opcode MalMapKeysEqual(left:MalValue, right:MalValue):i
 
       case $MAL_ATOM_TYPE
         result = left.number == right.number
+
+      case $MAL_REDUCED_TYPE
+        result = left.number == right.number
     endsw
   endif
 

@@ -32,6 +32,12 @@
 (check "composition one" 8 ((comp inc) 7))
 (check "composition order" 11 ((comp inc (partial * 2) +) 2 3))
 (check "composition zero input" 4 ((comp inc (constantly 3))))
+(check "composition preserves reduced input" true
+       (let* [r (reduced 3)] (= r ((comp identity (constantly r))))))
+(check "composition continues after reduced result" [3]
+       ((comp (fn* (r) [@r]) reduced identity) 3))
+(check "composition preserves reduced output" true
+       (reduced? ((comp reduced inc) 3)))
 (check "juxt" [4 2 3] ((juxt inc dec identity) 3))
 (check "juxt argument forwarding" ['(1 2) [1 2]] ((juxt list vector) 1 2))
 (check "closures retain composition inputs" 7
@@ -81,6 +87,14 @@
        (let* [r (reduced 3)] (= r (ensure-reduced r))))
 (check "nested reduced values have distinct identities" true
        (let* [r (reduced 3)] (not= r (reduced r))))
+(check "reduced map keys use identity" [:first :second 2 true {:left 1}]
+       (let* [r (reduced 3)
+              other (reduced 3)
+              values (hash-map r :first other :second)
+              replaced (assoc values r :updated)]
+         [(get-in values [r]) (get values other) (count replaced)
+          (= replaced (hash-map r :updated other :second))
+          (dissoc (hash-map r :removed :left 1) r)]))
 (check "empty seeded fold preserves reduced value" true
        (let* [r (reduced 3)] (= r (reduce list r []))))
 (check "reduced is opaque when printed" "#<reduced 3>" (pr-str (reduced 3)))
@@ -135,6 +149,13 @@
 (check "assoc in changes vector" {:a [1 7]} (assoc-in {:a [1 2]} [:a 1] 7))
 (check "assoc in appends vector" [1 2] (assoc-in [1] [1] 2))
 (check "assoc in empty path" {nil 7} (assoc-in {} [] 7))
+(def! stored-vector (fn* () '[1 2]))
+(check "assoc in replaces stored quoted vector entry" [7 2] (assoc-in (stored-vector) [0] 7))
+(check "assoc in appends to stored quoted vector" [1 2 3] (assoc-in (stored-vector) [2] 3))
+(check "update stored quoted vector" [2 2] (update (stored-vector) 0 inc))
+(check "assoc in nested stored quoted vector" {:a [1 7]}
+       (assoc-in ((fn* () '{:a [1 2]})) [:a 1] 7))
+(check "stored quoted vector remains unchanged" [1 2] (stored-vector))
 (check "update" {:a 4} (update {:a 1} :a + 3))
 (check "update missing" {:a 3} (update nil :a (constantly 3)))
 (check "update vector" [2 2] (update [1 2] 0 inc))
@@ -179,6 +200,10 @@
 (check "conditional closure capture" 9 (let* [x 9] (if-let [x (fn* () x)] (x) missing)))
 (check "conditional binding does not leak" 9 (let* [x 9] (do (if-let [x 2] x) x)))
 (check "nil predicate shadow" false (let* [nil? (constantly true)] (if-some [x false] x 7)))
+(check "if let binds ampersand" 1 (if-let [& 1] & 0))
+(check "if some binds ampersand" false (if-some [& false] & 0))
+(check "when let binds ampersand" 1 (when-let [& 1] &))
+(check "when some binds ampersand" false (when-some [& false] &))
 
 (def! calls (atom []))
 (def! record (fn* (x) (do (swap! calls (fn* (xs) (conj xs x))) x)))

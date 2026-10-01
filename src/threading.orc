@@ -54,9 +54,12 @@ opcode MalInstallThreadingMacros(env:MalEnv):MalEnv
         value
         ;; Evaluate the value before binding its name, so closures created
         ;; by a step retain the preceding binding.
-        (list (list 'fn* (list name)
-                    (threading/as (first forms) name (rest forms)))
-              value))))
+        ;; Use a fresh parameter because fn* reserves & for rest arguments.
+        (let* [parameter (gensym)]
+          (list (list 'fn* (list parameter)
+                      (list 'let* (list name parameter)
+                            (threading/as (first forms) name (rest forms))))
+                value)))))
 
   (defmacro! ->
     (fn* (value & forms) (threading/expand false value forms)))

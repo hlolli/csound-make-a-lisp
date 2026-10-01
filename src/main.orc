@@ -7,6 +7,7 @@
 #include "src/utils.orc"
 #include "src/input.orc"
 #include "src/error.orc"
+#include "src/file.orc"
 #include "src/env.orc"
 #include "src/reader.orc"
 #include "src/printer.orc"

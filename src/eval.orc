@@ -387,23 +387,6 @@ opcode MalConj(args:MalValue):MalValue
   xout result
 endop
 
-opcode MalSlurpFile(filename:S):MalValue
-  content:S init ""
-  line:S init ""
-  lineNumber:i = 0
-
-read_line:
-  line, lineNumber readfi filename
-
-  if (lineNumber != -1) ithen
-    content strcat content, line
-    igoto read_line
-  endif
-
-  result:MalValue MalMkString content
-  xout result
-endop
-
 opcode MalEquals(left:MalValue, right:MalValue):i
   result:i = 0
   leftIsSequence:i = 0
