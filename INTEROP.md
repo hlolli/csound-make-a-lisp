@@ -64,11 +64,18 @@ An event may omit trailing parameters to use their defaults. The instrument
 name must be a Csound identifier. Its body must be a Csound statement with no
 outputs, such as `outs`, `chnmix`, or a `csound/do` sequence.
 
+`csound` is a namespace. You can alias it with
+`(ns music.voice (:require [csound :as c]))` and call `c/definst` or `c/oscili`.
+Instruments defined outside `user` receive a host name that includes a
+namespace identifier, so `music.voice/Tone` and `music.bass/Tone` can coexist.
+Pass the instrument value to `csound/event`; its host name is an internal
+detail. Instruments in `user` keep their original Csound names.
+
 Use `csound/source` to inspect orchestra text without defining an instrument:
 
 ```clojure
-(def! signal (csound/poscil 0.02 440))
-(def! graph (csound/outs signal signal))
+(def signal (csound/poscil 0.02 440))
+(def graph (csound/outs signal signal))
 (println (csound/source 'Preview [] graph))
 ```
 
@@ -82,7 +89,7 @@ reverb instrument can read a shared audio channel, output the wet signal,
 then clear the channel for the next control period:
 
 ```clojure
-(def! audio-bus (csound/at-rate :a csound/chnget))
+(def audio-bus (csound/at-rate :a csound/chnget))
 (csound/definst Send [frequency 440]
   (csound/chnmix (csound/oscil 0.02 frequency) "reverb-send"))
 (csound/definst Return []
@@ -159,8 +166,8 @@ keywords for multiple outputs, and `nil` for a statement with no outputs.
 Numbers have init rate; strings have type `:S`.
 
 ```clojure
-(def! kosc (csound/at-rate :k csound/poscil))
-(def! modulation (kosc 1 2))
+(def kosc (csound/at-rate :k csound/poscil))
+(def modulation (kosc 1 2))
 (csound/type modulation)                    ; :k
 (csound/type (+ modulation 440))            ; :k
 (csound/type (csound/poscil 0.02 440))       ; :a
@@ -217,19 +224,19 @@ mode, offset, and wrap arguments after the index and table number.
 ## Multiple outputs and arrays
 
 ```clojure
-(def! stereo (csound/pan2 signal 0.5))
+(def stereo (csound/pan2 signal 0.5))
 (csound/type stereo)                         ; [:a :a]
-(def! channels (csound/outputs stereo))
+(def channels (csound/outputs stereo))
 (csound/type (nth channels 0))               ; :a
 (csound/outs stereo)
 
-(def! frequencies (csound/array :i [440 660]))
+(def frequencies (csound/array :i [440 660]))
 (csound/type frequencies)                    ; :i-array
 (csound/type (csound/aget frequencies 0))     ; :i
 (csound/type (csound/sumarray frequencies))  ; :i
 (csound/type (csound/lenarray frequencies))  ; :i
 
-(def! pair-array
+(def pair-array
   ((csound/at-rate :a-array csound/pan2) signal 0.5))
 (csound/outs (csound/aget pair-array 0) (csound/aget pair-array 1))
 ```
@@ -240,9 +247,64 @@ an opcode that returns one array therefore has one output.
 
 `csound/array` accepts `:i`, `:k`, `:a`, or `:S` and a MAL vector. It checks
 each element's type. Plain MAL vectors do not become Csound arrays implicitly.
-Array signatures match exactly. `csound/aget` currently accepts only an
-init-rate index into a one-dimensional array. Literal indices must be whole
-and nonnegative, and must fit when the graph supplies a known array length.
+Array signatures match exactly. `csound/aget`, `nth`, and `get` accept init-
+or control-rate indices into a one-dimensional array. A control-rate index
+into an init-rate array produces a control-rate value. Literal indices must
+be whole and nonnegative, and must fit when the graph supplies a known length.
+
+### Collection operators on Csound arrays
+
+Use the usual collection functions on a Csound array:
+
+```clojure
+(def frequencies (csound/array :i [440 660]))
+(nth frequencies 0)              ; init-rate Csound value
+(get frequencies 1)              ; init-rate Csound value
+(count frequencies)              ; init-rate lenarray call
+
+(csound/definst ArrayTone []
+  (let [changed (update frequencies 0 + 220)
+        signal (csound/oscili 0.02 (first changed))]
+    (csound/outs signal signal)))
+```
+
+| Operators | Csound array behavior |
+| --- | --- |
+| `nth`, `get`, `first`, `second`, `last` | Read an element at the array/index rate. |
+| `count` | Produce an init-rate `lenarray` call, including for opcode outputs. |
+| `assoc`, `update` | Write into the native array and return a graph for that same array. |
+| `get-in`, `assoc-in`, `update-in` | Follow paths through MAL maps/vectors and Csound arrays. |
+| `seq`, `vec`, `map`, `mapv`, `reduce`, and sequence helpers | Work on element graphs when the array length is known while building the instrument. |
+| `empty?`, `contains?` | Return MAL booleans when the length and index are known while building the instrument. |
+
+These calls build Csound code. Reads return graph values. Updates run when
+their result is used in the instrument, or when they appear in `csound/do`:
+
+```clojure
+(csound/definst ArrayWrite []
+  (let [values (csound/array :k [440 660])
+        alias values]
+    (csound/do
+      (assoc values 0 220)
+      (csound/outs (csound/oscili 0.02 (nth alias 0))
+                   (csound/oscili 0.02 (nth alias 1))))))
+```
+
+The write reaches aliases of the same native array within that instrument.
+Each instrument instance owns its array. Reusing an update graph emits its
+write once; calling `assoc` again creates another write. MAL `do` alone does
+not sequence graph operations.
+
+Array updates keep the element type and length. `assoc` replaces existing
+slots; `conj` does not grow native arrays. Init-rate arrays require init-rate
+indices and values for writes. Control and audio arrays run their writes
+during performance. `get` uses the same checked access as `nth`, including
+an error for a missing element. Csound checks indices computed at runtime.
+
+Sequence helpers build a MAL sequence of element graphs, so they need a
+known length. They do not copy running audio into MAL. Arrays returned by
+opcodes can still use indexed reads, writes, and `count`; sequence helpers
+and MAL boolean queries report an error when they would need runtime data.
 
 ## Adding an opcode
 
@@ -271,8 +333,8 @@ python3 tests/check-csound-interop.py --csound "$CSOUND" --fixture catalog
 ## Scope
 
 This is a curated opcode set with concrete signatures. It does not yet import
-the full opcode registry or support arbitrary UDOs, multidimensional arrays,
-or control-rate array indices. `outs` currently accepts two audio channels.
+the full opcode registry or support arbitrary UDOs or multidimensional arrays.
+`outs` currently accepts two audio channels.
 The earlier `csound-eval` and `definst` names remain aliases for `csound/eval`
 and `csound/definst`.
 

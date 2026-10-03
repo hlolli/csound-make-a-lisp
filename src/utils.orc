@@ -3,7 +3,8 @@
 ;; file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 opcode MalEnvHandle(id:i):MalEnv
-  env:MalEnv init malEmptyStrings, malEmptyValues, malEmptyEnvs, 0, id, 0
+  paths:MalValue init $MAL_LIST_TYPE, 0, "", malEmptyValues, malEmptyEnvs, malEmptyValues, 0, 0, 0
+  env:MalEnv init malEmptyStrings, malEmptyValues, malEmptyEnvs, 0, id, 0, "", paths
   xout env
 endop
 

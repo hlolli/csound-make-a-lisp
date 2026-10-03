@@ -23,7 +23,7 @@ release-check:
     python3 tests/check-bundle.py --build-only
     python3 tests/check-release.py
 
-test: launchers bundle-check release-check smoke reader eval step3 step4 step5 step6 file-loading step7 step8 step9 step-a script-args unit core-helpers harness-reader harness-eval harness-env harness-step4 harness-step5 harness-step6 harness-step7 harness-step8 harness-step9 harness-stepA harness-threading harness-csound csound-interop
+test: launchers bundle-check release-check smoke reader eval step3 step4 step5 step6 file-loading step7 step8 step9 step-a script-args unit core-helpers clojure-forms namespaces harness-reader harness-eval harness-env harness-step4 harness-step5 harness-step6 harness-step7 harness-step8 harness-step9 harness-stepA harness-threading harness-csound csound-interop
 
 launchers:
     python3 tests/check-launchers.py
@@ -111,6 +111,17 @@ harness-stepA:
 
 core-helpers:
     ./run tests/core-helpers.mal
+
+clojure-forms:
+    ./run tests/clojure-forms.mal
+
+eval-forms:
+    {{csound}} {{csound_flags}} tests/eval-forms.orc
+
+namespaces:
+    ./run tests/namespaces.mal
+    {{csound}} {{csound_flags}} tests/namespace-sessions.orc
+    python3 tests/check-namespaces.py --csound "{{csound}}"
 
 harness-threading:
     python3 mal/runtest.py --test-timeout 120 --no-deferrable --no-optional tests/harness/threading.mal -- tests/harness/run-stepA-mal

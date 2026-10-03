@@ -3,10 +3,10 @@
 ;; Run from this repository: ./play demo/xanadu.mal
 
 ;; The original uses Csound's 32768 full scale. This host uses 1.
-(def! pluck-gain 0.06103515625)     ; 2000 / 32768
-(def! fm-gain 0.030517578125)       ; 1000 / 32768
-(def! pitch-shift 0.00666667)
-(def! control-oscili (csound/at-rate :k csound/oscili))
+(def pluck-gain 0.06103515625)     ; 2000 / 32768
+(def fm-gain 0.030517578125)       ; 1000 / 32768
+(def pitch-shift 0.00666667)
+(def control-oscili (csound/at-rate :k csound/oscili))
 
 ;; Sine, cosine, and the unscaled log of the Bessel function I0(x), x = 0..20.
 (csound/event "f" 1 0 65536 10 1)
@@ -15,15 +15,14 @@
 
 ;; All three strings share the same excitation table. Only the center string
 ;; has vibrato; the outer strings sit eight cents above and below the note.
-(def! plucked-strings
-  (fn* (pitch amplitude)
-    (let* [frequency (csound/cpspch pitch)
-           octave (csound/octpch pitch)
-           vibrato (control-oscili 0.008333333333333333 (/ frequency 50) 1)]
-      (mapv (fn* (frequency) (csound/pluck amplitude frequency 1000 1 1))
-            [(csound/cpsoct (+ octave vibrato))
-             (csound/cpsoct (+ octave pitch-shift))
-             (csound/cpsoct (- octave pitch-shift))]))))
+(defn plucked-strings [pitch amplitude]
+  (let* [frequency (csound/cpspch pitch)
+         octave (csound/octpch pitch)
+         vibrato (control-oscili 0.008333333333333333 (/ frequency 50) 1)]
+    (mapv (fn* (frequency) (csound/pluck amplitude frequency 1000 1 1))
+          [(csound/cpsoct (+ octave vibrato))
+           (csound/cpsoct (+ octave pitch-shift))
+           (csound/cpsoct (- octave pitch-shift))])))
 
 ;; Instrument 1: moving taps from 0.1 to 1 second and back, plus fixed echoes.
 ;; There is no feedback, so each tap can use its own delay line. vdelay uses
@@ -70,7 +69,7 @@
 ;; Each section has six sustained FM notes and six plucked notes, strummed
 ;; 0.1 seconds apart. Pitches retain Csound's octave.pitch-class notation.
 ;; Repeated pitches and the wide octave spacing are part of the source score.
-(def! sections
+(def sections
   [{:start 0 :ratio [2 0.2] :pluck XanaduMovingPluck
     :fm [7.06 8.01 8.06 8.10 8.11 9.04]
     :strings [8.06 9.01 9.06 9.10 9.11 10.04]}       ; F#7addB
@@ -93,18 +92,17 @@
     :fm [7.06 8.01 8.06 8.10 8.11 9.04]
     :strings [9.06 10.01 10.06 10.10 10.11 11.04]}]) ; F#7addB
 
-(def! section-events
-  (fn* (section)
-    (let* [start (get section :start)
-           ratio (get section :ratio)
-           pluck (get section :pluck)]
-      (concat
-       (mapv (fn* (pitch)
-               ["i" XanaduFM start 15 pitch (first ratio) (second ratio)])
-             (get section :fm))
-       (mapv (fn* (string pitch)
-               ["i" pluck (+ start (* string 0.1)) 10 pitch])
-             [0 1 2 3 4 5] (get section :strings))))))
+(defn section-events [section]
+  (let* [start (get section :start)
+         ratio (get section :ratio)
+         pluck (get section :pluck)]
+    (concat
+     (mapv (fn* (pitch)
+             ["i" XanaduFM start 15 pitch (first ratio) (second ratio)])
+           (get section :fm))
+     (mapv (fn* (string pitch)
+             ["i" pluck (+ start (* string 0.1)) 10 pitch])
+           [0 1 2 3 4 5] (get section :strings)))))
 
 (->> sections
      (mapv section-events)

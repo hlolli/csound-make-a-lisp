@@ -3,6 +3,33 @@
 A MAL interpreter written in Csound 7, with Clojure-style helpers and Csound
 instrument support.
 
+Use `def`, `defn`, and `defmacro` for definitions, and atoms for changing state:
+
+```clojure
+(def counter (atom 0))
+(defn tick! [] (swap! counter inc))
+(tick!)
+;; 1
+@counter
+;; 1
+```
+
+Collection updates return new values. Global definitions can be replaced,
+as in Clojure; `let` bindings keep their values. See
+[definitions and state](CORE.md#definitions-and-state) for syntax and limits.
+The original MAL forms still work for existing programs and self-hosting.
+
+Use `ns` to group definitions and `require` to load `.mal` libraries:
+
+```clojure
+(ns music.main (:require [music.notes :as notes]))
+(notes/add-note! 67)
+```
+
+Each namespace owns its definitions and aliases. Libraries can share atoms
+through qualified names. See
+[namespaces](CORE.md#namespaces) for the file layout and supported forms.
+
 ## Build the include file
 
 ```sh
@@ -53,6 +80,16 @@ The include guard permits repeated inclusion. Only `mal.inc` and Csound 7 are
 needed at runtime; the source checkout and reference MAL implementation are
 not required. The generated file contains its license and can be distributed
 on its own. Rebuild it after editing `src/` or changing `VERSION`.
+
+## Live evaluation
+
+For live coding in the Csound Web-IDE, see the
+[Web-IDE example](examples/web-ide/README.md). It includes a persistent
+`LispEval` hook, a Lisp file, and the WebMCP evaluation steps.
+
+Use `MalEvalFormsEnv(source, env)` for a region or file containing several
+forms. It returns the last value and the updated environment. Keep that
+environment for the next call. `MalEvalSourceEnv` still reads one form.
 
 ## Check the bundle
 

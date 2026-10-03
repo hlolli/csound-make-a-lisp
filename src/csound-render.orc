@@ -83,8 +83,23 @@ opcode MalCsoundRenderValue(value:MalValue):MalCsoundRender
         if (value.number == $MAL_CSOUND_INFIX_NODE) ithen
           result.expression init sprintf("(%s %s %s)", left.expression, value.string, right.expression)
         else
-          result.expression init sprintf("%s[%s]", left.expression, right.expression)
+          ;; Keep each read at its place in the graph, before later writes.
+          variable:S init sprintf("%sMal%d", types[0], malCsoundTemporaryCount)
+          malCsoundTemporaryCount += 1
+          statement:S init sprintf("  %s = %s[%s]\n", variable, left.expression, right.expression)
+          result.statements strcat result.statements, statement
+          result.expression init variable
         endif
+      elseif (value.number == $MAL_CSOUND_ARRAY_SET_NODE) ithen
+        arrayRender:MalCsoundRender init MalCsoundRenderValue(MalAt(value, 2))
+        indexRender:MalCsoundRender init MalCsoundRenderValue(MalAt(value, 3))
+        valueRender:MalCsoundRender init MalCsoundRenderValue(MalAt(value, 4))
+        result init MalCsoundAppendRender(result, arrayRender)
+        result init MalCsoundAppendRender(result, indexRender)
+        result init MalCsoundAppendRender(result, valueRender)
+        statement:S init sprintf("  %s[%s] = %s\n", arrayRender.expression, indexRender.expression, valueRender.expression)
+        result.statements strcat result.statements, statement
+        result.expression init arrayRender.expression
       elseif (value.number == $MAL_CSOUND_ARRAY_NODE) ithen
         variable:S init sprintf("%sMal%d", strsub(types[0], 0, 1), malCsoundTemporaryCount)
         malCsoundTemporaryCount += 1

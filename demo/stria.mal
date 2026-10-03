@@ -5,44 +5,40 @@
 ;; The score uses StriaVoice's parameter names. :start, :duration, :attack,
 ;; and :decay are seconds; :carrier, :mod-a, and :mod-b are Hz.
 ;; Translate named fields to Csound's p2..p32 order only when scheduling.
-(def! note-parameters
-  (fn* (note)
-    (concat
-     (mapv (partial get note)
-           [:start :duration :amplitude :carrier :mod-a :index-a-start :index-a-end
-            :mod-b :index-b-start :index-b-end :attack :decay :skew :distance :reverb-send])
-     [0 0 0 0 0] ; unused p17..p21
-     (mapv (partial get note) [:front-left :front-right :rear-right :rear-left])
-     [0 0] ; unused p26..p27
-     (mapv (partial get note) [:amplitude-table :skew-table :index-a-table :index-b-table])
-     [(get-in note [:end-flag] 0)])))
+(defn note-parameters [note]
+  (concat
+   (mapv (partial get note)
+         [:start :duration :amplitude :carrier :mod-a :index-a-start :index-a-end
+          :mod-b :index-b-start :index-b-end :attack :decay :skew :distance :reverb-send])
+   [0 0 0 0 0] ; unused p17..p21
+   (mapv (partial get note) [:front-left :front-right :rear-right :rear-left])
+   [0 0] ; unused p26..p27
+   (mapv (partial get note) [:amplitude-table :skew-table :index-a-table :index-b-table])
+   [(get-in note [:end-flag] 0)]))
 
-(def! play-note
+(def play-note
   (comp (partial apply csound/event "i" StriaVoice) note-parameters))
-(def! play-notes (partial mapv play-note))
+(def play-notes (partial mapv play-note))
 
-(def! play-reverb
-  (fn* (event)
-    (apply csound/event "i" StriaReverb
-           (mapv (partial get event) [:start :duration :rate-start :rate-end :depth :unused7]))))
+(defn play-reverb [event]
+  (apply csound/event "i" StriaReverb
+         (mapv (partial get event) [:start :duration :rate-start :rate-end :depth :unused7])))
 
-(def! play-table (partial apply csound/event "f"))
+(def play-table (partial apply csound/event "f"))
 
-(def! play-section
-  (fn* (section)
-    (do
-      (play-reverb (get section :reverb))
-      (play-notes (get section :notes)))))
+(defn play-section [section]
+  (do
+    (play-reverb (get section :reverb))
+    (play-notes (get section :notes))))
 
-(def! read-edn (comp read-string slurp))
-(def! play-section-file (comp play-section read-edn))
+(def read-edn (comp read-string slurp))
+(def play-section-file (comp play-section read-edn))
 
-(def! play-score
-  (fn* (score)
-    (do
-      (mapv play-table (get score :tables))
-      (csound/event "i" StriaOutput 0 (get score :duration))
-      (mapv play-section-file (get score :sections))
-      (csound/event "e" (get score :duration) 0))))
+(defn play-score [score]
+  (do
+    (mapv play-table (get score :tables))
+    (csound/event "i" StriaOutput 0 (get score :duration))
+    (mapv play-section-file (get score :sections))
+    (csound/event "e" (get score :duration) 0)))
 
 (-> "demo/stria/score.edn" read-edn play-score)

@@ -85,8 +85,9 @@ opcode MalCsoundSequence(args:MalValue):MalValue
   if (args.length > 0) ithen
     for index in [0 ... args.length - 1] do
       child:MalValue init MalAt(args, index)
-      if (child.type != $MAL_CSOUND_NODE_TYPE || strlen(MalCsoundTypes(child)) != 0) ithen
-        result init MalMkError("csound/do: expected Csound statements with no outputs")
+      if (child.type != $MAL_CSOUND_NODE_TYPE || \
+          (strlen(MalCsoundTypes(child)) != 0 && child.number != $MAL_CSOUND_ARRAY_SET_NODE)) ithen
+        result init MalMkError("csound/do: expected Csound statements or array updates")
         break
       endif
     od
@@ -313,44 +314,7 @@ opcode MalCsoundAtRate(rate:MalValue, fn:MalValue):MalValue
   xout result
 endop
 
-opcode MalCsoundArray(rate:MalValue, values:MalValue):MalValue
-  result:MalValue init MalMkError("csound/array: expected :i, :k, :a or :S and a vector")
-  if (rate.type == $MAL_KEYWORD_TYPE && strlen(rate.string) == 1 && \
-      strindex("ikaS", rate.string) >= 0 && values.type == $MAL_VECTOR_TYPE) ithen
-    arrayType:S init sprintf("%s[]", rate.string)
-    result init MalMkCsoundNode("array", $MAL_CSOUND_ARRAY_NODE, arrayType, values)
-    if (values.length > 0) ithen
-      for index in [0 ... values.length - 1] do
-        actual:S init MalCsoundTypes(MalAt(values, index))
-        if (MalCsoundTypeCost(actual, rate.string) < 0) ithen
-          result init MalMkError(sprintf("csound/array: element %d expected %s, got %s", \
-            index, rate.string, actual))
-          break
-        endif
-      od
-    endif
-  endif
-  xout result
-endop
-
-opcode MalCsoundArrayAt(array:MalValue, index:MalValue):MalValue
-  types:S init MalCsoundTypes(array)
-  result:MalValue init MalMkError("csound/aget: expected a one-dimensional array and an init-rate index")
-  if (strlen(types) == 3 && strcmp(strsub(types, 1), "[]") == 0 && \
-      strcmp(MalCsoundTypes(index), "i") == 0) ithen
-    if (index.type == $MAL_NUMBER_TYPE && (index.number < 0 || \
-        int(index.number) != index.number)) ithen
-      result init MalMkError("csound/aget: index must be a nonnegative integer")
-    elseif (array.number == $MAL_CSOUND_ARRAY_NODE && \
-            index.type == $MAL_NUMBER_TYPE && index.number >= array.length - 2) ithen
-      result init MalMkError("csound/aget: index out of bounds")
-    else
-      args:MalValue init MalMkList2(array, index)
-      result init MalMkCsoundNode("aget", $MAL_CSOUND_INDEX_NODE, strsub(types, 0, 1), args)
-    endif
-  endif
-  xout result
-endop
+#include "src/csound-arrays.orc"
 
 opcode MalCsoundType(value:MalValue):MalValue
   types:S init MalCsoundTypes(value)

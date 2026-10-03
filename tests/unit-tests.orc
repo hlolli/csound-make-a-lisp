@@ -311,7 +311,7 @@ instr TEST_ENV_SNAPSHOTS
   endif
 
   detached:MalEnv init snapshot.keys, snapshot.values, snapshot.outer, \
-    snapshot.length, -1, snapshot.persistent
+    snapshot.length, -1, snapshot.persistent, snapshot.namespace, snapshot.loadPaths
   detachedSnapshot:MalEnv MalEnvResolve detached
   detachedSnapshot.values[0] init MalMkList2(MalMkNumber(9), MalMkNumber(8))
   detachedSecond:i init detached.values[0].list[1].number
@@ -322,6 +322,27 @@ instr TEST_ENV_SNAPSHOTS
   endif
 
   prints "ENV snapshot, Assertion success\n"
+endin
+
+instr TEST_LET_RELEASE
+  env:MalEnv init MalMkStepAEnv()
+  liveBefore:i = malEnvCount - malEnvFreeCount
+  for index in [0 ... 24] do
+    value:MalValue, env = MalEvalSourceEnv( \
+      "(let [x 1 y (+ x 2) x 4] (+ x y))", env)
+    failed:MalValue, env = MalEvalSourceEnv( \
+      "(try* (let [x 1 y (throw 7)] y) (catch* e e))", env)
+    if (value.type != $MAL_NUMBER_TYPE || value.number != 7 || \
+        failed.type != $MAL_NUMBER_TYPE || failed.number != 7) ithen
+      prints "LET release, Assertion failed: wrong result\n"
+      exitnow(1)
+    endif
+  od
+  if (malEnvCount - malEnvFreeCount != liveBefore) ithen
+    prints "LET release, Assertion failed: unused scopes remain after evaluation\n"
+    exitnow(1)
+  endif
+  prints "LET release, Assertion success\n"
 endin
 
 instr TEST_METADATA
@@ -391,5 +412,6 @@ schedule("TEST_BUILTINS", 0, 0)
 schedule("TEST_ENV", 0, 0)
 schedule("TEST_ENV_RELEASE", 0, 0)
 schedule("TEST_ENV_SNAPSHOTS", 0, 0)
+schedule("TEST_LET_RELEASE", 0, 0)
 schedule("TEST_METADATA", 0, 0)
 event_i("e", 0, 0)

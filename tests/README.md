@@ -33,6 +33,40 @@ lexical scope, skipped forms, and the order and number of evaluations.
 `just core-helpers` checks collection operations, function composition,
 nested updates, conditional bindings, and early return from reductions.
 
+`just csound-interop` also checks collection operators on native arrays.
+The arrays fixture renders indexed reads, writes through aliases, control-rate
+indices, opcode-produced arrays, and string arrays. Signal levels check that
+writes happen in order and reach the same native storage.
+
+`just clojure-forms` checks `def`, `defn`, `defmacro`, `fn`, and `let`,
+including global definitions, local scope, closures, macros, and tail calls.
+It also checks immutable collection updates, saved atom values, shared atom
+references, failed swaps, and compatibility with the original MAL forms.
+`just test` and the standalone bundle check both run it.
+
+`just namespaces` checks qualified names, aliases, referred definitions,
+closures, macros, shared atoms, separate interpreter sessions, host bindings,
+and instruments with the same local name. It also checks real library files,
+nested imports, load-once behavior, cycles, failed imports, retry, and caller
+namespace restoration. The standalone bundle check runs these tests too.
+
+`just eval-forms` checks multi-form regions, persistent atoms and namespaces,
+reader errors, and recovery after an evaluation error. The bundle check also
+runs it without the source tree.
+
+To test the Web-IDE example against its browser engine, build `dist/mal.inc`
+and pass the installed browser package to the Node check:
+
+```sh
+python3 tools/bundle.py --output dist/mal.inc
+node tests/check-web-ide.mjs /path/to/web-ide/node_modules/@csound/browser/dist/csound.js
+```
+
+This uses the real WebAssembly engine without an audio device. It checks the
+`LispEval` hook, persistent state, errors, source strings, and the example
+instrument. Test the WebMCP tools in the IDE itself as described in the
+[Web-IDE example](../examples/web-ide/README.md).
+
 `just file-loading` checks repeated reads from one call site, empty files,
 long lines, filenames with spaces and Unicode, and nested `load-file` calls.
 It runs without the reference MAL checkout and forms part of `just test`.

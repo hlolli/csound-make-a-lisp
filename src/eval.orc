@@ -112,6 +112,8 @@ opcode MalIsSequential(value:MalValue):i
   xout result
 endop
 
+#include "src/namespaces.orc"
+
 opcode MalCopySequenceAs(value:MalValue, resultType:i):MalValue
   values:MalValue[] init value.length
 
@@ -346,7 +348,14 @@ opcode MalSeq(value:MalValue):MalValue
       endif
 
     default
-      result init MalMkError("seq: expected list, vector, map, string, or nil")
+      if (MalIsCsoundArray(value) == 1) ithen
+        sequence:MalValue init MalCsoundArraySeq(value)
+        if (sequence.type == $MAL_ERROR_TYPE || sequence.length > 0) ithen
+          result init sequence
+        endif
+      else
+        result init MalMkError("seq: expected list, vector, map, string, Csound array, or nil")
+      endif
   endsw
 
   xout result
@@ -512,8 +521,13 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
     else
       targetFn:MalValue init MalAt(args, 0)
       sequence:MalValue init MalAt(args, 1)
+      if (MalIsCsoundArray(sequence) == 1) ithen
+        sequence init MalCsoundArraySeq(sequence)
+      endif
 
-      if (MalIsSequential(sequence) == 0) ithen
+      if (sequence.type == $MAL_ERROR_TYPE) ithen
+        result init sequence
+      elseif (MalIsSequential(sequence) == 0) ithen
         result init MalMkError("map: second argument must be list or vector")
       else
         result init MalMapSequence(targetFn, sequence)
@@ -634,12 +648,23 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
     else
       mapValue:MalValue init MalAt(args, 0)
 
-      if (mapValue.type != $MAL_HASH_MAP_TYPE) ithen
-        result init MalMkError("assoc: first argument must be a hash map")
+      if (MalIsCsoundArray(mapValue) == 0 && \
+          mapValue.type != $MAL_HASH_MAP_TYPE && mapValue.type != $MAL_VECTOR_TYPE && \
+          mapValue.type != $MAL_NIL_TYPE) ithen
+        result init MalMkError("assoc: first argument must be a map, vector, or nil")
       elseif ((args.length - 1) % 2 != 0) ithen
         result init MalMkError("assoc: expected key/value pairs")
       else
-        result init MalAssocPairs(mapValue, args, 1)
+        result init mapValue
+        if (args.length > 1) ithen
+          for pairIndex in [0 ... (args.length - 1) / 2 - 1] do
+            keyIndex:i = 1 + pairIndex * 2
+            result init MalCoreAssoc(result, MalAt(args, keyIndex), MalAt(args, keyIndex + 1))
+            if (result.type == $MAL_ERROR_TYPE) ithen
+              break
+            endif
+          od
+        endif
       endif
     endif
 
@@ -663,7 +688,9 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
       mapValue:MalValue init MalAt(args, 0)
       key:MalValue init MalAt(args, 1)
 
-      if (mapValue.type == $MAL_NIL_TYPE) ithen
+      if (MalIsCsoundArray(mapValue) == 1) ithen
+        result init MalCsoundArrayRead(mapValue, key, "get")
+      elseif (mapValue.type == $MAL_NIL_TYPE) ithen
         result init MalMkValue($MAL_NIL_TYPE)
       elseif (mapValue.type != $MAL_HASH_MAP_TYPE) ithen
         result init MalMkError("get: first argument must be a hash map or nil")
@@ -679,7 +706,16 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
       mapValue:MalValue init MalAt(args, 0)
       key:MalValue init MalAt(args, 1)
 
-      if (mapValue.type != $MAL_HASH_MAP_TYPE) ithen
+      if (MalIsCsoundArray(mapValue) == 1) ithen
+        size:i = MalCsoundArraySize(mapValue)
+        if (size < 0 || MalIsCsoundNode(key) == 1) ithen
+          result init MalMkError("contains?: Csound array bounds are only known at instrument runtime")
+        else
+          validIndex:i = key.type == $MAL_NUMBER_TYPE && \
+            key.number == int(key.number) && key.number >= 0 && key.number < size
+          result init MalMkBool(validIndex)
+        endif
+      elseif (mapValue.type != $MAL_HASH_MAP_TYPE) ithen
         result init MalMkError("contains?: first argument must be a hash map")
       else
         found:i = MalMapFindKey(mapValue, key) >= 0
@@ -800,7 +836,12 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
     else
       sequence:MalValue init MalAt(args, 0)
 
-      if (MalIsSequential(sequence) == 0) ithen
+      if (MalIsCsoundArray(sequence) == 1) ithen
+        sequence init MalCsoundArraySeq(sequence)
+      endif
+      if (sequence.type == $MAL_ERROR_TYPE) ithen
+        result init sequence
+      elseif (MalIsSequential(sequence) == 0) ithen
         result init MalMkError("vec: expected list or vector argument")
       else
         result init MalCopySequenceAs(sequence, $MAL_VECTOR_TYPE)
@@ -814,7 +855,9 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
       sequence:MalValue init MalAt(args, 0)
       indexValue:MalValue init MalAt(args, 1)
 
-      if (MalIsSequential(sequence) == 0) ithen
+      if (MalIsCsoundArray(sequence) == 1) ithen
+        result init MalCsoundArrayRead(sequence, indexValue, "nth")
+      elseif (MalIsSequential(sequence) == 0) ithen
         result init MalMkError("nth: first argument must be list or vector")
       elseif (indexValue.type != $MAL_NUMBER_TYPE) ithen
         result init MalMkError("nth: index must be a number")
@@ -834,7 +877,9 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
     else
       sequence:MalValue init MalAt(args, 0)
 
-      if (sequence.type == $MAL_NIL_TYPE || \
+      if (MalIsCsoundArray(sequence) == 1) ithen
+        result init MalCsoundArrayRead(sequence, MalMkNumber(0), "first")
+      elseif (sequence.type == $MAL_NIL_TYPE || \
           (MalIsSequential(sequence) == 1 && sequence.length == 0)) ithen
         result init MalMkValue($MAL_NIL_TYPE)
       elseif (MalIsSequential(sequence) == 0) ithen
@@ -850,7 +895,12 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
     else
       sequence:MalValue init MalAt(args, 0)
 
-      if (sequence.type != $MAL_NIL_TYPE && MalIsSequential(sequence) == 0) ithen
+      if (MalIsCsoundArray(sequence) == 1) ithen
+        sequence init MalCsoundArraySeq(sequence)
+      endif
+      if (sequence.type == $MAL_ERROR_TYPE) ithen
+        result init sequence
+      elseif (sequence.type != $MAL_NIL_TYPE && MalIsSequential(sequence) == 0) ithen
         result init MalMkError("rest: expected list, vector, or nil")
       else
         result init MalMkValue($MAL_LIST_TYPE)
@@ -883,7 +933,9 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
     else
       collection:MalValue init MalAt(args, 0)
 
-      if (MalIsSequential(collection) == 0) ithen
+      if (MalIsCsoundArray(collection) == 1) ithen
+        result init MalMkError("conj: Csound arrays have a fixed length")
+      elseif (MalIsSequential(collection) == 0) ithen
         result init MalMkError("conj: first argument must be list or vector")
       else
         result init MalConj(args)
@@ -903,11 +955,20 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
       result init MalArityError(fn.string, 1, args.length)
     else
       value:MalValue init MalAt(args, 0)
-      isEmpty:i = value.type == $MAL_NIL_TYPE || \
-        value.type == $MAL_LIST_TYPE && value.length == 0 || \
-        value.type == $MAL_VECTOR_TYPE && value.length == 0 || \
-        value.type == $MAL_HASH_MAP_TYPE && value.length == 0
-      result init MalMkBool(isEmpty)
+      if (MalIsCsoundArray(value) == 1) ithen
+        size:i = MalCsoundArraySize(value)
+        if (size < 0) ithen
+          result init MalMkError("empty?: Csound array length is only known at instrument runtime")
+        else
+          result init MalMkBool(size == 0 ? 1 : 0)
+        endif
+      else
+        isEmpty:i = value.type == $MAL_NIL_TYPE || \
+          value.type == $MAL_LIST_TYPE && value.length == 0 || \
+          value.type == $MAL_VECTOR_TYPE && value.length == 0 || \
+          value.type == $MAL_HASH_MAP_TYPE && value.length == 0
+        result init MalMkBool(isEmpty)
+      endif
     endif
 
   elseif (strcmp(fn.string, "count") == 0) ithen
@@ -917,7 +978,9 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
       value:MalValue init MalAt(args, 0)
       result init MalMkValue($MAL_NUMBER_TYPE)
 
-      if (value.type == $MAL_NIL_TYPE) ithen
+      if (MalIsCsoundArray(value) == 1) ithen
+        result init MalCsoundArrayCount(value)
+      elseif (value.type == $MAL_NIL_TYPE) ithen
         result.number = 0
       elseif (value.type == $MAL_LIST_TYPE || \
               value.type == $MAL_VECTOR_TYPE) ithen
@@ -977,6 +1040,12 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
       instrumentName:MalValue init MalAt(args, 0)
       parameters:MalValue init MalAt(args, 1)
       graph:MalValue init MalAt(args, 2)
+      if (fn.number > 0 && MalCsoundIdentifierIsValid(instrumentName) == 1) ithen
+        namespaceIndex:i = fn.number - 1
+        if (strcmp(malNamespaces[namespaceIndex].name, "user") != 0) ithen
+          instrumentName init MalMkSymbol(sprintf("mal_ns_%d_%s", namespaceIndex, instrumentName.string))
+        endif
+      endif
       result init MalCompileCsoundInstrument( \
         instrumentName, parameters, graph)
     endif
@@ -1206,6 +1275,11 @@ opcode MalBindFunctionEnv(fn:MalValue, args:MalValue):(MalValue, MalEnv)
     capturedEnv:MalEnv init MalEnvResolve(closure[0])
     callEnv init MalMkEnvWithOuter(capturedEnv)
 
+    if (strlen(fn.string) > 0) ithen
+      callEnv.namespace init fn.string
+      callEnv init MalEnvStore(callEnv)
+    endif
+
     if (requiredCount > 0) ithen
       for index in [0 ... requiredCount - 1] do
         param:MalValue init MalAt(params, index)
@@ -1251,7 +1325,11 @@ opcode MalApply(fn:MalValue, args:MalValue):MalValue
   if (fn.type == $MAL_BUILTIN_OPERATOR_TYPE) ithen
     result:MalValue init MalApplyBuiltinOperator(fn, args)
   elseif (fn.type == $MAL_BUILTIN_TYPE) ithen
-    result:MalValue init MalApplyBuiltin(fn, args)
+    if (lenarray(fn.env) > 0) ithen
+      result:MalValue init MalApplyNamespaceBuiltin(fn, args)
+    else
+      result:MalValue init MalApplyBuiltin(fn, args)
+    endif
   elseif (fn.type == $MAL_BUILTIN_OPCODE_TYPE) ithen
     result:MalValue init MalApplyCsoundOpcode(fn, args)
   elseif (fn.type == $MAL_FUNCTION_TYPE) ithen
@@ -1331,7 +1409,7 @@ opcode MalEvalAstEnv(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   currentEnv:MalEnv init env
   switch ast.type
     case $MAL_SYMBOL_TYPE
-      result init MalEnvGet(env, ast.string)
+      result init MalResolveSymbol(env, ast.string)
 
     case $MAL_LIST_TYPE
       result, currentEnv = MalEvalSequenceEnv(ast, env, 0, $MAL_LIST_TYPE)
@@ -1439,7 +1517,7 @@ opcode MalFunctionCaptureEnv(fn:MalValue, env:MalEnv):MalValue
     retainedEnv:MalEnv init MalEnvRetain(env)
     closure:MalEnv[] init 1
     closure[0] init MalEnvHandle(retainedEnv.id)
-    result:MalValue init fn.type, fn.number, fn.string, fn.list, closure, \
+    result:MalValue init fn.type, fn.number, retainedEnv.namespace, fn.list, closure, \
       fn.metadata, fn.length, fn.isMacro, fn.astRef
   else
     result:MalValue init fn
@@ -1452,7 +1530,7 @@ opcode MalRefreshTopLevelFunctionClosures(env:MalEnv):MalEnv
   xout env
 endop
 
-opcode MalEvalDefinition(ast:MalValue, env:MalEnv, name:S, asMacro:i):(MalValue, MalEnv)
+opcode MalEvalDefinition(ast:MalValue, env:MalEnv, name:S, asMacro:i, atRoot:i):(MalValue, MalEnv)
   result:MalValue init MalMkValue($MAL_NIL_TYPE)
   currentEnv:MalEnv init env
   if (ast.length != 3) ithen
@@ -1465,8 +1543,17 @@ opcode MalEvalDefinition(ast:MalValue, env:MalEnv, name:S, asMacro:i):(MalValue,
     if (symbol.type != $MAL_SYMBOL_TYPE) ithen
       result init MalMkError(sprintf("%s: first argument must be a symbol", name))
     else
+      definitionEnv:MalEnv init MalEnvResolve(currentEnv)
+      key:MalValue init MalMkString(symbol.string)
+      if (atRoot == 1 || lenarray(definitionEnv.outer) == 0) ithen
+        key init MalDefinitionKey(definitionEnv, symbol.string)
+        definitionEnv init MalEnvRoot(definitionEnv)
+      endif
       definitionInputEnv:MalEnv init currentEnv
-      value:MalValue, currentEnv = EVAL_ENV(valueForm, definitionInputEnv)
+      value:MalValue init key
+      if (key.type != $MAL_ERROR_TYPE) ithen
+        value, currentEnv = EVAL_ENV(valueForm, definitionInputEnv)
+      endif
 
       if (value.type == $MAL_ERROR_TYPE) ithen
         result init value
@@ -1477,15 +1564,14 @@ opcode MalEvalDefinition(ast:MalValue, env:MalEnv, name:S, asMacro:i):(MalValue,
           value init MalFunctionAsMacro(value)
         endif
 
-        currentEnv init MalEnvSet(currentEnv, symbol.string, value)
+        definitionEnv init MalEnvSet(definitionEnv, key.string, value)
 
         if (MalIsFnForm(valueForm) == 1) ithen
           value init MalFunctionCaptureEnv(value, currentEnv)
-          currentEnv init MalEnvSet(currentEnv, symbol.string, value)
+          definitionEnv init MalEnvSet(definitionEnv, key.string, value)
         endif
 
-        currentEnv init MalRefreshTopLevelFunctionClosures(currentEnv)
-        value init MalEnvGet(currentEnv, symbol.string)
+        currentEnv init MalEnvResolve(currentEnv)
         result init value
       endif
     endif
@@ -1495,14 +1581,15 @@ opcode MalEvalDefinition(ast:MalValue, env:MalEnv, name:S, asMacro:i):(MalValue,
 endop
 
 opcode MalEvalDef(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
+  head:MalValue init MalAt(ast, 0)
   result:MalValue, currentEnv:MalEnv = \
-    MalEvalDefinition(ast, env, "def!", 0)
+    MalEvalDefinition(ast, env, head.string, 0, MalIsSymbolNamed(head, "def"))
   xout result, currentEnv
 endop
 
 opcode MalEvalDefMacro(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   result:MalValue, currentEnv:MalEnv = \
-    MalEvalDefinition(ast, env, "defmacro!", 1)
+    MalEvalDefinition(ast, env, "defmacro!", 1, 0)
   xout result, currentEnv
 endop
 
@@ -1555,6 +1642,8 @@ opcode MalEvalFn(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
 
   xout result, currentEnv
 endop
+
+#include "src/forms.orc"
 
 opcode MalEvalIf(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   result:MalValue init MalMkValue($MAL_NIL_TYPE)
@@ -1671,11 +1760,8 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
 
   while (done == 0) do
     transientEnvId:i = -1
-    hasDebug:i = MalEnvHas(evalEnv, "DEBUG-EVAL")
-
-    if (hasDebug == 1) ithen
-      debugValue:MalValue init MalEnvGet(evalEnv, "DEBUG-EVAL")
-
+    debugValue:MalValue init MalResolveSymbol(evalEnv, "DEBUG-EVAL")
+    if (debugValue.type != $MAL_ERROR_TYPE) ithen
       if (MalIsTruthy(debugValue) == 1) ithen
         SdebugAst:S init pr_str(workAst)
         prints "EVAL: %s\n", SdebugAst
@@ -1685,7 +1771,12 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
     if (workAst.type == $MAL_LIST_TYPE && workAst.length > 0) ithen
       head:MalValue init MalAt(workAst, 0)
 
-      if (MalIsSymbolNamed(head, "quote") == 1) ithen
+      if (MalIsSymbolNamed(head, "ns") == 1) ithen
+        result init MalEvalNamespace(workAst, evalEnv)
+        evalEnv init MalEnvResolve(evalEnv)
+        done = 1
+
+      elseif (MalIsSymbolNamed(head, "quote") == 1) ithen
         result init MalEvalQuote(workAst)
         done = 1
 
@@ -1702,7 +1793,7 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
           endif
         endif
 
-      elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "def!") == 0) ithen
+      elseif (MalIsSymbolNamed(head, "def") == 1 || MalIsSymbolNamed(head, "def!") == 1) ithen
         recursiveInputEnv init evalEnv
         result, evalEnv = MalEvalDef(workAst, recursiveInputEnv)
         done = 1
@@ -1711,6 +1802,18 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
         recursiveInputEnv init evalEnv
         result, evalEnv = MalEvalDefMacro(workAst, recursiveInputEnv)
         done = 1
+
+      elseif (MalIsSymbolNamed(head, "defn") == 1 || MalIsSymbolNamed(head, "defmacro") == 1) ithen
+        recursiveInputEnv init evalEnv
+        result, evalEnv = MalEvalNamedDefinition(workAst, recursiveInputEnv)
+        done = 1
+
+      elseif (MalIsSymbolNamed(head, "fn") == 1) ithen
+        workAst init MalExpandFn(workAst, 1, "fn")
+        if (workAst.type == $MAL_ERROR_TYPE) ithen
+          result init workAst
+          done = 1
+        endif
 
       elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "fn*") == 0) ithen
         recursiveInputEnv init evalEnv
@@ -1813,11 +1916,25 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
           endif
         endif
 
-      elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "let*") == 0) ithen
+      elseif (MalIsSymbolNamed(head, "let*") == 1 || MalIsSymbolNamed(head, "let") == 1) ithen
+        immutableLet:i = MalIsSymbolNamed(head, "let")
+        if (immutableLet == 1) ithen
+          ;; Validate every binding before running any of their value forms.
+          body:MalValue init MalLetBody(workAst)
+          if (body.type == $MAL_ERROR_TYPE) ithen
+            result init body
+            done = 1
+          else
+            workAst init MalMkList3(head, MalAt(workAst, 1), body)
+          endif
+        endif
         letEnv:MalEnv init MalMkEnvWithOuter(evalEnv)
-        transientEnvId = letEnv.id
+        transientEnvIds, transientEnvCount = MalEnvTrack( \
+          transientEnvIds, transientEnvCount, letEnv.id)
 
-        if (workAst.length != 3) ithen
+        if (done == 1) ithen
+          ;; Keep the validation error; the new scope will be released below.
+        elseif (workAst.length != 3) ithen
           result init MalMkError(sprintf("let*: expected 2 arguments, got %d", \
             workAst.length - 1))
           done = 1
@@ -1854,6 +1971,13 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
                   letError = 1
                   done = 1
                 else
+                  if (immutableLet == 1) ithen
+                    ;; Bind after evaluating in the preceding scope. Closures
+                    ;; keep earlier values even when a later name shadows one.
+                    letEnv init MalMkEnvWithOuter(letEnv)
+                    transientEnvIds, transientEnvCount = MalEnvTrack( \
+                      transientEnvIds, transientEnvCount, letEnv.id)
+                  endif
                   letEnv init MalEnvSet(letEnv, letName.string, letValue)
 
                   letIndex += 2
@@ -1931,29 +2055,8 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
     endif
 
     if (transientEnvId >= 0) ithen
-      transientCapacity:i = lenarray(transientEnvIds)
-
-      if (transientEnvCount >= transientCapacity) ithen
-        preservedEnvIds:i[] init transientEnvCount
-
-        if (transientEnvCount > 0) ithen
-          for copyIndex in [0 ... transientEnvCount - 1] do
-            preservedEnvIds[copyIndex] = transientEnvIds[copyIndex]
-          od
-        endif
-
-        newTransientCapacity:i = transientCapacity == 0 ? 16 : transientCapacity * 2
-        transientEnvIds init newTransientCapacity
-
-        if (transientEnvCount > 0) ithen
-          for copyIndex in [0 ... transientEnvCount - 1] do
-            transientEnvIds[copyIndex] = preservedEnvIds[copyIndex]
-          od
-        endif
-      endif
-
-      transientEnvIds[transientEnvCount] = transientEnvId
-      transientEnvCount += 1
+      transientEnvIds, transientEnvCount = MalEnvTrack( \
+        transientEnvIds, transientEnvCount, transientEnvId)
     endif
   od
 
@@ -1988,12 +2091,39 @@ opcode MalEvalSourceEnv(source:S, env:MalEnv):(MalValue, MalEnv)
   xout result, currentEnv
 endop
 
+;; Read every form before evaluation, since read-string and load-file reuse
+;; the reader's token storage. A region behaves like a top-level do form.
+opcode MalEvalFormsEnv(source:S, env:MalEnv):(MalValue, MalEnv)
+  ast:MalValue init MalMkList1(MalMkSymbol("do"))
+  tokens:MalTokens init tokenize(source)
+  if (tokens.length > 0) ithen
+    reader:MalReader init MalMkReader(tokens)
+    while (reader.done == 0 && ast.type != $MAL_ERROR_TYPE) do
+      form:MalReadResult init read_form(reader)
+      value:MalValue init MalReadResultValue(form)
+      reader init MalReadResultReader(form)
+      if (value.type == $MAL_ERROR_TYPE) ithen
+        ast init value
+      else
+        ast init MalAppendValue(ast, value)
+      endif
+    od
+  endif
+  nextEnv:MalEnv init env
+  if (ast.type == $MAL_ERROR_TYPE) ithen
+    result:MalValue init ast
+  else
+    result, nextEnv = EVAL_ENV(ast, env)
+  endif
+  xout result, nextEnv
+endop
+
 #include "src/threading.orc"
 
 opcode MalMkStep6Env():MalEnv
   env:MalEnv init MalMkStep2Env()
   env init MalEnvSet(env, "*ARGV*", MalMkValue($MAL_LIST_TYPE))
-  source:S init "(def! load-file (fn* (f) (eval (read-string (str \"(do \" (slurp f) \"\\nnil)\")))))"
+  source:S init "(defn load-file [f] (eval (read-string (str \"(do \" (slurp f) \"\\nnil)\"))))"
   result:MalValue, env = MalEvalSourceEnv(source, env)
 
   if (result.type == $MAL_ERROR_TYPE) ithen
@@ -2005,11 +2135,11 @@ endop
 
 opcode MalMkStep8Env():MalEnv
   env:MalEnv init MalMkStep6Env()
-  source:S init "(defmacro! cond (fn* (& xs) (if (> (count xs) 0) "
+  source:S init "(defmacro cond [& xs] (if (> (count xs) 0) "
   source strcat source, "(list 'if (first xs) "
   source strcat source, "(if (> (count xs) 1) (nth xs 1) "
   source strcat source, "(throw \"odd number of forms to cond\")) "
-  source strcat source, "(cons 'cond (rest (rest xs)))))))"
+  source strcat source, "(cons 'cond (rest (rest xs))))))"
   result:MalValue, env = MalEvalSourceEnv(source, env)
 
   if (result.type == $MAL_ERROR_TYPE) ithen
@@ -2060,7 +2190,7 @@ opcode MalMkStepAEnv():MalEnv
   env init MalEnvSet(env, "time-ms", MalMkBuiltin("time-ms"))
   env init MalEnvSet(env, "println", MalMkBuiltin("println"))
   env init MalEnvSet(env, "readline", MalMkBuiltin("readline"))
-  source:S init "(def! *host-language* \"Csound7\")"
+  source:S init "(def *host-language* \"Csound7\")"
   result:MalValue, env = MalEvalSourceEnv(source, env)
 
   if (result.type == $MAL_ERROR_TYPE) ithen
@@ -2069,11 +2199,14 @@ opcode MalMkStepAEnv():MalEnv
 
   env init MalInstallCoreHelpers(env)
   env init MalInstallThreadingMacros(env)
+  env init MalInstallNamespaces(env)
   xout env
 endop
 
 opcode MalMkCsoundEnv():MalEnv
   env:MalEnv init MalMkStepAEnv()
+  csoundNs:i = MalNsEnsure(env, "csound", 1)
+  malNamespaces[csoundNs].status = 1
   env init MalEnvSet(env, "csound-eval", MalMkBuiltin("csound-eval"))
   env init MalEnvSet(env, "csound/param-bindings", \
     MalMkBuiltin("csound/param-bindings"))
@@ -2090,8 +2223,10 @@ opcode MalMkCsoundEnv():MalEnv
   env init MalEnvSet(env, "csound/source", MalMkBuiltin("csound/source"))
   env init MalCsoundInstallOpcodes(env)
 
-  source:S init "(defmacro! csound/definst (fn* (name params body) (list 'def! name (list 'csound/compile-inst (list 'quote name) (list 'quote params) (list 'let* (csound/param-bindings params) body)))))"
+  env init MalNsSwitch(env, "csound")
+  source:S init "(defmacro definst [name params body] (list 'def name (list 'csound/compile-inst (list 'quote name) (list 'quote params) (list 'let* (csound/param-bindings params) body))))"
   result:MalValue, env = MalEvalSourceEnv(source, env)
+  env init MalNsSwitch(env, "user")
 
   if (result.type == $MAL_ERROR_TYPE) ithen
     prints "definst bootstrap failed: %s\n", result.string

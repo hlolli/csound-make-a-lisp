@@ -5,9 +5,9 @@
 ;; Preserve the reconstruction's FM voice, four-channel reverb, filter banks,
 ;; stereo fold-down, function tables, and full 958-second score.
 ;; The CsoundQt spectrogram and GUI setup do not affect the sound.
-(def! output-scale 0.000030517578125) ; 1 / 32768
-(def! k-linseg (csound/at-rate :k csound/linseg))
-(def! audio-bus (csound/at-rate :a csound/chnget))
+(def output-scale 0.000030517578125) ; 1 / 32768
+(def k-linseg (csound/at-rate :k csound/linseg))
+(def audio-bus (csound/at-rate :a csound/chnget))
 
 (csound/definst StriaVoice
   [amplitude 0 carrier 0 mod-a 0 index-a-start 0 index-a-end 0
@@ -41,10 +41,9 @@
 
 ;; A factor of two compensates for the reconstruction's sample rate.
 ;; The delay constants below equal the source's sample counts / 12800.
-(def! reverb-tap
-  (fn* (signal rate depth phase)
-    (let* [motion (csound/oscili (* 1000 depth) rate 1 phase)]
-      (csound/vdelay signal (* (+ 1000 motion) 0.078125) 10000))))
+(defn reverb-tap [signal rate depth phase]
+  (let* [motion (csound/oscili (* 1000 depth) rate 1 phase)]
+    (csound/vdelay signal (* (+ 1000 motion) 0.078125) 10000)))
 
 (csound/definst StriaReverb [rate-start 1 rate-end 1 depth -1 unused7 0]
   (let* [diffused (-> (audio-bus "stria-reverb")
@@ -72,13 +71,12 @@
                      "stria-rear-left")
       (csound/chnclear "stria-reverb"))))
 
-(def! filtered-channel
-  (fn* (channel)
-    (-> (audio-bus channel)
-        (csound/butterlp 11500)
-        (csound/butterlp 11500)
-        (csound/butterlp 11500)
-        (csound/butterlp 11500))))
+(defn filtered-channel [channel]
+  (-> (audio-bus channel)
+      (csound/butterlp 11500)
+      (csound/butterlp 11500)
+      (csound/butterlp 11500)
+      (csound/butterlp 11500)))
 
 ;; Define the output last so it runs after the voices and reverb each block.
 (csound/definst StriaOutput []

@@ -321,7 +321,7 @@ instr TEST
   env = ASSERT_REP_ENV("(assoc {} :a)", \
     "assoc: expected key/value pairs", env)
   env = ASSERT_REP_ENV("(assoc [] :a 1)", \
-    "assoc: first argument must be a hash map", env)
+    "vector key must be an integer", env)
   env = ASSERT_REP_ENV("(dissoc [])", \
     "dissoc: first argument must be a hash map", env)
   env = ASSERT_REP_ENV("(get [] :a)", \

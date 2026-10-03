@@ -55,6 +55,13 @@ FIXTURES = (
         ("classic synthesis", 0.21, 0.39),
         ("classic reverb tail", 0.44, 0.50),
     )),
+    RenderFixture("arrays", 0.51, (
+        ("indexed reads and updates", 0.01, 0.09),
+        ("shared array writes", 0.11, 0.19),
+        ("control-rate indices", 0.21, 0.29),
+        ("opcode-produced arrays", 0.31, 0.39),
+        ("string array writes", 0.41, 0.49),
+    )),
 )
 
 
@@ -159,6 +166,20 @@ def check_classic_audio(rate, channels):
             raise RuntimeError("classic: bus did not clear after the sender ended")
 
 
+def check_array_audio(rate, channels):
+    # Gains encode values read back from the native arrays. A copied array,
+    # skipped write, repeated write, or wrong index changes these levels.
+    amplitudes = ((0.017, 0.016), (0.02, 0.04), (0.02, 0.05),
+                  (0.04 / math.sqrt(2), 0.08 / math.sqrt(2)), (0.01, 0.01))
+    for region, expected_channels in enumerate(amplitudes):
+        for channel, amplitude in zip(channels, expected_channels):
+            actual = rms(section(channel, rate, region * 0.1 + 0.01,
+                                 region * 0.1 + 0.09)) / 32768
+            expected = amplitude / math.sqrt(2)
+            if not math.isclose(actual, expected, rel_tol=0.03):
+                raise RuntimeError(f"arrays: region {region} level {actual}, expected {expected}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--csound", default=os.environ.get("CSOUND", "csound"))
@@ -183,6 +204,8 @@ def main():
                     check_catalog_audio(rate, channels)
                 elif fixture.name == "classic":
                     check_classic_audio(rate, channels)
+                elif fixture.name == "arrays":
+                    check_array_audio(rate, channels)
                 instruments += len(fixture.regions)
     except (RuntimeError, OSError, wave.Error) as error:
         print(f"FAIL: {error}", file=sys.stderr)

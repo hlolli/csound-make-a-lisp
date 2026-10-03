@@ -111,8 +111,10 @@ def check_standalone(csound=None):
             host = (ROOT / "src" / name).read_text(encoding="utf-8")
             (directory / "src" / name).write_text(
                 host.replace(original_include, bundled_include), encoding="utf-8")
-        for name in ["check-file-loading.py", "check-csound-interop.py", "core-helpers.mal",
-                     "csound-interop.mal", "csound-catalog.mal", "csound-classic.mal"]:
+        for name in ["check-file-loading.py", "check-csound-interop.py", "check-namespaces.py",
+                     "core-helpers.mal", "clojure-forms.mal", "namespaces.mal",
+                     "csound-interop.mal", "csound-catalog.mal", "csound-classic.mal",
+                     "csound-arrays.mal"]:
             shutil.copy2(ROOT / "tests" / name, directory / "tests" / name)
 
         checkpoint = (ROOT / "tests/stepA-mal.orc").read_text(encoding="utf-8")
@@ -125,7 +127,25 @@ def check_standalone(csound=None):
         run([csound, "-n", "-d", "-m128", "--orc", "src/run.orc", "--",
              "tests/core-helpers.mal"], directory, " core helper checks")
         print("PASS: bundled core helpers and macros", flush=True)
-        for name in ["check-file-loading.py", "check-csound-interop.py"]:
+        run([csound, "-n", "-d", "-m128", "--orc", "src/run.orc", "--",
+             "tests/clojure-forms.mal"], directory, " Clojure form and immutability checks")
+        print("PASS: bundled Clojure forms, immutable values, and atoms", flush=True)
+
+        forms = (ROOT / "tests/eval-forms.orc").read_text(encoding="utf-8")
+        (directory / "eval-forms.orc").write_text(
+            forms.replace(original_include, bundled_include), encoding="utf-8")
+        run([csound, "-n", "-d", "-m128", "--orc", "eval-forms.orc"], directory,
+            "PASS: multiple forms, session state, reader errors, and recovery")
+        print("PASS: bundled region evaluation", flush=True)
+        run([csound, "-n", "-d", "-m128", "--orc", "src/run.orc", "--",
+             "tests/namespaces.mal"], directory, " namespace checks")
+        sessions = (ROOT / "tests/namespace-sessions.orc").read_text(encoding="utf-8")
+        (directory / "sessions.orc").write_text(
+            sessions.replace(original_include, bundled_include), encoding="utf-8")
+        run([csound, "-n", "-d", "-m128", "--orc", "sessions.orc"], directory,
+            "PASS: namespace session isolation")
+        print("PASS: bundled namespaces and session isolation", flush=True)
+        for name in ["check-file-loading.py", "check-namespaces.py", "check-csound-interop.py"]:
             print(run([sys.executable, str(directory / "tests" / name), "--csound", csound],
                       directory, "PASS:").strip(), flush=True)
 

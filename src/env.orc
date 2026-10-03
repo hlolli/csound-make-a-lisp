@@ -2,6 +2,8 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+declare MalNsRegister(root:MalEnv, key:S):void
+
 malEnvRegistry@global:MalEnv[] init 0
 malEnvCount@global:i init 0
 malEnvFreeIds@global:i[] init 0
@@ -75,7 +77,7 @@ endop
 ;; The member constructor lets snapshots share the value and outer arrays.
 opcode MalEnvSnapshot(env:MalEnv):MalEnv
   result:MalEnv init env.keys, env.values, env.outer, env.length, env.id, \
-    env.persistent
+    env.persistent, env.namespace, env.loadPaths
   xout result
 endop
 
@@ -108,7 +110,7 @@ opcode MalEnvRetain(env:MalEnv):MalEnv
 
   if (resolved.id >= 0 && resolved.persistent == 0) ithen
     resolved init resolved.keys, resolved.values, resolved.outer, \
-      resolved.length, resolved.id, 1
+      resolved.length, resolved.id, 1, resolved.namespace, resolved.loadPaths
     resolved MalEnvStore resolved
 
     if (lenarray(resolved.outer) > 0) ithen
@@ -135,11 +137,29 @@ opcode MalEnvRelease(env:MalEnv):void
   endif
 endop
 
+;; Record scopes to release when the evaluator returns, including tail calls.
+opcode MalEnvTrack(ids:i[], count:i, id:i):(i[], i)
+  capacity:i = lenarray(ids)
+  result:i[] init ids
+  if (count >= capacity) ithen
+    newCapacity:i = capacity == 0 ? 16 : capacity * 2
+    expanded:i[] init newCapacity
+    if (count > 0) ithen
+      for index in [0 ... count - 1] do
+        expanded[index] = ids[index]
+      od
+    endif
+    result init expanded
+  endif
+  result[count] = id
+  xout result, count + 1
+endop
+
 opcode MalMkEnv():MalEnv
   ;; TODO: Once Csound supports zero-argument struct init for UDTs, this
   ;; constructor can become a cleaner default-initialized MalEnv.
   id:i MalEnvAllocateId
-  env:MalEnv init malEmptyStrings, malEmptyValues, malEmptyEnvs, 0, id, 1
+  env:MalEnv init malEmptyStrings, malEmptyValues, malEmptyEnvs, 0, id, 1, "", MalMkList1(MalMkString("."))
   env MalEnvStore env
   xout env
 endop
@@ -149,7 +169,7 @@ opcode MalMkEnvWithOuter(parent:MalEnv):MalEnv
   resolvedParent:MalEnv MalEnvResolve parent
   outer:MalEnv[] init 1
   outer[0] MalEnvHandle resolvedParent.id
-  env:MalEnv init malEmptyStrings, malEmptyValues, outer, 0, id, 0
+  env:MalEnv init malEmptyStrings, malEmptyValues, outer, 0, id, 0, resolvedParent.namespace, MalMkValue($MAL_LIST_TYPE)
   env MalEnvStore env
   xout env
 endop
@@ -194,10 +214,13 @@ opcode MalEnvSet(env:MalEnv, key:S, value:MalValue):MalEnv
     keys[resolved.length] init key
     values[resolved.length] init value
     resolved init keys, values, resolved.outer, newLength, resolved.id, \
-      resolved.persistent
+      resolved.persistent, resolved.namespace, resolved.loadPaths
   endif
 
   resolved MalEnvStore resolved
+  if (lenarray(resolved.outer) == 0 && strlen(resolved.namespace) > 0) ithen
+    MalNsRegister(resolved, key)
+  endif
   xout resolved
 endop
 

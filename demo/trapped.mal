@@ -6,20 +6,19 @@
 ;; The local a/k names follow the source to make the equations easy to compare.
 ;; Parameters have names; unused score fields keep their original positions.
 ;; Csound's original amplitudes stay inside the graph. Scale only the outputs.
-(def! output-scale 0.000030517578125) ; 1 / 32768
-(def! stereo-out
-  (fn* (left right)
-    (csound/outs (* left output-scale) (* right output-scale))))
-(def! audio-bus (csound/at-rate :a csound/chnget))
-(def! k-line (csound/at-rate :k csound/line))
-(def! k-linseg (csound/at-rate :k csound/linseg))
-(def! k-expseg (csound/at-rate :k csound/expseg))
-(def! k-expon (csound/at-rate :k csound/expon))
-(def! k-linen (csound/at-rate :k csound/linen))
-(def! k-oscil (csound/at-rate :k csound/oscil))
-(def! k-randh (csound/at-rate :k csound/randh))
-(def! k-randi (csound/at-rate :k csound/randi))
-(def! k-phasor (csound/at-rate :k csound/phasor))
+(def output-scale 0.000030517578125) ; 1 / 32768
+(defn stereo-out [left right]
+  (csound/outs (* left output-scale) (* right output-scale)))
+(def audio-bus (csound/at-rate :a csound/chnget))
+(def k-line (csound/at-rate :k csound/line))
+(def k-linseg (csound/at-rate :k csound/linseg))
+(def k-expseg (csound/at-rate :k csound/expseg))
+(def k-expon (csound/at-rate :k csound/expon))
+(def k-linen (csound/at-rate :k csound/linen))
+(def k-oscil (csound/at-rate :k csound/oscil))
+(def k-randh (csound/at-rate :k csound/randh))
+(def k-randi (csound/at-rate :k csound/randi))
+(def k-phasor (csound/at-rate :k csound/phasor))
 
 (csound/event "f" 1 0 8192 10 1)
 (csound/event "f" 2 0 512 10 10 8 0 6 0 4 0 1)
@@ -349,7 +348,7 @@
 ;; 59/200, 61/230, 65/270, 78/40. Csound ramps seconds per beat.
 ;; Rows hold [beat start-seconds seconds-per-beat half-slope].
 ;; Fractions are decimal constants because plain MAL division truncates.
-(def! final-tempo
+(def final-tempo
   [[0 0 1 0]
    [40 40 1 0.1]
    [45 47.5 2 -0.0625]
@@ -362,31 +361,28 @@
    [65 62.97705314009661 0.2222222222222222 0.04914529914529915]
    [78 74.17149758454106 1.5 0]])
 
-(def! beat-seconds
-  (fn* (beat segments)
-    (let* [segment (or (->> segments
-                            (take-while (fn* (segment) (<= (first segment) beat)))
-                            last)
-                       (first segments))
-           delta (- beat (first segment))]
-      (+ (second segment)
-         (* delta (+ (nth segment 2) (* delta (nth segment 3))))))))
+(defn beat-seconds [beat segments]
+  (let* [segment (or (->> segments
+                          (take-while (fn* (segment) (<= (first segment) beat)))
+                          last)
+                     (first segments))
+         delta (- beat (first segment))]
+    (+ (second segment)
+       (* delta (+ (nth segment 2) (* delta (nth segment 3)))))))
 
-(def! voices
+(def voices
   {1 TrappedIvory 2 TrappedBlue 3 TrappedViolet 4 TrappedBlack 5 TrappedGreen
    6 TrappedCopper 7 TrappedPewter 8 TrappedRed 9 TrappedSand 10 TrappedTaupe
    11 TrappedRust 12 TrappedTeal 13 TrappedFoam 98 TrappedSmear 99 TrappedSwirl})
-(def! section-note
-  (fn* (offset tempo note)
-    (let* [voice (get voices (first note))
-           beat (second note)
-           start (beat-seconds beat tempo)
-           end (beat-seconds (+ beat (nth note 2)) tempo)]
-      (concat ["i" voice (+ offset start) (- end start)]
-              (drop 3 note)))))
-(def! play-section
-  (fn* (offset tempo notes)
-    (mapv (comp (partial apply csound/event) (partial section-note offset tempo)) notes)))
+(defn section-note [offset tempo note]
+  (let* [voice (get voices (first note))
+         beat (second note)
+         start (beat-seconds beat tempo)
+         end (beat-seconds (+ beat (nth note 2)) tempo)]
+    (concat ["i" voice (+ offset start) (- end start)]
+            (drop 3 note))))
+(defn play-section [offset tempo notes]
+  (mapv (comp (partial apply csound/event) (partial section-note offset tempo)) notes))
 
 ;; Note rows retain p1, p2, p3, and the source's remaining score fields.
 ;; The empty timing instrument (100) becomes each section's explicit length.

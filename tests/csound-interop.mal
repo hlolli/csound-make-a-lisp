@@ -80,8 +80,7 @@
   (try* (csound/aget ia 0.5) (catch* e e)))
 (check "array negative index" "csound/aget: index must be a nonnegative integer"
   (try* (csound/aget ia -1) (catch* e e)))
-(check "array index rate" "csound/aget: expected a one-dimensional array and an init-rate index"
-  (try* (csound/aget ia kfreq) (catch* e e)))
+(check "control index promotes the read" :k (csound/type (csound/aget ia kfreq)))
 (def! pan-array ((csound/at-rate :a-array csound/pan2) signal 0.5))
 (check "array output" :a-array (csound/type pan-array))
 (check "array is one output" 1 (count (csound/outputs pan-array)))

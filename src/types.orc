@@ -10,7 +10,9 @@ struct MalReader peek:S, position:i, length:i, done:i
 
 struct MalReadResult value:MalValue, reader:MalReader
 
-struct MalEnv keys:S[], values:MalValue[], outer:MalEnv[], length:i, id:i, persistent:i
+struct MalEnv keys:S[], values:MalValue[], outer:MalEnv[], length:i, id:i, persistent:i, namespace:S, loadPaths:MalValue
+
+struct MalNamespace name:S, owner:i, aliases:MalValue, refers:MalValue, core:i, status:i, keys:S[], slots:i[], length:i
 
 struct MalCsoundRender statements:S, expression:S, outputs:i, error:S
 

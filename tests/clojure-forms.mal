@@ -1,0 +1,156 @@
+;; This Source Code Form is subject to the terms of the Mozilla Public
+;; License, v. 2.0. If a copy of the MPL was not distributed with this
+;; file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+(def checks (atom 0))
+(defn check [label expected actual]
+  (if (= expected actual)
+    (swap! checks inc)
+    (throw (str label ": expected " (pr-str expected) ", got " (pr-str actual)))))
+(defn fails? [f] (try* (do (f) false) (catch* e true)))
+
+(check "def returns the value" 42 (def answer 42))
+(check "global lookup" 42 answer)
+(def saved-answer answer)
+(def answer 43)
+(check "redefinition preserves the old value" [42 43] [saved-answer answer])
+(defn read-answer [] answer)
+(def answer 44)
+(check "functions see global redefinition" 44 (read-answer))
+(check "def preserves a local name" 2 (let [answer 2] (def answer 45) answer))
+(check "def in let changes the global" 45 answer)
+(check "def evaluates in the local scope" 7 (let [x 7] (def from-local x)))
+(check "definition escapes let" 7 from-local)
+(let [offset 3] (defn add-offset [n] (+ offset n)))
+(check "global function retains its local closure" 7 (add-offset 4))
+(defn define-inside-call [x] (def from-call x))
+(define-inside-call 9)
+(check "definition escapes a call" 9 from-call)
+(check "local name does not escape" true (fails? (fn [] offset)))
+
+(def calls (atom []))
+(defn twice [x]
+  (swap! calls conj x)
+  (+ x x))
+(check "defn body returns last form" 12 (twice 6))
+(check "defn body runs in order" [6] @calls)
+(defn collect [x & xs] (cons x xs))
+(check "variadic defn" '(1 2 3) (collect 1 2 3))
+(defn countdown [n] (if (= n 0) :done (countdown (dec n))))
+(check "tail calls through defn" :done (countdown 2000))
+(defn countdown-with-let [n]
+  (let [remaining n]
+    (if (= remaining 0) :done (countdown-with-let (dec remaining)))))
+(check "tail calls through let" :done (countdown-with-let 1000))
+(defn later [] (forward))
+(defn forward [] :found)
+(check "forward function reference" :found (later))
+(check "fn supports several body forms" 5 ((fn [x] (swap! calls conj :fn) (inc x)) 4))
+(check "empty fn body" nil ((fn [])))
+(check "empty defn body" nil (do (defn empty-body []) (empty-body)))
+
+(defmacro unless [test & body] (list 'if test nil (cons 'do body)))
+(check "defmacro marks the function" true (macro? unless))
+(check "macro receives unevaluated forms" nil (unless true (throw "skipped") :bad))
+(check "macro expands several forms" :ok (unless false (swap! calls conj :macro) :ok))
+(check "macro body runs in order" :ok
+       (do (defmacro mark-and-expand [value]
+             (swap! calls conj :expand)
+             value)
+           (mark-and-expand :ok)))
+(check "new forms run their effects once" [6 :fn :macro :expand] @calls)
+(let [value 11] (defmacro captured [] value))
+(check "global macro retains its closure" 11 (captured))
+(def plain (fn [x] x))
+(defmacro wrapped [x] (plain x))
+(check "defmacro preserves other functions" [true false] [(fn? plain) (macro? plain)])
+
+(check "let returns its last body form" 3 (let [x 1 y (inc x)] x (+ x y)))
+(check "empty let body" nil (let [x 1]))
+(check "empty let bindings" 2 (let [] 1 2))
+(check "shadowing preserves captured locals" [1 2]
+       (let [x 1 f (fn [] x) x 2] [(f) x]))
+(check "binding initializer sees the preceding scope" 1
+       (let [x 1 x (fn [] x)] (x)))
+(check "later bindings do not leak into earlier closures" true
+       (let [f (fn [] not-yet-bound) not-yet-bound 2] (fails? f)))
+(check "let can bind the rest marker" 7 (let [& 7] &))
+(check "binding values run once in order" [1 2 [:first :second]]
+       (let [visits (atom [])
+             x (do (swap! visits conj :first) 1)
+             y (do (swap! visits conj :second) (inc x))]
+         [x y @visits]))
+
+(def original {:voice {:notes [60 64] :gain 0.2}})
+(def state (atom original))
+(def alias state)
+(def before @state)
+(check "swap returns the new value" {:voice {:notes [60 64 67] :gain 0.2}}
+       (swap! state update-in [:voice :notes] conj 67))
+(check "atom aliases share state" @state @alias)
+(check "swap preserves dereferenced snapshots" original before)
+(check "swap preserves input data" {:voice {:notes [60 64] :gain 0.2}} original)
+(check "assoc creates a new vector" [61 64] (assoc (get-in before [:voice :notes]) 0 61))
+(check "assoc appends at vector length" [1 2 3] (assoc [1] 1 2 2 3))
+(check "assoc creates a map from nil" {:a 1} (assoc nil :a 1))
+(check "assoc preserves map" [{:a 1} {:a 2 :b 3}]
+       (let [m {:a 1}] [m (assoc m :a 2 :b 3)]))
+(check "dissoc preserves map" [{:a 1 :b 2} {:b 2}]
+       (let [m {:a 1 :b 2}] [m (dissoc m :a)]))
+(check "conj preserves list and vector" ['(1 2) '(3 1 2) [1 2] [1 2 3]]
+       (let [xs '(1 2) ys [1 2]] [xs (conj xs 3) ys (conj ys 3)]))
+(defn literal [] '{:notes [60 64]})
+(check "updates leave quoted function bodies intact" [{:notes [61 64]} {:notes [60 64]}]
+       [(update-in (literal) [:notes] assoc 0 61) (literal)])
+(check "with-meta preserves original metadata" [nil {:tag :new}]
+       (let [xs [1 2] ys (with-meta xs {:tag :new})] [(meta xs) (meta ys)]))
+(check "assoc keeps collection metadata" {:tag :old}
+       (meta (assoc (with-meta [1] {:tag :old}) 0 2)))
+(def current @state)
+(check "failed swap throws" true (fails? (fn [] (swap! state (fn [old] (throw :failed))))))
+(check "failed swap preserves atom" current @state)
+(check "failed swap with a nonfunction throws" true (fails? (fn [] (swap! state 3))))
+(check "invalid swap preserves atom" current @state)
+(check "reset returns value" {:done true} (reset! alias {:done true}))
+(check "reset updates every alias" {:done true} @state)
+(check "reset preserves the previous value" {:voice {:notes [60 64 67] :gain 0.2}} current)
+(check "independent atoms have distinct identities" false (= (atom 0) (atom 0)))
+(check "atoms inside collections retain identity" 2
+       (let [cell (atom 1) snapshot {:cell cell}]
+         (reset! cell 2)
+         @(get snapshot :cell)))
+(defn make-counter [] (let [counter (atom 0)] (fn [] (swap! counter inc))))
+(def counter (make-counter))
+(check "closure owns changing state in an atom" [1 2] [(counter) (counter)])
+(check "atom storage growth preserves references" [2 0 19]
+       (let [first-cell (atom 1)
+             cells (mapv atom [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19])]
+         (swap! first-cell inc)
+         [@first-cell @(first cells) @(last cells)]))
+
+(check "failed definition preserves the old value" [true 45]
+       [(fails? (fn [] (def answer (throw :failed)))) answer])
+(check "eval accepts new definitions" 23 (eval '(def via-eval 23)))
+(check "eval definition is global" 23 via-eval)
+(check "legacy def still works" 10 (def! legacy 10))
+(check "legacy def stays local" [12 10] [(let* [legacy 11] (def! legacy 12)) legacy])
+(check "legacy macro still works" 3
+       (do (defmacro! legacy-macro (fn* [x] (list '+ x 1))) (legacy-macro 2)))
+
+(def invalid-effects (atom 0))
+(check "invalid forms fail before evaluating bodies" true
+       (every? identity
+               (map (fn [form] (fails? (fn [] (eval form))))
+                    '[(def) (def 1 (swap! invalid-effects inc))
+                      (def extra 1 2) (defn) (defn 1 [] 2)
+                      (defn bad (x) (swap! invalid-effects inc))
+                      (defn bad [x x] x) (defmacro bad [x &] x)
+                      (defmacro) (defmacro 1 [] 2) (fn) (fn (x) x)
+                      (fn [x & &] x) (fn [x & xs z] x) (fn [1] 2)
+                      (let) (let (x 1) x) (let [x] x)
+                      (let [x (swap! invalid-effects inc) 1 2] x)
+                      (assoc [1] -1 2) (assoc [1] 2 2) (assoc [1] 0.5 2)
+                      (assoc [1] :key 2) (assoc {} :key)
+                      (reset! 1 2) (swap! 1 inc)])))
+(check "invalid forms have no effects" 0 @invalid-effects)
+(println (str "PASS: " @checks " Clojure form and immutability checks"))

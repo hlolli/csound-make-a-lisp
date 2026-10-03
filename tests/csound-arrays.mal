@@ -1,0 +1,109 @@
+;; This Source Code Form is subject to the terms of the Mozilla Public
+;; License, v. 2.0. If a copy of the MPL was not distributed with this
+;; file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+(defn check [label expected actual]
+  (if (= expected actual)
+    (println "PASS" label)
+    (throw (str label ": expected " (pr-str expected) ", got " (pr-str actual)))))
+(defn check-type [label expected value] (check label expected (csound/type value)))
+(defn fails? [f] (try* (do (f) false) (catch* e true)))
+(defn tone [level] (csound/oscili level 440))
+
+(def frequencies (csound/array :i [1 2 3]))
+(def controls (csound/array :k [10 20]))
+(def labels (csound/array :S ["left" "right"]))
+(def index ((csound/at-rate :k csound/line) 1 1 1))
+(check-type "nth reads init arrays" :i (nth frequencies 0))
+(check-type "get reads control arrays" :k (get controls 1))
+(check-type "first reads strings" :S (first labels))
+(check-type "second reads arrays" :i (second frequencies))
+(check-type "last reads arrays" :k (last controls))
+(check-type "count reads arrays" :i (count frequencies))
+(check-type "control index promotes an init-array read" :k (nth frequencies index))
+(check-type "get-in reaches an array" :i (get-in {:notes frequencies} [:notes 1]))
+(check-type "assoc returns the native array" :i-array (assoc frequencies 0 4))
+(check-type "update accepts inc" :k-array (update controls 0 inc))
+(check-type "assoc-in reaches an array" :i-array
+  (get (assoc-in {:notes frequencies} [:notes 0] 4) :notes))
+(check-type "update-in reaches an array" :i-array
+  (get (update-in {:notes frequencies} [:notes 0] + 4) :notes))
+(check-type "vec exposes element graphs" :k (nth (vec controls) 0))
+(check "seq keeps the array length" 3 (count (seq frequencies)))
+(check-type "map accepts arrays" :i (first (map inc frequencies)))
+(check-type "reduce accepts arrays" :i (reduce + frequencies))
+(check "empty array sequence" nil (seq (csound/array :i [])))
+(check "empty array vector" [] (vec (csound/array :i [])))
+(check "empty? recognizes an empty native array" true (empty? (csound/array :i [])))
+(check "empty? recognizes a populated native array" false (empty? frequencies))
+(check "contains? checks array bounds" [true false false false]
+  [(contains? frequencies 2) (contains? frequencies 3)
+   (contains? frequencies -1) (contains? frequencies :note)])
+(check "first rejects an empty native array" true
+  (fails? (fn [] (first (csound/array :i [])))))
+(check "last rejects an empty native array" true
+  (fails? (fn [] (last (csound/array :i [])))))
+(check "array bounds survive an update" true
+  (fails? (fn [] (nth (assoc frequencies 0 4) 3))))
+(check "array writes do not append" true (fails? (fn [] (assoc frequencies 3 4))))
+(check "array index must be whole" true (fails? (fn [] (get controls 0.5))))
+(check "array index must be nonnegative" true (fails? (fn [] (nth controls -1))))
+(check "array key must be numeric" true (fails? (fn [] (get controls :note))))
+(check "array element type is checked" true (fails? (fn [] (assoc frequencies 0 "bad"))))
+(check "array writes do not downcast" true (fails? (fn [] (assoc frequencies 0 index))))
+(check "init-array writes need an init index" true
+  (fails? (fn [] (assoc frequencies index 4))))
+(check "MAL vectors still preserve their input" [[1 2] [3 2]]
+  (let [values [1 2]] [values (assoc values 0 3)]))
+
+;; Multiple writes and a read-modify-write must reach the same native array.
+(csound/definst ArrayValues []
+  (let [before (first frequencies)
+        written (update (assoc frequencies 0 4 2 6) 1 inc)
+        total (+ (nth written 0) (+ (get written 1) (last written)))
+        level (+ total (count written))]
+    ;; Left includes a read made before the writes; right uses only new values.
+    (csound/outs (tone (* 0.001 (+ before level))) (tone (* 0.001 level)))))
+
+;; Discarding an update's output in csound/do still writes through aliases.
+;; Reusing the same graph twice must emit that update only once.
+(csound/definst ArrayAliases []
+  (let [values (csound/array :k [1 0])
+        alias values
+        bump (update values 0 inc)]
+    (csound/do
+      bump bump
+      (assoc values 1 (* (first alias) 2))
+      (csound/outs (tone (* 0.01 (first alias)))
+                   (tone (* 0.01 (get alias 1)))))))
+
+(csound/definst ArrayIndices []
+  (let [initial (csound/array :i [10 20])
+        running (assoc (csound/array :k [30 40]) index 50)]
+    (csound/outs (tone (* 0.001 (nth initial index)))
+                 (tone (* 0.001 (nth running index))))))
+
+;; Opcode outputs have a length that MAL cannot inspect while building code.
+(def stereo ((csound/at-rate :a-array csound/pan2) (tone 0.04) 0.5))
+(check-type "count accepts opcode-produced arrays" :i (count stereo))
+(check "seq rejects an unknown length" true (fails? (fn [] (seq stereo))))
+(check "empty? rejects an unknown length" true (fails? (fn [] (empty? stereo))))
+(check "contains? rejects a runtime index" true
+  (fails? (fn [] (contains? controls index))))
+(csound/definst ArrayOutputs []
+  (let [written (assoc stereo 1 (* (first stereo) 2))]
+    (csound/outs (first written) (last written))))
+
+(csound/definst ArrayStrings []
+  (csound/do
+    (assoc labels 1 "changed")
+    (csound/outs (tone (csound/chnget (get labels 1))) (tone 0.01))))
+(csound/eval "chnset 0.5, \"right\"\nchnset 0.01, \"changed\"\nreturn 1")
+
+(csound/event "i" ArrayValues 0 0.1)
+(csound/event "i" ArrayAliases 0.1 0.1)
+(csound/event "i" ArrayIndices 0.2 0.1)
+(csound/event "i" ArrayOutputs 0.3 0.1)
+(csound/event "i" ArrayStrings 0.4 0.1)
+(csound/event "e" 0.51 0)
+(println "CSOUND-ARRAYS-PASS")

@@ -20,7 +20,10 @@ endop
 opcode MalCoreLookup(collection:MalValue, key:MalValue):(MalValue, i)
   result:MalValue init MalMkValue($MAL_NIL_TYPE)
   found:i = 0
-  if (collection.type == $MAL_HASH_MAP_TYPE) ithen
+  if (MalIsCsoundArray(collection) == 1) ithen
+    result init MalCsoundArrayRead(collection, key, "get-in")
+    found = 1
+  elseif (collection.type == $MAL_HASH_MAP_TYPE) ithen
     index:i = MalMapFindKey(collection, key)
     if (index >= 0) ithen
       result init MalAt(collection, index + 1)
@@ -44,7 +47,9 @@ endop
 
 opcode MalCoreAssoc(collection:MalValue, key:MalValue, value:MalValue):MalValue
   result:MalValue init MalMkError("expected a map, vector, or nil")
-  if (collection.type == $MAL_NIL_TYPE || collection.type == $MAL_HASH_MAP_TYPE) ithen
+  if (MalIsCsoundArray(collection) == 1) ithen
+    result init MalCsoundArrayWrite(collection, key, value)
+  elseif (collection.type == $MAL_NIL_TYPE || collection.type == $MAL_HASH_MAP_TYPE) ithen
     result init MalMapAssoc(collection, key, value)
     result.metadata init collection.metadata
   elseif (collection.type == $MAL_VECTOR_TYPE) ithen
@@ -79,7 +84,11 @@ opcode MalCoreAssocIn(collection:MalValue, path:MalValue, offset:i, value:MalVal
   replacement:MalValue init value
   if (offset + 1 < path.length) ithen
     child:MalValue, found:i = MalCoreLookup(collection, key)
-    replacement init MalCoreAssocIn(child, path, offset + 1, value)
+    if (child.type == $MAL_ERROR_TYPE) ithen
+      replacement init child
+    else
+      replacement init MalCoreAssocIn(child, path, offset + 1, value)
+    endif
   endif
   if (replacement.type == $MAL_ERROR_TYPE) ithen
     result:MalValue init replacement
@@ -95,7 +104,9 @@ opcode MalCoreGetIn(collection:MalValue, path:MalValue, fallback:MalValue):MalVa
     for index in [0 ... path.length - 1] do
       current:MalValue init result
       result, found:i = MalCoreLookup(current, MalAt(path, index))
-      if (found == 0) ithen
+      if (result.type == $MAL_ERROR_TYPE) ithen
+        break
+      elseif (found == 0) ithen
         result init fallback
         break
       endif
@@ -341,7 +352,10 @@ opcode MalCoreMaps(name:S, args:MalValue):MalValue
           callArgs init MalAppendValue(callArgs, MalAt(args, index))
         od
       endif
-      value:MalValue init MalApply(MalAt(args, 2), callArgs)
+      value:MalValue init old
+      if (old.type != $MAL_ERROR_TYPE) ithen
+        value init MalApply(MalAt(args, 2), callArgs)
+      endif
       if (value.type == $MAL_ERROR_TYPE) ithen
         result init value
       else
@@ -432,6 +446,10 @@ opcode MalApplyCoreBuiltin(fn:MalValue, args:MalValue):MalValue
           result.number = malReducedCount
           malReducedCount += 1
         endif
+      elseif (MalIsCsoundNode(value) == 1 && \
+              (strcmp(name, "inc") == 0 || strcmp(name, "dec") == 0)) ithen
+        operator:S init strcmp(name, "inc") == 0 ? "+" : "-"
+        result init MalMkCsoundInfix(operator, MalMkList2(value, MalMkNumber(1)))
       elseif (value.type != $MAL_NUMBER_TYPE) ithen
         result init MalMkError(sprintf("%s: expected a number", name))
       elseif (strcmp(name, "inc") == 0) ithen
@@ -453,9 +471,25 @@ opcode MalApplyCoreBuiltin(fn:MalValue, args:MalValue):MalValue
       result init MalArityError(name, 1, args.length)
     else
       original:MalValue init MalAt(args, 0)
-      sequence:MalValue init MalSeq(original)
+      sequence:MalValue init MalMkValue($MAL_NIL_TYPE)
+      directArrayRead:i = MalIsCsoundArray(original) == 1 && \
+        (strcmp(name, "second") == 0 || strcmp(name, "last") == 0)
+      if (directArrayRead == 0) ithen
+        sequence init MalSeq(original)
+      endif
       result init MalMkValue($MAL_NIL_TYPE)
-      if (sequence.type == $MAL_ERROR_TYPE) ithen
+      if (directArrayRead == 1) ithen
+        arrayIndex:MalValue init MalMkNumber(1)
+        if (strcmp(name, "last") == 0) ithen
+          size:i = MalCsoundArraySize(original)
+          if (size >= 0) ithen
+            arrayIndex init MalMkNumber(size - 1)
+          else
+            arrayIndex init MalMkCsoundInfix("-", MalMkList2(MalCsoundArrayCount(original), MalMkNumber(1)))
+          endif
+        endif
+        result init MalCsoundArrayRead(original, arrayIndex, name)
+      elseif (sequence.type == $MAL_ERROR_TYPE) ithen
         result init sequence
       elseif (strcmp(name, "not-empty") == 0) ithen
         if (sequence.length > 0) ithen
@@ -496,65 +530,56 @@ opcode MalInstallCoreHelpers(env:MalEnv):MalEnv
   od
   source:S init {{
 (do
-  (def! constantly (fn* (value) (fn* (& args) value)))
-  (def! complement (fn* (f) (fn* (& args) (not (apply f args)))))
-  (def! partial
-    (fn* (f & bound)
-      (if (empty? bound) f
-          (fn* (& args) (apply f (concat bound args))))))
-  (def! comp
-    (fn* (& functions)
-      (if (empty? functions) identity
-          (if (= (count functions) 1) (first functions)
-              (let* [ordered (reverse functions)]
-                (fn* (& args)
-                  ;; Keep reduced values as data so every function runs.
-                  (first
-                    (reduce (fn* (value f) (list (f (first value))))
-                            (list (apply (first ordered) args))
-                            (rest ordered)))))))))
-  (def! juxt
-    (fn* (f & functions)
-      (let* [all (cons f functions)]
-        (fn* (& args) (mapv (fn* (g) (apply g args)) all)))))
+  (defn constantly [value] (fn* (& args) value))
+  (defn complement [f] (fn* (& args) (not (apply f args))))
+  (defn partial [f & bound]
+    (if (empty? bound) f
+        (fn* (& args) (apply f (concat bound args)))))
+  (defn comp [& functions]
+    (if (empty? functions) identity
+        (if (= (count functions) 1) (first functions)
+            (let* [ordered (reverse functions)]
+              (fn* (& args)
+                ;; Keep reduced values as data so every function runs.
+                (first
+                  (reduce (fn* (value f) (list (f (first value))))
+                          (list (apply (first ordered) args))
+                          (rest ordered))))))))
+  (defn juxt [f & functions]
+    (let* [all (cons f functions)]
+      (fn* (& args) (mapv (fn* (g) (apply g args)) all))))
 
-  (def! core/logic
-    (fn* (all? forms)
-      (if (empty? forms) (if all? true nil)
-          (if (= (count forms) 1) (first forms)
-              (let* [name (gensym)]
-                (list 'let* (list name (first forms))
-                      (if all?
-                        (list 'if name (core/logic all? (rest forms)) name)
-                        (list 'if name name (core/logic all? (rest forms))))))))))
-  (defmacro! and (fn* (& forms) (core/logic true forms)))
-  (defmacro! or (fn* (& forms) (core/logic false forms)))
-  (defmacro! when (fn* (test & body) (list 'if test (cons 'do body) nil)))
-  (defmacro! when-not (fn* (test & body) (list 'if test nil (cons 'do body))))
+  (defn core/logic [all? forms]
+    (if (empty? forms) (if all? true nil)
+        (if (= (count forms) 1) (first forms)
+            (let* [name (gensym)]
+              (list 'let* (list name (first forms))
+                    (if all?
+                      (list 'if name (core/logic all? (rest forms)) name)
+                      (list 'if name name (core/logic all? (rest forms)))))))))
+  (defmacro and [& forms] (core/logic true forms))
+  (defmacro or [& forms] (core/logic false forms))
+  (defmacro when [test & body] (list 'if test (cons 'do body) nil))
+  (defmacro when-not [test & body] (list 'if test nil (cons 'do body)))
 
-  (def! core/binding
-    (fn* (bindings then else nil-only?)
-      (if (and (vector? bindings) (= (count bindings) 2) (symbol? (first bindings)))
-        (let* [name (gensym)
-               body (list (list 'fn* (list name)
-                                (list 'let* (list (first bindings) name) then)) name)]
-          (list 'let* (list name (nth bindings 1))
-                (if nil-only?
-                  (list 'if (list nil? name) else body)
-                  (list 'if name body else))))
-        (throw "conditional binding requires [name expression]"))))
-  (defmacro! if-let
-    (fn* (bindings then & otherwise)
-      (if (> (count otherwise) 1) (throw "if-let: expected 2 or 3 arguments")
-          (core/binding bindings then (first otherwise) false))))
-  (defmacro! if-some
-    (fn* (bindings then & otherwise)
-      (if (> (count otherwise) 1) (throw "if-some: expected 2 or 3 arguments")
-          (core/binding bindings then (first otherwise) true))))
-  (defmacro! when-let
-    (fn* (bindings & body) (core/binding bindings (cons 'do body) nil false)))
-  (defmacro! when-some
-    (fn* (bindings & body) (core/binding bindings (cons 'do body) nil true))))
+  (defn core/binding [bindings then else nil-only?]
+    (if (and (vector? bindings) (= (count bindings) 2) (symbol? (first bindings)))
+      (let* [name (gensym)
+             body (list (list 'fn* (list name)
+                              (list 'let* (list (first bindings) name) then)) name)]
+        (list 'let* (list name (nth bindings 1))
+              (if nil-only?
+                (list 'if (list nil? name) else body)
+                (list 'if name body else))))
+      (throw "conditional binding requires [name expression]")))
+  (defmacro if-let [bindings then & otherwise]
+    (if (> (count otherwise) 1) (throw "if-let: expected 2 or 3 arguments")
+        (core/binding bindings then (first otherwise) false)))
+  (defmacro if-some [bindings then & otherwise]
+    (if (> (count otherwise) 1) (throw "if-some: expected 2 or 3 arguments")
+        (core/binding bindings then (first otherwise) true)))
+  (defmacro when-let [bindings & body] (core/binding bindings (cons 'do body) nil false))
+  (defmacro when-some [bindings & body] (core/binding bindings (cons 'do body) nil true)))
 }}
   result:MalValue, currentEnv = MalEvalSourceEnv(source, currentEnv)
   if (result.type == $MAL_ERROR_TYPE) ithen

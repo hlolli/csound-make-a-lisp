@@ -68,9 +68,9 @@ EVALUATE:
 
   if (strcmp(Sinput, ":help") == 0) ithen
     Shelp init "Try these forms:\n  (+ 1 2)\n"
-    Shelp strcat Shelp, "  (def! square (fn* (x) (* x x)))\n"
+    Shelp strcat Shelp, "  (defn square [x] (* x x))\n"
     Shelp strcat Shelp, "  (map square [1 2 3 4])\n"
-    Shelp strcat Shelp, "  (def! counter (atom 0))\n"
+    Shelp strcat Shelp, "  (def counter (atom 0))\n"
     Shelp strcat Shelp, "  (swap! counter + 1)\n"
     Shelp strcat Shelp, \
       "  (try* (throw \"boom\") (catch* error error))\n"

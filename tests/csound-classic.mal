@@ -49,9 +49,9 @@
 (check-type "empty sequence" nil (csound/do))
 (check-type "nested sequence" nil
   (csound/do (csound/do (csound/chnmix signal "test")) (csound/chnclear "test")))
-(check "sequence rejects scalar" "csound/do: expected Csound statements with no outputs"
+(check "sequence rejects scalar" "csound/do: expected Csound statements or array updates"
   (try* (csound/do 1) (catch* e e)))
-(check "sequence rejects audio node" "csound/do: expected Csound statements with no outputs"
+(check "sequence rejects audio node" "csound/do: expected Csound statements or array updates"
   (try* (csound/do signal) (catch* e e)))
 (check "clear needs a channel" "csound/chnclear: no matching signature for ()"
   (try* (csound/chnclear) (catch* e e)))
