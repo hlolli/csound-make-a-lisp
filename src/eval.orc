@@ -480,6 +480,18 @@ opcode MalEquals(left:MalValue, right:MalValue):i
 
       case $MAL_REDUCED_TYPE
         result = left.number == right.number
+
+      case $MAL_CSOUND_INSTRUMENT_TYPE
+        ;; The name selects the Csound voice; defaults affect bare calls.
+        result = strcmp(left.string, right.string) == 0 && left.length == right.length
+        if (result == 1 && left.length > 0) ithen
+          for index in [0 ... left.length - 1] do
+            if (MalEquals(MalAt(left, index), MalAt(right, index)) == 0) ithen
+              result = 0
+              break
+            endif
+          od
+        endif
     endsw
   endif
 

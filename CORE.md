@@ -145,7 +145,7 @@ The earlier MAL learning steps keep their original global environment.
 
 | Use | Functions |
 | --- | --- |
-| Numbers and truth values | `inc`, `dec`, `zero?`, `pos?`, `neg?`, `some?`, `boolean`, `not=` |
+| Numbers and truth values | `inc`, `dec`, `mod`, `zero?`, `pos?`, `neg?`, `some?`, `boolean`, `not=` |
 | Compose functions | `identity`, `constantly`, `complement`, `partial`, `comp`, `juxt` |
 | Read sequences | `next`, `second`, `last`, `butlast`, `reverse`, `not-empty` |
 | Transform collections | `reduce`, `filter`, `remove`, `keep`, `mapv`, `filterv` |
@@ -173,6 +173,18 @@ The earlier MAL learning steps keep their original global environment.
 (get-in {:voice {:pan nil}} [:voice :pan] 0.5)
 ;; nil
 ```
+
+Fraction literals such as `1/3`, `-1/4`, and `7/2` read as numbers. The numerator
+is a signed integer; the denominator is an unsigned integer and must not be
+zero. They use Csound's double precision, not exact rational arithmetic, and
+print as decimals. For example, `[1/4 1/2 3/4]` reads as `[0.25 0.5 0.75]`.
+This does not change `/`, which still performs truncating division.
+
+`mod` takes two numbers and returns a remainder with the divisor's sign, as in
+[Clojure](https://clojure.github.io/clojure/clojure.core-api.html#clojure.core/mod).
+For example, `(mod 4 3)` returns `1` and `(mod -1 3)` returns `2`. A zero divisor
+raises an error. Use `(nth items (mod step (count items)))` to wrap an index
+through a nonempty vector; `nth` itself still checks its bounds.
 
 `mapv` accepts several collections and stops at the shortest one. `keep` drops
 only `nil`; `some` returns the first truthy predicate result. `get-in` accepts

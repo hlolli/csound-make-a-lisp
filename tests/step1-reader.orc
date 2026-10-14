@@ -306,6 +306,16 @@ instr TEST
   ASSERT_REP("123", "123")
   ASSERT_REP("-123", "-123")
   ASSERT_REP("1.5", "1.5")
+  ASSERT_REP("1/2", "0.5")
+  ASSERT_REP("-1/4", "-0.25")
+  ASSERT_REP("[1/4 1/2 3/4]", "[0.25 0.5 0.75]")
+  ASSERT_REP("music/3", "music/3")
+  FractionErrorAst:MalValue = READ("1/0")
+  if (FractionErrorAst.type != $MAL_ERROR_TYPE || \
+      strcmp(FractionErrorAst.string, "fraction: denominator must not be zero") != 0) then
+    prints "READ fraction zero denominator, Assertion failed\n"
+    exitnow(1)
+  endif
   ASSERT_REP("123 ", "123")
   ASSERT_REP("abc", "abc")
   ASSERT_REP("abc", "abc")

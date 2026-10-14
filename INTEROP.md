@@ -71,6 +71,10 @@ namespace identifier, so `music.voice/Tone` and `music.bass/Tone` can coexist.
 Pass the instrument value to `csound/event`; its host name is an internal
 detail. Instruments in `user` keep their original Csound names.
 
+Instrument values compare equal with `=` when their Csound names and positional
+defaults match. Metadata does not affect equality. Redefining the same Csound
+name updates that voice; it does not give older values a separate voice.
+
 Use `csound/source` to inspect orchestra text without defining an instrument:
 
 ```clojure

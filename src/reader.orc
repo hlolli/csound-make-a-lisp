@@ -231,6 +231,28 @@ opcode MalStringTokenHasClosingQuote(token:S):i
 endop
 
 
+;; Recognize signed integer/integer literals without changing qualified names.
+opcode MalFractionSlash(token:S):i
+  slash:i = strindex(token, "/")
+  length:i = strlen(token)
+  start:i = 0
+  if (length > 0 && (strchar:i(token, 0) == 45 || strchar:i(token, 0) == 43)) ithen
+    start = 1
+  endif
+  if (slash <= start || slash == length - 1) ithen
+    slash = -1
+  else
+    for index in [start ... length - 1] do
+      character:i = strchar:i(token, index)
+      if (index != slash && (character < 48 || character > 57)) ithen
+        slash = -1
+        break
+      endif
+    od
+  endif
+  xout slash
+endop
+
 opcode read_atom(reader:MalReader):MalValue
   Stoken init reader.peek
   itokenLen = strlen(Stoken)
@@ -246,6 +268,17 @@ opcode read_atom(reader:MalReader):MalValue
   elseif MalIsNumericString(Stoken) == 1 ithen
     inum = strtod:i(Stoken)
     v:MalValue init MalMkNumber(inum)
+  elseif MalFractionSlash(Stoken) > 0 ithen
+    slash:i = MalFractionSlash(Stoken)
+    numerator:i = strtod:i(strsub(Stoken, 0, slash))
+    denominator:i = strtod:i(strsub(Stoken, slash + 1))
+    if (denominator == 0) ithen
+      v init MalMkError("fraction: denominator must not be zero")
+    elseif (numerator - numerator != 0 || denominator - denominator != 0) ithen
+      v init MalMkError("fraction: numerator and denominator must be finite")
+    else
+      v init MalMkNumber(numerator / denominator)
+    endif
   elseif strcmp("nil", Stoken) == 0 ithen
     v:MalValue init MalMkValue($MAL_NIL_TYPE)
   elseif strcmp("true", Stoken) == 0 ithen

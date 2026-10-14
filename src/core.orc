@@ -373,6 +373,26 @@ opcode MalApplyCoreBuiltin(fn:MalValue, args:MalValue):MalValue
     result init MalCoreReduce(args)
   elseif (strcmp(name, "mapv") == 0) ithen
     result init MalCoreMapv(args)
+  elseif (strcmp(name, "mod") == 0) ithen
+    if (args.length != 2) ithen
+      result init MalArityError(name, 2, args.length)
+    else
+      dividend:MalValue init MalAt(args, 0)
+      divisor:MalValue init MalAt(args, 1)
+      if (dividend.type != $MAL_NUMBER_TYPE || divisor.type != $MAL_NUMBER_TYPE) ithen
+        result init MalMkError("mod: expected numeric arguments")
+      elseif (divisor.number == 0) ithen
+        result init MalMkError("mod: division by zero")
+      else
+        ;; Csound's remainder follows the dividend. mod follows the divisor.
+        remainder:i = dividend.number % divisor.number
+        if ((remainder < 0 && divisor.number > 0) || \
+            (remainder > 0 && divisor.number < 0)) ithen
+          remainder += divisor.number
+        endif
+        result init MalMkNumber(remainder)
+      endif
+    endif
   elseif (strcmp(name, "filter") == 0 || strcmp(name, "filterv") == 0 || \
           strcmp(name, "remove") == 0 || strcmp(name, "keep") == 0 || \
           strcmp(name, "every?") == 0 || strcmp(name, "not-every?") == 0 || \
@@ -519,7 +539,7 @@ endop
 
 opcode MalInstallCoreHelpers(env:MalEnv):MalEnv
   currentEnv:MalEnv init env
-  names:S[] fillarray "identity", "inc", "dec", "zero?", "pos?", "neg?", \
+  names:S[] fillarray "identity", "inc", "dec", "mod", "zero?", "pos?", "neg?", \
     "some?", "boolean", "not=", "next", "second", "last", "butlast", \
     "reverse", "not-empty", "reduce", "reduced", "reduced?", "ensure-reduced", \
     "unreduced", "filter", "remove", "keep", "mapv", "filterv", "every?", \
