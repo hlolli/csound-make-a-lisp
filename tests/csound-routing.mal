@@ -1,0 +1,104 @@
+;; This Source Code Form is subject to the terms of the Mozilla Public
+;; License, v. 2.0. If a copy of the MPL was not distributed with this
+;; file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+(defn check [label expected actual]
+  (if (= expected actual)
+    (println "PASS" label)
+    (throw (str label ": expected " (pr-str expected) ", got " (pr-str actual)))))
+
+(def audio (csound/line 0.02 1 0.02))
+(def control ((csound/at-rate :k csound/line) 0.02 1 0.02))
+(check "formatted string graph" :S (csound/type (csound/sprintf "bus-%d-%d" 1 2)))
+(check "format requires numeric init values" "csound/sprintf: no matching signature for (S, k)"
+  (try* (csound/sprintf "bus-%d" control) (catch* e e)))
+(check "format requires a value" "csound/sprintf: no matching signature for (S)"
+  (try* (csound/sprintf "bus") (catch* e e)))
+(check "init channel write" nil (csound/type (csound/chnset 0.02 "level")))
+(check "control channel write" nil (csound/type (csound/chnset control "level")))
+(check "audio channel write" nil (csound/type (csound/chnset audio "audio")))
+(check "string channel write" nil (csound/type (csound/chnset "value" "name")))
+(check "channel name is a string" "csound/chnset: no matching signature for (i, i)"
+  (try* (csound/chnset 1 2) (catch* e e)))
+(check "flanger" :a (csound/type (csound/flanger audio audio control)))
+(check "flanger maximum delay" :a (csound/type (csound/flanger audio audio control 0.1)))
+(check "flanger delay is audio" "csound/flanger: no matching signature for (a, k, i)"
+  (try* (csound/flanger audio control 0.5) (catch* e e)))
+(check "flanger feedback is control" "csound/flanger: no matching signature for (a, a, a)"
+  (try* (csound/flanger audio audio audio) (catch* e e)))
+(check "flanger maximum delay is init" "csound/flanger: no matching signature for (a, a, i, k)"
+  (try* (csound/flanger audio audio 0.5 control) (catch* e e)))
+
+(check "numeric source" "instr 100\nendin\nreturn 1\n"
+  (csound/source 100 [] (csound/do)))
+(check "maximum numeric source" "instr 32767\nendin\nreturn 1\n"
+  (csound/source 32767 [] (csound/do)))
+(map (fn [id]
+       (check (str "reject instrument id " id)
+         "csound/definst: name must be a Csound-compatible symbol or an integer from 1 to 32767"
+         (try* (csound/source id [] (csound/do)) (catch* e e))))
+  [0 -1 1.5 32768 90000 "100"])
+(def empty-numeric (csound/compile-inst 40 [] (csound/do)))
+(check "numeric equality" true (= empty-numeric (csound/definst 40 [] (csound/do))))
+(check "numeric ids differ" false (= empty-numeric (csound/definst 41 [] (csound/do))))
+(check "numeric defaults differ" false
+  (= empty-numeric (csound/definst 40 [level 0.02] (csound/do))))
+(check "numeric instrument call" nil (empty-numeric))
+
+;; Compile in reverse execution order, inside a namespace. Numeric IDs keep
+;; sends before effects and effects before output in every control block.
+(ns routing.test)
+(def same-numeric (csound/compile-inst 40 [] (csound/do)))
+(def audio-channel (csound/at-rate :a csound/chnget))
+(def return-voice
+  (csound/definst 30 [bus 1]
+    (let [left (csound/sprintf "bus-%d-left" bus)
+          right (csound/sprintf "bus-%d-right" bus)]
+      (csound/do
+        (csound/outs (audio-channel left) (audio-channel right))
+        (csound/chnclear left right)))))
+(def effect
+  (csound/definst 20 [bus 1]
+    (let [input (csound/sprintf "bus-%d-input" bus)
+          signal (audio-channel input)
+          delay (csound/line 0.002 p3 0.002)]
+      (csound/do
+        (csound/chnset (csound/flanger signal delay 0) (csound/sprintf "bus-%d-left" bus))
+        (csound/chnset (csound/flanger signal delay 0 0.01) (csound/sprintf "bus-%d-right" bus))
+        (csound/chnclear input)))))
+(def send
+  (csound/definst 10 [bus 1]
+    (let [signal (csound/line 0.02 p3 0.02)]
+      (csound/do
+        (csound/outs (* signal 0) signal)
+        (csound/chnmix signal (csound/sprintf "bus-%d-input" bus))))))
+
+;; Each channel write rate also compiles into running Csound code.
+(def controls
+  (csound/definst 50 []
+    (csound/do
+      (csound/chnset 0.02 "init-1")
+      (csound/chnset ((csound/at-rate :k csound/line) 0.03 p3 0.03) "control-level")
+      (csound/chnset (csound/sprintf "init-%d" 1) "level-name"))))
+(def controls-output
+  (csound/definst 60 []
+    (let [channel ((csound/at-rate :S csound/chnget) "level-name")
+          init-level ((csound/at-rate :i csound/chnget) channel)
+          control-level (csound/chnget "control-level")]
+      (csound/outs (csound/poscil init-level 440) (csound/poscil control-level 440)))))
+
+(ns user (:require [routing.test :as routing]))
+(check "numeric instrument remains callable across namespaces" true (fn? routing/send))
+(check "numeric ID is unchanged across namespaces" true
+  (= empty-numeric routing/same-numeric))
+(check "numeric instrument map key" :found
+  (get (hash-map empty-numeric :found) routing/same-numeric))
+(check "numeric metadata does not affect equality" true
+  (= routing/send (with-meta routing/send {:label :send})))
+(csound/event "i" routing/return-voice 0 0.15)
+(csound/event "i" routing/effect 0 0.15)
+(csound/event "i" routing/send 0 0.1)
+(csound/event "i" routing/controls 0.2 0.1)
+(csound/event "i" routing/controls-output 0.2 0.1)
+(csound/event "e" 0.31 0)
+(println "CSOUND-ROUTING-PASS")

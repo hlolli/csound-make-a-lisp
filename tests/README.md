@@ -54,6 +54,11 @@ namespace restoration. The standalone bundle check runs these tests too.
 reader errors, and recovery after an evaluation error. The bundle check also
 runs it without the source tree.
 
+`just eval-jobs` compares resumable evaluation with the synchronous evaluator.
+It checks closures, macros, errors, job cancellation, scope cleanup, collection
+callbacks, and an atom update that must retry after another client changes the
+atom. The standalone bundle check runs these fixtures too.
+
 To test the Web-IDE example against its browser engine, build `dist/mal.inc`
 and pass the installed browser package to the Node check:
 
@@ -73,7 +78,7 @@ It runs without the reference MAL checkout and forms part of `just test`.
 
 The Csound interop checks cover signature matching, rate selection, multiple
 outputs, typed arrays, function tables, and instrument scheduling. They render
-fourteen audio regions, check stereo output without clipping, and measure
+short audio regions, check stereo output without clipping, and measure
 array gains, envelope shape, delay onset, reverb tails, and numeric precision.
 The shared-channel check adds two sends, reads before clearing, and checks
 that the channel falls silent when its sender stops:
@@ -81,6 +86,11 @@ that the channel falls silent when its sender stops:
 ```sh
 just --set csound "$CSOUND" csound-interop
 ```
+
+The routing fixture declares numeric instruments in reverse order, then checks
+that sends still run before effects and output. It measures a flanger's onset
+to detect extra control-block delays, checks that buses clear, and exercises
+init, control, audio, and string channel writes with generated channel names.
 
 `just launchers` checks local build selection, environment overrides, and
 argument handling without starting Csound or opening an audio device.

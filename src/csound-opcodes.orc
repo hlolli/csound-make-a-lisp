@@ -147,6 +147,10 @@ opcode MalCsoundInstallEffectOpcodes(env:MalEnv):MalEnv
   fn init MalAppendValue(fn, MalCsoundSignature("a", "a,a,i,i", 3, "", 0))
   env init MalEnvSet(env, "csound/vdelay", fn)
 
+  fn init MalMkCsoundOpcode("flanger", "a")
+  fn init MalAppendValue(fn, MalCsoundSignature("a", "a,a,k,i", 3, "", 0))
+  env init MalEnvSet(env, "csound/flanger", fn)
+
   fn init MalMkCsoundOpcode("reverbsc", "a,a")
   fn init MalAppendValue(fn, MalCsoundSignature("a,a", "a,a,k,k,i,i,i", 4, "", 0))
   env init MalEnvSet(env, "csound/reverbsc", fn)
@@ -240,12 +244,20 @@ opcode MalCsoundInstallChannelOpcodes(env:MalEnv):MalEnv
     fn init MalAppendValue(fn, MalCsoundSignature(rates[index], "S", 1, "", 0))
   od
   env init MalEnvSet(env, "csound/chnget", fn)
+  fn init MalMkCsoundOpcode("chnset", "")
+  for index in [0 ... lenarray(rates) - 1] do
+    fn init MalAppendValue(fn, MalCsoundSignature("", strcat(rates[index], ",S"), 2, "", 0))
+  od
+  env init MalEnvSet(env, "csound/chnset", fn)
   fn init MalMkCsoundOpcode("chnmix", "")
   fn init MalAppendValue(fn, MalCsoundSignature("", "a,S", 2, "", 0))
   env init MalEnvSet(env, "csound/chnmix", fn)
   fn init MalMkCsoundOpcode("chnclear", "")
   fn init MalAppendValue(fn, MalCsoundSignature("", "", 0, "S", 1))
   env init MalEnvSet(env, "csound/chnclear", fn)
+  fn init MalMkCsoundOpcode("sprintf", "S")
+  fn init MalAppendValue(fn, MalCsoundSignature("S", "S", 1, "i", 1))
+  env init MalEnvSet(env, "csound/sprintf", fn)
   xout env
 endop
 

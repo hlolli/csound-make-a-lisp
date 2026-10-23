@@ -116,6 +116,22 @@
                 (def *ns* 'bad) (def missing-ns/value 2)])))
 (check "failed ns leaves caller namespace" 'user *ns*)
 (check "namespace maps are immutable" {} (do (assoc (ns-aliases 'user) 'x 'alpha) (ns-aliases 'user)))
+(ns ordered-names)
+(def zebra 9)
+(def a 1)
+(def aa 2)
+(def á 3)
+(def middle 4)
+(user/check "definitions resolve regardless of insertion order" [1 2 4 9 3]
+            [a aa middle zebra á])
+(user/check "missing name between existing names stays missing" true
+            (user/fails? (fn [] aaa)))
+(def a 10)
+(user/check "redefinition preserves neighboring bindings" [10 2 4 9 3]
+            [a aa middle zebra á])
+(ns user)
+(alias 'ordered 'ordered-names)
+(check "alias resolves bindings after insertion and redefinition" 10 ordered/a)
 (ns instruments.one)
 (csound/definst tone [] (csound/outs (csound/oscili 0 440) (csound/oscili 0 440)))
 (ns instruments.two)

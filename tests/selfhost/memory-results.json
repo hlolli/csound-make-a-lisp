@@ -1,0 +1,126 @@
+{
+  "workload": "Full self-hosted MAL Step A smoke test",
+  "metric": "Process peak RSS sampled every 50 ms, in MiB",
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "mal_src_orc_sha256": "9d973da279aba946e6161ffa1b2a30ef9553b764a4ae4a6480920be313a0cdd2",
+  "workload_sha256": "f68dafaab5757420077c495fbaa672e37dac32d1b9fc3f428eb631c11e897981",
+  "local_branch": "perf/mal-memory-stack",
+  "local_worktree": "/Users/hlolli/csound/csound/.worktrees/mal-memory-strings",
+  "stages": [
+    {
+      "change": "Substring buffers",
+      "csound_commit": "421a7a816",
+      "pull_requests": [
+        3364,
+        3365
+      ],
+      "runs": [
+        {
+          "peak_mib": 460.3,
+          "seconds": 136.27,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "change": "Struct field storage",
+      "csound_commit": "99159e88f",
+      "pull_requests": [
+        3364,
+        3365,
+        3366
+      ],
+      "runs": [
+        {
+          "peak_mib": 425.2,
+          "seconds": 109.1,
+          "passed": true
+        },
+        {
+          "peak_mib": 407.6,
+          "seconds": 105.15,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "change": "String storage",
+      "csound_commit": "a0d2599d9",
+      "pull_requests": [
+        3364,
+        3365,
+        3366,
+        3368
+      ],
+      "runs": [
+        {
+          "peak_mib": 377.9,
+          "seconds": 108.23,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "change": "Hash table capacity",
+      "csound_commit": "4ebf79172",
+      "pull_requests": [
+        3364,
+        3365,
+        3366,
+        3368,
+        3367
+      ],
+      "runs": [
+        {
+          "peak_mib": 352.1,
+          "seconds": 109.92,
+          "passed": true
+        },
+        {
+          "peak_mib": 352.8,
+          "seconds": 112.05,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "change": "UDO converter tables",
+      "csound_commit": "e70edbffd",
+      "pull_requests": [
+        3364,
+        3365,
+        3366,
+        3368,
+        3367,
+        3369
+      ],
+      "runs": [
+        {
+          "peak_mib": 308.4,
+          "seconds": 109.3,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "change": "Struct constructor argument blocks",
+      "csound_commit": "5fd262d15",
+      "pull_requests": [
+        3364,
+        3365,
+        3366,
+        3368,
+        3367,
+        3369,
+        3370
+      ],
+      "runs": [
+        {
+          "peak_mib": 307.3,
+          "seconds": 108.33,
+          "passed": true
+        }
+      ]
+    }
+  ]
+}

@@ -64,6 +64,28 @@ opcode MalCsoundIdentifierIsValid(value:MalValue):i
   xout valid
 endop
 
+opcode MalCsoundInstrumentNameIsValid(value:MalValue):i
+  if (value.type == $MAL_NUMBER_TYPE) ithen
+    ;; Running instrument instances store their ID in a signed 16-bit field.
+    valid:i = value.number > 0 && value.number <= 32767
+    if (valid == 1) ithen
+      valid = value.number == int(value.number)
+    endif
+  else
+    valid = MalCsoundIdentifierIsValid(value)
+  endif
+  xout valid
+endop
+
+opcode MalCsoundInstrumentName(value:MalValue):S
+  if (value.type == $MAL_NUMBER_TYPE) ithen
+    name:S init MalCsoundNumber(value.number)
+  else
+    name init value.string
+  endif
+  xout name
+endop
+
 opcode MalCsoundDefaults(params:MalValue):MalValue
   defaults:MalValue init MalMkValue($MAL_LIST_TYPE)
 

@@ -11,7 +11,11 @@ opcode MalScheduleCsoundInstrument(instrument:MalValue, args:MalValue, \
       "%s: expected at most %d arguments, got %d", \
       instrument.string, instrument.length, args.length))
   else
-    scoreLine:S init sprintf("i \"%s\" %s %s", instrument.string, \
+    identifier:S init sprintf("\"%s\"", instrument.string)
+    if (instrument.number > 0) ithen
+      identifier init MalCsoundNumber(instrument.number)
+    endif
+    scoreLine:S init sprintf("i %s %s %s", identifier, \
       MalCsoundNumber(start), MalCsoundNumber(duration))
 
     if (instrument.length > 0) ithen

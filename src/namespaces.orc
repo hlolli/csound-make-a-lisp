@@ -75,6 +75,21 @@ opcode MalNsSwitch(env:MalEnv, name:S):MalEnv
   xout MalEnvResolve(env)
 endop
 
+;; Namespace indexes keep names sorted; root binding slots remain stable.
+opcode MalNsKeyPosition(nsIndex:i, name:S):i
+  low:i = 0
+  high:i = malNamespaces[nsIndex].length
+  while (low < high) do
+    middle:i = int((low + high) / 2)
+    if (strcmp(malNamespaces[nsIndex].keys[middle], name) < 0) ithen
+      low = middle + 1
+    else
+      high = middle
+    endif
+  od
+  xout low
+endop
+
 opcode MalNsRegister(root:MalEnv, key:S):void
   ;; MalEnvSet keeps these indexes current. Root slots never move; lookup
   ;; needs only names and slot numbers, without copying all global values.
@@ -85,28 +100,25 @@ opcode MalNsRegister(root:MalEnv, key:S):void
   nsIndex:i = MalNsEnsure(root, prefix, 1)
   record:MalNamespace init malNamespaces[nsIndex]
   slot:i = MalEnvFind(root, key)
-  found:i = -1
-  if (record.length > 0) ithen
-    for index in [0 ... record.length - 1] do
-      if (strcmp(record.keys[index], local) == 0) ithen
-        found = index
-        break
-      endif
-    od
+  position:i = MalNsKeyPosition(nsIndex, local)
+  found:i = 0
+  if (position < record.length) ithen
+    found = strcmp(record.keys[position], local) == 0
   endif
-  if (found >= 0) ithen
-    record.slots[found] = slot
+  if (found == 1) ithen
+    record.slots[position] = slot
   else
     keys:S[] init record.length + 1
     slots:i[] init record.length + 1
     if (record.length > 0) ithen
       for index in [0 ... record.length - 1] do
-        keys[index] init record.keys[index]
-        slots[index] = record.slots[index]
+        destination:i = index < position ? index : index + 1
+        keys[destination] init record.keys[index]
+        slots[destination] = record.slots[index]
       od
     endif
-    keys[record.length] init local
-    slots[record.length] = slot
+    keys[position] init local
+    slots[position] = slot
     record.keys init keys
     record.slots init slots
     record.length += 1
@@ -118,14 +130,11 @@ opcode MalNsSlot(owner:i, namespace:S, name:S):i
   slot:i = -1
   nsIndex:i = MalNsFind(owner, namespace)
   if (nsIndex >= 0) ithen
-    record:MalNamespace init malNamespaces[nsIndex]
-    if (record.length > 0) ithen
-      for index in [0 ... record.length - 1] do
-        if (strcmp(record.keys[index], name) == 0) ithen
-          slot = record.slots[index]
-          break
-        endif
-      od
+    position:i = MalNsKeyPosition(nsIndex, name)
+    if (position < malNamespaces[nsIndex].length) ithen
+      if (strcmp(malNamespaces[nsIndex].keys[position], name) == 0) ithen
+        slot = malNamespaces[nsIndex].slots[position]
+      endif
     endif
   endif
   xout slot
@@ -160,7 +169,7 @@ opcode MalResolveSymbol(env:MalEnv, name:S):MalValue
   else
     namespace:S init malEnvRegistry[id].namespace
     found:i = 0
-    result:MalValue init MalMkError(sprintf("'%s' not found", name))
+    result:MalValue init MalMkValue($MAL_NIL_TYPE)
     while (id != rootId && found == 0) do
       if (malEnvRegistry[id].length > 0) ithen
         for index in [0 ... malEnvRegistry[id].length - 1] do
@@ -174,33 +183,42 @@ opcode MalResolveSymbol(env:MalEnv, name:S):MalValue
       id = malEnvRegistry[id].outer[0].id
     od
     if (found == 0) ithen
-      prefix:S, local:S = MalNameParts(name)
-      nsIndex:i = MalNsFind(rootId, namespace)
-      if (strlen(prefix) > 0) ithen
-        if (nsIndex >= 0) ithen
-          aliasIndex:i = MalMapFindKey(malNamespaces[nsIndex].aliases, MalMkSymbol(prefix))
-          if (aliasIndex >= 0) ithen
-            target:MalValue init MalAt(malNamespaces[nsIndex].aliases, aliasIndex + 1)
-            prefix init target.string
-          endif
-        endif
-        result init MalNsQualified(rootId, prefix, local)
-      elseif (strcmp(name, "*ns*") == 0) ithen
+      if (strcmp(name, "*ns*") == 0) ithen
         result init MalMkSymbol(malEnvRegistry[rootId].namespace)
       else
-        result init MalNsQualified(rootId, namespace, name)
-        if (result.type == $MAL_ERROR_TYPE && nsIndex >= 0) ithen
-          refIndex:i = MalMapFindKey(malNamespaces[nsIndex].refers, MalMkSymbol(name))
-          if (refIndex >= 0) ithen
-            target:MalValue init MalAt(malNamespaces[nsIndex].refers, refIndex + 1)
-            targetNs:S, targetName:S = MalNameParts(target.string)
-            result init MalNsQualified(rootId, targetNs, targetName)
-          elseif (malNamespaces[nsIndex].core == 1) ithen
-            result init MalNsQualified(rootId, "clojure.core", name)
+        slot:i = -1
+        prefix:S, local:S = MalNameParts(name)
+        nsIndex:i = MalNsFind(rootId, namespace)
+        if (strlen(prefix) > 0) ithen
+          if (nsIndex >= 0) ithen
+            aliasIndex:i = MalMapFindKey(malNamespaces[nsIndex].aliases, MalMkSymbol(prefix))
+            if (aliasIndex >= 0) ithen
+              target:MalValue init MalAt(malNamespaces[nsIndex].aliases, aliasIndex + 1)
+              prefix init target.string
+            endif
+          endif
+          slot = MalNsSlot(rootId, prefix, local)
+          if (slot < 0) ithen
+            result init MalMkError(sprintf("'%s/%s' not found", prefix, local))
+          endif
+        else
+          slot = MalNsSlot(rootId, namespace, name)
+          if (slot < 0 && nsIndex >= 0) ithen
+            refIndex:i = MalMapFindKey(malNamespaces[nsIndex].refers, MalMkSymbol(name))
+            if (refIndex >= 0) ithen
+              target:MalValue init MalAt(malNamespaces[nsIndex].refers, refIndex + 1)
+              targetNs:S, targetName:S = MalNameParts(target.string)
+              slot = MalNsSlot(rootId, targetNs, targetName)
+            elseif (malNamespaces[nsIndex].core == 1) ithen
+              slot = MalNsSlot(rootId, "clojure.core", name)
+            endif
+          endif
+          if (slot < 0) ithen
+            result init MalMkError(sprintf("'%s' not found", name))
           endif
         endif
-        if (result.type == $MAL_ERROR_TYPE) ithen
-          result init MalMkError(sprintf("'%s' not found", name))
+        if (slot >= 0) ithen
+          result init malEnvRegistry[rootId].values[slot]
         endif
       endif
     endif

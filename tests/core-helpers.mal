@@ -94,6 +94,33 @@
 (check "empty string" nil (not-empty ""))
 (check "sequence of map entries" '([:a 1]) (seq {:a 1}))
 (check "sequence of empty map" nil (seq {}))
+(check "nested vector map key" 42
+       (get (assoc {} ["voice" [1 2]] 42) ["voice" [1 2]]))
+(check "list and vector map keys agree" :value
+       (get (hash-map [1 [2 3]] :value) '(1 (2 3))))
+(check "structural map key contains" true (contains? {[1 2] nil} '(1 2)))
+(check "structural key assoc replaces" [1 :new]
+       (let* [value (assoc {[1 2] :old} '(1 2) :new)]
+         [(count value) (get value [1 2])]))
+(check "structural key dissoc" {:keep 1}
+       (dissoc {[1 2] :drop :keep 1} '(1 2)))
+(check "map key ignores entry order" :found
+       (get (hash-map {:a [1 2] :b 3} :found) {:b 3 :a '(1 2)}))
+(check "nested map key" :found
+       (get (hash-map [{[1 2] {:x 3}}] :found) '[{(1 2) {:x 3}}]))
+(check "structural key mismatch" nil
+       (get {[1 2] :value} [1 3]))
+(check "reader normalizes structural keys" [1 :last]
+       (let* [value (read-string "{[1 2] :first (1 2) :last}")]
+         [(count value) (get value [1 2])]))
+(check "map equality uses structural keys" true
+       (= {[1 2] {:a 3}} (hash-map '(1 2) {:a 3})))
+(check "key metadata does not affect identity" :value
+       (get (hash-map (with-meta [1 2] {:label :a}) :value)
+            (with-meta [1 2] {:label :b})))
+(check "atom identity inside keys" [:found nil]
+       (let* [a (atom 1) b (atom 1) value (hash-map [a] :found)]
+         [(get value [a]) (get value [b])]))
 (check "second string" "b" (second "abc"))
 (check "last string" "c" (last "abc"))
 (check "take string" '("a" "b") (take 2 "abc"))
@@ -214,6 +241,15 @@
 (check "and preserves nil" nil (and 1 nil missing))
 (check "or returns first truthy value" 0 (or nil false 0 missing))
 (check "or final false" false (or nil false))
+(check "logic expansion accepts vector forms" 9 (eval (core/logic true [true 9])))
+(check "logic expansion handles empty forms" nil (core/logic false []))
+(check "logic expansion handles one form" 'unchanged (core/logic true '[unchanged]))
+(def! original-logic core/logic)
+(def! core/logic (fn* [all? forms] 91))
+(check "and uses the current expansion helper" 91 (and missing another-missing))
+(check "or uses the current expansion helper" 91 (or missing another-missing))
+(def! core/logic original-logic)
+(check "logic helper restoration" 7 (and true 7))
 (check "when skips body" nil (when false missing))
 (check "when returns final form" 3 (when true 1 2 3))
 (check "when empty body" nil (when true))

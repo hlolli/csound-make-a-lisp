@@ -2,8 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-declare EVAL_ENV(result:MalValue, nextEnv:MalEnv):(MalValue, MalEnv)
-declare MalEquals(left:MalValue, right:MalValue):(i)
+declare MalEvalInternal(result:MalValue, nextEnv:MalEnv):(MalValue, MalEnv)
 declare MalApply(fn:MalValue, args:MalValue):(MalValue)
 declare MalQuasiquote(ast:MalValue):(MalValue)
 declare MalEvalSourceEnv(source:S, env:MalEnv):(MalValue, MalEnv)
@@ -483,7 +482,7 @@ opcode MalEquals(left:MalValue, right:MalValue):i
 
       case $MAL_CSOUND_INSTRUMENT_TYPE
         ;; The name selects the Csound voice; defaults affect bare calls.
-        result = strcmp(left.string, right.string) == 0 && left.length == right.length
+        result = left.number == right.number && strcmp(left.string, right.string) == 0 && left.length == right.length
         if (result == 1 && left.length > 0) ithen
           for index in [0 ... left.length - 1] do
             if (MalEquals(MalAt(left, index), MalAt(right, index)) == 0) ithen
@@ -1284,8 +1283,7 @@ opcode MalBindFunctionEnv(fn:MalValue, args:MalValue):(MalValue, MalEnv)
     result init MalMkError("fn*: missing closure environment")
   else
     closure:MalEnv[] init fn.env
-    capturedEnv:MalEnv init MalEnvResolve(closure[0])
-    callEnv init MalMkEnvWithOuter(capturedEnv)
+    callEnv init MalMkEnvWithOuter(closure[0])
 
     if (strlen(fn.string) > 0) ithen
       callEnv.namespace init fn.string
@@ -1324,8 +1322,8 @@ opcode MalApplyFunction(fn:MalValue, args:MalValue):MalValue
 
   if (result.type != $MAL_ERROR_TYPE) ithen
     body:MalValue init MalFunctionBody(fn)
-    bodyInputEnv:MalEnv init callEnv
-    result, callEnv = EVAL_ENV(body, bodyInputEnv)
+    bodyInputEnv:MalEnv init MalEnvHandle(callEnv.id)
+    result, callEnv = MalEvalInternal(body, bodyInputEnv)
   endif
 
   MalEnvRelease(callEnv)
@@ -1357,14 +1355,14 @@ endop
 
 opcode MalEvalSequenceEnv(ast:MalValue, env:MalEnv, startIndex:i, resultType:i):(MalValue, MalEnv)
   result:MalValue init MalMkValue(resultType)
-  currentEnv:MalEnv init env
+  currentEnv:MalEnv init MalEnvHandle(env.id)
   index:i = startIndex
   done:i = 0
 
   while (index < ast.length && done == 0) do
     value:MalValue init MalAt(ast, index)
-    valueInputEnv:MalEnv init currentEnv
-    evaluated:MalValue, currentEnv = EVAL_ENV(value, valueInputEnv)
+    valueInputEnv:MalEnv init MalEnvHandle(currentEnv.id)
+    evaluated:MalValue, currentEnv = MalEvalInternal(value, valueInputEnv)
 
     if (evaluated.type == $MAL_ERROR_TYPE) ithen
       result init evaluated
@@ -1393,15 +1391,15 @@ endop
 
 opcode MalEvalHashMapEnv(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   result:MalValue init MalMkValue($MAL_HASH_MAP_TYPE)
-  currentEnv:MalEnv init env
+  currentEnv:MalEnv init MalEnvHandle(env.id)
   index:i = 0
   done:i = 0
 
   while (index < ast.length && done == 0) do
     key:MalValue init MalAt(ast, index)
     value:MalValue init MalAt(ast, index + 1)
-    valueInputEnv:MalEnv init currentEnv
-    evaluated:MalValue, currentEnv = EVAL_ENV(value, valueInputEnv)
+    valueInputEnv:MalEnv init MalEnvHandle(currentEnv.id)
+    evaluated:MalValue, currentEnv = MalEvalInternal(value, valueInputEnv)
 
     if (evaluated.type == $MAL_ERROR_TYPE) ithen
       result init evaluated
@@ -1418,7 +1416,7 @@ endop
 
 opcode MalEvalAstEnv(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   result:MalValue init ast
-  currentEnv:MalEnv init env
+  currentEnv:MalEnv init MalEnvHandle(env.id)
   switch ast.type
     case $MAL_SYMBOL_TYPE
       result init MalResolveSymbol(env, ast.string)
@@ -1544,7 +1542,7 @@ endop
 
 opcode MalEvalDefinition(ast:MalValue, env:MalEnv, name:S, asMacro:i, atRoot:i):(MalValue, MalEnv)
   result:MalValue init MalMkValue($MAL_NIL_TYPE)
-  currentEnv:MalEnv init env
+  currentEnv:MalEnv init MalEnvHandle(env.id)
   if (ast.length != 3) ithen
     result init MalMkError(sprintf("%s: expected 2 arguments, got %d", \
       name, ast.length - 1))
@@ -1561,10 +1559,10 @@ opcode MalEvalDefinition(ast:MalValue, env:MalEnv, name:S, asMacro:i, atRoot:i):
         key init MalDefinitionKey(definitionEnv, symbol.string)
         definitionEnv init MalEnvRoot(definitionEnv)
       endif
-      definitionInputEnv:MalEnv init currentEnv
+      definitionInputEnv:MalEnv init MalEnvHandle(currentEnv.id)
       value:MalValue init key
       if (key.type != $MAL_ERROR_TYPE) ithen
-        value, currentEnv = EVAL_ENV(valueForm, definitionInputEnv)
+        value, currentEnv = MalEvalInternal(valueForm, definitionInputEnv)
       endif
 
       if (value.type == $MAL_ERROR_TYPE) ithen
@@ -1634,7 +1632,7 @@ endop
 
 opcode MalEvalFn(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   result:MalValue init MalMkValue($MAL_NIL_TYPE)
-  currentEnv:MalEnv init env
+  currentEnv:MalEnv init MalEnvHandle(env.id)
   if (ast.length != 3) ithen
     result init MalMkError(sprintf("fn*: expected 2 arguments, got %d", \
       ast.length - 1))
@@ -1659,25 +1657,25 @@ endop
 
 opcode MalEvalIf(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   result:MalValue init MalMkValue($MAL_NIL_TYPE)
-  currentEnv:MalEnv init env
+  currentEnv:MalEnv init MalEnvHandle(env.id)
   if (ast.length < 3 || ast.length > 4) ithen
     result init MalMkError(sprintf("if: expected 2 or 3 arguments, got %d", \
       ast.length - 1))
   else
     conditionForm:MalValue init MalAt(ast, 1)
-    branchInputEnv:MalEnv init currentEnv
-    condition:MalValue, currentEnv = EVAL_ENV(conditionForm, branchInputEnv)
+    branchInputEnv:MalEnv init MalEnvHandle(currentEnv.id)
+    condition:MalValue, currentEnv = MalEvalInternal(conditionForm, branchInputEnv)
 
     if (condition.type == $MAL_ERROR_TYPE) ithen
       result init condition
     elseif (MalIsTruthy(condition) == 1) ithen
       thenForm:MalValue init MalAt(ast, 2)
-      branchInputEnv init currentEnv
-      result, currentEnv = EVAL_ENV(thenForm, branchInputEnv)
+      branchInputEnv init MalEnvHandle(currentEnv.id)
+      result, currentEnv = MalEvalInternal(thenForm, branchInputEnv)
     elseif (ast.length == 4) ithen
       elseForm:MalValue init MalAt(ast, 3)
-      branchInputEnv init currentEnv
-      result, currentEnv = EVAL_ENV(elseForm, branchInputEnv)
+      branchInputEnv init MalEnvHandle(currentEnv.id)
+      result, currentEnv = MalEvalInternal(elseForm, branchInputEnv)
     endif
   endif
 
@@ -1686,14 +1684,14 @@ endop
 
 opcode MalEvalDo(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   result:MalValue init MalMkValue($MAL_NIL_TYPE)
-  currentEnv:MalEnv init env
+  currentEnv:MalEnv init MalEnvHandle(env.id)
   index:i = 1
   done:i = 0
 
   while (index < ast.length && done == 0) do
     form:MalValue init MalAt(ast, index)
-    formInputEnv:MalEnv init currentEnv
-    result, currentEnv = EVAL_ENV(form, formInputEnv)
+    formInputEnv:MalEnv init MalEnvHandle(currentEnv.id)
+    result, currentEnv = MalEvalInternal(form, formInputEnv)
 
     if (result.type == $MAL_ERROR_TYPE) ithen
       done = 1
@@ -1707,7 +1705,7 @@ endop
 
 opcode MalEvalLet(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   result:MalValue init MalMkValue($MAL_NIL_TYPE)
-  currentEnv:MalEnv init env
+  currentEnv:MalEnv init MalEnvHandle(env.id)
   letEnv:MalEnv init MalMkEnvWithOuter(env)
 
   if (ast.length != 3) ithen
@@ -1734,8 +1732,8 @@ opcode MalEvalLet(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
           result init MalMkError("let*: binding name must be a symbol")
           done = 1
         else
-          letInputEnv:MalEnv init letEnv
-          value:MalValue, letEnv = EVAL_ENV(valueForm, letInputEnv)
+          letInputEnv:MalEnv init MalEnvHandle(letEnv.id)
+          value:MalValue, letEnv = MalEvalInternal(valueForm, letInputEnv)
 
           if (value.type == $MAL_ERROR_TYPE) ithen
             result init value
@@ -1749,8 +1747,8 @@ opcode MalEvalLet(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
       od
 
       if (done == 0) ithen
-        letInputEnv init letEnv
-        result, letEnv = EVAL_ENV(body, letInputEnv)
+        letInputEnv init MalEnvHandle(letEnv.id)
+        result, letEnv = MalEvalInternal(body, letInputEnv)
       endif
     endif
   endif
@@ -1760,23 +1758,27 @@ opcode MalEvalLet(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   xout result, currentEnv
 endop
 
-opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
+;; Internal calls carry registry handles. The public evaluator resolves its
+;; returned environment once, instead of copying all bindings at every form.
+opcode MalEvalInternal(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   result:MalValue init ast
   workAst:MalValue init ast
-  evalEnv:MalEnv init env
-  returnEnv:MalEnv init env
-  recursiveInputEnv:MalEnv init env
+  evalEnv:MalEnv init MalEnvHandle(env.id)
+  returnEnv:MalEnv init MalEnvHandle(env.id)
+  recursiveInputEnv:MalEnv init MalEnvHandle(env.id)
   transientEnvIds:i[] init 0
   transientEnvCount:i = 0
   done:i = 0
 
   while (done == 0) do
     transientEnvId:i = -1
-    debugValue:MalValue init MalResolveSymbol(evalEnv, "DEBUG-EVAL")
-    if (debugValue.type != $MAL_ERROR_TYPE) ithen
-      if (MalIsTruthy(debugValue) == 1) ithen
-        SdebugAst:S init pr_str(workAst)
-        prints "EVAL: %s\n", SdebugAst
+    if (malDebugEvalBindingSeen == 1) ithen
+      debugValue:MalValue init MalResolveSymbol(evalEnv, "DEBUG-EVAL")
+      if (debugValue.type != $MAL_ERROR_TYPE) ithen
+        if (MalIsTruthy(debugValue) == 1) ithen
+          SdebugAst:S init pr_str(workAst)
+          prints "EVAL: %s\n", SdebugAst
+        endif
       endif
     endif
 
@@ -1806,17 +1808,17 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
         endif
 
       elseif (MalIsSymbolNamed(head, "def") == 1 || MalIsSymbolNamed(head, "def!") == 1) ithen
-        recursiveInputEnv init evalEnv
+        recursiveInputEnv init MalEnvHandle(evalEnv.id)
         result, evalEnv = MalEvalDef(workAst, recursiveInputEnv)
         done = 1
 
       elseif (MalIsSymbolNamed(head, "defmacro!") == 1) ithen
-        recursiveInputEnv init evalEnv
+        recursiveInputEnv init MalEnvHandle(evalEnv.id)
         result, evalEnv = MalEvalDefMacro(workAst, recursiveInputEnv)
         done = 1
 
       elseif (MalIsSymbolNamed(head, "defn") == 1 || MalIsSymbolNamed(head, "defmacro") == 1) ithen
-        recursiveInputEnv init evalEnv
+        recursiveInputEnv init MalEnvHandle(evalEnv.id)
         result, evalEnv = MalEvalNamedDefinition(workAst, recursiveInputEnv)
         done = 1
 
@@ -1828,7 +1830,7 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
         endif
 
       elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "fn*") == 0) ithen
-        recursiveInputEnv init evalEnv
+        recursiveInputEnv init MalEnvHandle(evalEnv.id)
         result, evalEnv = MalEvalFn(workAst, recursiveInputEnv)
         done = 1
 
@@ -1857,8 +1859,8 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
               done = 1
             else
               tryForm:MalValue init MalAt(workAst, 1)
-              recursiveInputEnv init evalEnv
-              tryResult:MalValue, evalEnv = EVAL_ENV( \
+              recursiveInputEnv init MalEnvHandle(evalEnv.id)
+              tryResult:MalValue, evalEnv = MalEvalInternal( \
                 tryForm, recursiveInputEnv)
 
               if (tryResult.type == $MAL_ERROR_TYPE) ithen
@@ -1868,7 +1870,7 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
                 catchEnv init MalEnvSet( \
                   catchEnv, catchBinding.string, catchValue)
                 workAst init MalAt(catchClause, 2)
-                evalEnv init catchEnv
+                evalEnv init MalEnvHandle(catchEnv.id)
               else
                 result init tryResult
                 done = 1
@@ -1884,8 +1886,8 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
           done = 1
         else
           ifConditionForm:MalValue init MalAt(workAst, 1)
-          recursiveInputEnv init evalEnv
-          ifCondition:MalValue, evalEnv = EVAL_ENV( \
+          recursiveInputEnv init MalEnvHandle(evalEnv.id)
+          ifCondition:MalValue, evalEnv = MalEvalInternal( \
             ifConditionForm, recursiveInputEnv)
 
           if (ifCondition.type == $MAL_ERROR_TYPE) ithen
@@ -1912,8 +1914,8 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
 
           while (doIndex < doLastIndex && doError == 0) do
             doForm:MalValue init MalAt(workAst, doIndex)
-            recursiveInputEnv init evalEnv
-            result, evalEnv = EVAL_ENV(doForm, recursiveInputEnv)
+            recursiveInputEnv init MalEnvHandle(evalEnv.id)
+            result, evalEnv = MalEvalInternal(doForm, recursiveInputEnv)
 
             if (result.type == $MAL_ERROR_TYPE) ithen
               doError = 1
@@ -1974,8 +1976,8 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
                 letError = 1
                 done = 1
               else
-                recursiveInputEnv init letEnv
-                letValue:MalValue, letEnv = EVAL_ENV( \
+                recursiveInputEnv init MalEnvHandle(letEnv.id)
+                letValue:MalValue, letEnv = MalEvalInternal( \
                   letValueForm, recursiveInputEnv)
 
                 if (letValue.type == $MAL_ERROR_TYPE) ithen
@@ -1999,14 +2001,14 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
 
             if (letError == 0) ithen
               workAst init letBody
-              evalEnv init letEnv
+              evalEnv init MalEnvHandle(letEnv.id)
             endif
           endif
         endif
 
       else
-        recursiveInputEnv init evalEnv
-        fn:MalValue, evalEnv = EVAL_ENV(head, recursiveInputEnv)
+        recursiveInputEnv init MalEnvHandle(evalEnv.id)
+        fn:MalValue, evalEnv = MalEvalInternal(head, recursiveInputEnv)
 
         if (fn.type == $MAL_ERROR_TYPE) ithen
           result init fn
@@ -2022,7 +2024,7 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
             workAst init expansion
           endif
         else
-          recursiveInputEnv init evalEnv
+          recursiveInputEnv init MalEnvHandle(evalEnv.id)
           args:MalValue, evalEnv = MalEvalSequenceEnv( \
             workAst, recursiveInputEnv, 1, $MAL_LIST_TYPE)
 
@@ -2036,8 +2038,8 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
             else
               evalAst:MalValue init MalAt(args, 0)
               evalRoot:MalEnv init MalEnvRoot(evalEnv)
-              recursiveInputEnv init evalRoot
-              result, evalRoot = EVAL_ENV(evalAst, recursiveInputEnv)
+              recursiveInputEnv init MalEnvHandle(evalRoot.id)
+              result, evalRoot = MalEvalInternal(evalAst, recursiveInputEnv)
               evalEnv init MalEnvSetRoot(evalEnv, evalRoot)
 
               done = 1
@@ -2051,7 +2053,7 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
             else
               transientEnvId = callEnv.id
               workAst init MalFunctionBody(fn)
-              evalEnv init callEnv
+              evalEnv init MalEnvHandle(callEnv.id)
             endif
           else
             result init MalApply(fn, args)
@@ -2060,7 +2062,7 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
         endif
       endif
     else
-      recursiveInputEnv init evalEnv
+      recursiveInputEnv init MalEnvHandle(evalEnv.id)
       result, evalEnv = MalEvalAstEnv(workAst, recursiveInputEnv)
 
       done = 1
@@ -2072,7 +2074,7 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
     endif
   od
 
-  returnEnv init MalEnvResolve(returnEnv)
+  returnEnv init MalEnvHandle(returnEnv.id)
 
   if (transientEnvCount > 0) ithen
     for releaseIndex in [0 ... transientEnvCount - 1] do
@@ -2085,22 +2087,29 @@ opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   xout result, returnEnv
 endop
 
+opcode EVAL_ENV(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
+  handle:MalEnv init MalEnvHandle(env.id)
+  result:MalValue, nextEnv:MalEnv = MalEvalInternal(ast, handle)
+  updated:MalEnv init MalEnvResolve(nextEnv)
+  xout result, updated
+endop
+
 opcode EVAL(ast:MalValue, env:MalEnv):MalValue
-  result:MalValue, updatedEnv:MalEnv = EVAL_ENV(ast, env)
+  result:MalValue, updatedEnv:MalEnv = MalEvalInternal(ast, env)
   xout result
 endop
 
 opcode MalEvalSourceEnv(source:S, env:MalEnv):(MalValue, MalEnv)
   ast:MalValue init read_str(source)
-  currentEnv:MalEnv init env
+  currentEnv:MalEnv init MalEnvHandle(env.id)
   if (ast.type == $MAL_ERROR_TYPE) ithen
     result:MalValue init ast
   else
-    sourceInputEnv:MalEnv init currentEnv
-    result, currentEnv = EVAL_ENV(ast, sourceInputEnv)
+    sourceInputEnv:MalEnv init MalEnvHandle(currentEnv.id)
+    result, currentEnv = MalEvalInternal(ast, sourceInputEnv)
   endif
 
-  xout result, currentEnv
+  xout result, MalEnvResolve(currentEnv)
 endop
 
 ;; Read every form before evaluation, since read-string and load-file reuse
@@ -2121,13 +2130,13 @@ opcode MalEvalFormsEnv(source:S, env:MalEnv):(MalValue, MalEnv)
       endif
     od
   endif
-  nextEnv:MalEnv init env
+  nextEnv:MalEnv init MalEnvHandle(env.id)
   if (ast.type == $MAL_ERROR_TYPE) ithen
     result:MalValue init ast
   else
-    result, nextEnv = EVAL_ENV(ast, env)
+    result, nextEnv = MalEvalInternal(ast, env)
   endif
-  xout result, nextEnv
+  xout result, MalEnvResolve(nextEnv)
 endop
 
 #include "src/threading.orc"
@@ -2236,7 +2245,7 @@ opcode MalMkCsoundEnv():MalEnv
   env init MalCsoundInstallOpcodes(env)
 
   env init MalNsSwitch(env, "csound")
-  source:S init "(defmacro definst [name params body] (list 'def name (list 'csound/compile-inst (list 'quote name) (list 'quote params) (list 'let* (csound/param-bindings params) body))))"
+  source:S init "(defmacro definst [name params body] (let* [compiled (list 'csound/compile-inst (list 'quote name) (list 'quote params) (list 'let* (csound/param-bindings params) body))] (if (number? name) compiled (list 'def name compiled))))"
   result:MalValue, env = MalEvalSourceEnv(source, env)
   env init MalNsSwitch(env, "user")
 

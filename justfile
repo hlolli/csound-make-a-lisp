@@ -23,7 +23,7 @@ release-check:
     python3 tests/check-bundle.py --build-only
     python3 tests/check-release.py
 
-test: launchers bundle-check release-check smoke reader eval step3 step4 step5 step6 file-loading step7 step8 step9 step-a script-args unit core-helpers clojure-forms namespaces harness-reader harness-eval harness-env harness-step4 harness-step5 harness-step6 harness-step7 harness-step8 harness-step9 harness-stepA harness-threading harness-csound csound-interop
+test: launchers bundle-check release-check smoke reader eval step3 step4 step5 step6 file-loading step7 step8 step9 step-a script-args unit core-helpers clojure-forms eval-jobs namespaces harness-reader harness-eval harness-env harness-step4 harness-step5 harness-step6 harness-step7 harness-step8 harness-step9 harness-stepA harness-threading harness-csound csound-interop
 
 launchers:
     python3 tests/check-launchers.py
@@ -117,6 +117,10 @@ clojure-forms:
 
 eval-forms:
     {{csound}} {{csound_flags}} tests/eval-forms.orc
+
+eval-jobs:
+    {{csound}} {{csound_flags}} tests/eval-job.orc
+    {{csound}} {{csound_flags}} tests/eval-job-builtins.orc
 
 namespaces:
     ./run tests/namespaces.mal

@@ -75,6 +75,15 @@ when the atom sits inside a collection. These atoms run in the interpreter's
 single init-time evaluation; they do not add Clojure's thread coordination,
 validators, or watches.
 
+Map keys use the same equality rules as `=`. Lists and vectors with equal
+items select the same entry, including nested collections. Map keys ignore
+entry order; metadata does not affect lookup. For example:
+
+```clojure
+(get (assoc {} ["voice" [1 2]] 42) '("voice" (1 2)))
+;; 42
+```
+
 The original `def!`, `defmacro!`, `fn*`, and `let*` retain their MAL behavior
 for compatibility. In particular, `def!` writes to the current scope. New
 programs should use the forms above and atoms for state changes.

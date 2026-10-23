@@ -8,6 +8,7 @@ malEnvRegistry@global:MalEnv[] init 0
 malEnvCount@global:i init 0
 malEnvFreeIds@global:i[] init 0
 malEnvFreeCount@global:i init 0
+malDebugEvalBindingSeen@global:i init 0
 
 opcode MalEnvEnsureCapacity():void
   capacity:i = lenarray(malEnvRegistry)
@@ -83,10 +84,12 @@ endop
 
 opcode MalEnvResolve(env:MalEnv):MalEnv
   if (env.id >= 0 && env.id < malEnvCount) ithen
-    stored:MalEnv MalEnvSnapshot malEnvRegistry[env.id]
-
-    if (stored.id == env.id) ithen
-      result:MalEnv MalEnvSnapshot stored
+    if (malEnvRegistry[env.id].id == env.id) ithen
+      result:MalEnv init malEnvRegistry[env.id].keys, \
+        malEnvRegistry[env.id].values, malEnvRegistry[env.id].outer, \
+        malEnvRegistry[env.id].length, malEnvRegistry[env.id].id, \
+        malEnvRegistry[env.id].persistent, malEnvRegistry[env.id].namespace, \
+        malEnvRegistry[env.id].loadPaths
     else
       result:MalEnv MalEnvSnapshot env
     endif
@@ -124,13 +127,11 @@ opcode MalEnvRetain(env:MalEnv):MalEnv
 endop
 
 opcode MalEnvRelease(env:MalEnv):void
-  resolved:MalEnv MalEnvResolve env
-
   ;; Csound evaluates && operands eagerly, so guard the registry read first.
-  if (resolved.id > 0 && resolved.id < malEnvCount && \
-      resolved.persistent == 0) ithen
-    if (malEnvRegistry[resolved.id].id == resolved.id) ithen
-      releasedId:i = resolved.id
+  if (env.id > 0 && env.id < malEnvCount) ithen
+    if (malEnvRegistry[env.id].id == env.id && \
+        malEnvRegistry[env.id].persistent == 0) ithen
+      releasedId:i = env.id
       malEnvRegistry[releasedId] MalEnvHandle -1
       MalEnvPushFreeId(releasedId)
     endif
@@ -166,21 +167,39 @@ endop
 
 opcode MalMkEnvWithOuter(parent:MalEnv):MalEnv
   id:i MalEnvAllocateId
-  resolvedParent:MalEnv MalEnvResolve parent
+  parentId:i = parent.id
+  registered:i = 0
+  if (parentId >= 0 && parentId < malEnvCount) ithen
+    registered = malEnvRegistry[parentId].id == parentId
+  endif
+  if (registered == 1) ithen
+    namespace:S init malEnvRegistry[parentId].namespace
+  else
+    namespace:S init parent.namespace
+  endif
   outer:MalEnv[] init 1
-  outer[0] MalEnvHandle resolvedParent.id
-  env:MalEnv init malEmptyStrings, malEmptyValues, outer, 0, id, 0, resolvedParent.namespace, MalMkValue($MAL_LIST_TYPE)
+  outer[0] MalEnvHandle parentId
+  env:MalEnv init malEmptyStrings, malEmptyValues, outer, 0, id, 0, namespace, MalMkValue($MAL_LIST_TYPE)
   env MalEnvStore env
   xout env
 endop
 
 opcode MalEnvFind(env:MalEnv, key:S):i
-  resolved:MalEnv MalEnvResolve env
   found:i = -1
-
-  if (resolved.length > 0) ithen
-    for index in [0 ... resolved.length - 1] do
-      storedKey:S init resolved.keys[index]
+  registered:i = 0
+  if (env.id >= 0 && env.id < malEnvCount) ithen
+    registered = malEnvRegistry[env.id].id == env.id
+  endif
+  if (registered == 1) ithen
+    keys:S[] init malEnvRegistry[env.id].keys
+    length:i = malEnvRegistry[env.id].length
+  else
+    keys:S[] init env.keys
+    length:i = env.length
+  endif
+  if (length > 0) ithen
+    for index in [0 ... length - 1] do
+      storedKey:S init keys[index]
       comparison:i strcmp storedKey, key
 
       if (comparison == 0) ithen
@@ -194,6 +213,15 @@ opcode MalEnvFind(env:MalEnv, key:S):i
 endop
 
 opcode MalEnvSet(env:MalEnv, key:S, value:MalValue):MalEnv
+  ;; Once debug tracing has a binding, keep resolving it in each lexical scope.
+  ;; Until then no scope can enable tracing, so evaluation can skip the lookup.
+  if (strcmp(key, "DEBUG-EVAL") == 0) ithen
+    malDebugEvalBindingSeen = 1
+  elseif (strlen(key) > 10) ithen
+    if (strcmp(strsub(key, strlen(key) - 11), "/DEBUG-EVAL") == 0) ithen
+      malDebugEvalBindingSeen = 1
+    endif
+  endif
   resolved:MalEnv MalEnvResolve env
   index:i MalEnvFind resolved, key
 

@@ -2,6 +2,8 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+declare MalEquals(left:MalValue, right:MalValue):(i)
+
 opcode MalEnvHandle(id:i):MalEnv
   paths:MalValue init $MAL_LIST_TYPE, 0, "", malEmptyValues, malEmptyEnvs, malEmptyValues, 0, 0, 0
   env:MalEnv init malEmptyStrings, malEmptyValues, malEmptyEnvs, 0, id, 0, "", paths
@@ -187,43 +189,6 @@ opcode MalMkKeyword(name:S):MalValue
   xout val
 endop
 
-opcode MalMapKeysEqual(left:MalValue, right:MalValue):i
-  result:i = 0
-
-  if (left.type == right.type) ithen
-    switch left.type
-      case $MAL_STRING_TYPE
-        result = strcmp(left.string, right.string) == 0
-
-      case $MAL_KEYWORD_TYPE
-        result = strcmp(left.string, right.string) == 0
-
-      case $MAL_SYMBOL_TYPE
-        result = strcmp(left.string, right.string) == 0
-
-      case $MAL_NUMBER_TYPE
-        result = left.number == right.number
-
-      case $MAL_NIL_TYPE
-        result = 1
-
-      case $MAL_TRUE_TYPE
-        result = 1
-
-      case $MAL_FALSE_TYPE
-        result = 1
-
-      case $MAL_ATOM_TYPE
-        result = left.number == right.number
-
-      case $MAL_REDUCED_TYPE
-        result = left.number == right.number
-    endsw
-  endif
-
-  xout result
-endop
-
 opcode MalMapFindKey(mapValue:MalValue, key:MalValue):i
   result:i = -1
   entryCount:i = int(mapValue.length / 2)
@@ -232,7 +197,7 @@ opcode MalMapFindKey(mapValue:MalValue, key:MalValue):i
     for entryIndex in [0 ... entryCount - 1] do
       keyIndex:i = entryIndex * 2
 
-      if (MalMapKeysEqual(MalAt(mapValue, keyIndex), key) == 1) ithen
+      if (MalEquals(MalAt(mapValue, keyIndex), key) == 1) ithen
         result = keyIndex
         break
       endif
@@ -352,19 +317,23 @@ opcode MalMkAtom(value:MalValue):MalValue
 
   if (malAtomCount >= capacity) ithen
     preserved:MalValue[] init capacity
+    versions:i[] init capacity
 
     if (malAtomCount > 0) ithen
       for index in [0 ... malAtomCount - 1] do
         preserved[index] init malAtomValues[index]
+        versions[index] = malAtomVersions[index]
       od
     endif
 
     newCapacity:i = capacity == 0 ? 8 : capacity * 2
     malAtomValues init newCapacity
+    malAtomVersions init newCapacity
 
     if (malAtomCount > 0) ithen
       for index in [0 ... malAtomCount - 1] do
         malAtomValues[index] init preserved[index]
+        malAtomVersions[index] = versions[index]
       od
     endif
   endif
@@ -372,6 +341,7 @@ opcode MalMkAtom(value:MalValue):MalValue
   atomId:i = malAtomCount
   malAtomCount += 1
   malAtomValues[atomId] init value
+  malAtomVersions[atomId] = 0
 
   val:MalValue init $MAL_ATOM_TYPE, atomId, "", malEmptyValues, \
     malEmptyEnvs, malEmptyValues, 0, 0, 0
@@ -384,6 +354,7 @@ endop
 
 opcode MalAtomSetValue(atom:MalValue, value:MalValue):MalValue
   malAtomValues[atom.number] init value
+  malAtomVersions[atom.number] += 1
   xout value
 endop
 

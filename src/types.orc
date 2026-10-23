@@ -20,6 +20,7 @@ malEmptyValues@global:MalValue[] init 0
 malEmptyEnvs@global:MalEnv[] init 0
 malEmptyStrings@global:S[] init 0
 malAtomValues@global:MalValue[] init 0
+malAtomVersions@global:i[] init 0
 malAtomCount@global:i init 0
 malReducedCount@global:i init 0
 malGensymCount@global:i init 0

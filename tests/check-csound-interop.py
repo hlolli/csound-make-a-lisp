@@ -62,6 +62,10 @@ FIXTURES = (
         ("opcode-produced arrays", 0.31, 0.39),
         ("string array writes", 0.41, 0.49),
     )),
+    RenderFixture("routing", 0.31, (
+        ("numeric execution order", 0.01, 0.09),
+        ("channel write rates", 0.21, 0.29),
+    )),
 )
 
 
@@ -180,6 +184,27 @@ def check_array_audio(rate, channels):
                 raise RuntimeError(f"arrays: region {region} level {actual}, expected {expected}")
 
 
+def check_routing_audio(rate, channels):
+    # The right channel also contains a direct send, which marks the voice's
+    # start regardless of when Csound admits the event. A reversed execution
+    # order adds a control block to the left channel's 2 ms flanger delay.
+    onsets = [next(index for index, sample in enumerate(channel) if abs(sample) > 100)
+              for channel in channels]
+    delay = (onsets[0] - onsets[1]) / rate
+    if abs(delay - 0.002) > 2 / rate:
+        raise RuntimeError(f"routing: expected 2 ms onset, got {delay}")
+    for channel, amplitude in zip(channels, (0.02, 0.04)):
+        actual = rms(section(channel, rate, 0.01, 0.09)) / 32768
+        if not math.isclose(actual, amplitude, rel_tol=0.03):
+            raise RuntimeError("routing: routed signal has the wrong level")
+        if max(abs(sample) for sample in section(channel, rate, 0.11, 0.19)) > 1:
+            raise RuntimeError("routing: stale audio remained in the bus")
+    for channel, amplitude in zip(channels, (0.02, 0.03)):
+        actual = rms(section(channel, rate, 0.21, 0.29)) / 32768
+        if not math.isclose(actual, amplitude / math.sqrt(2), rel_tol=0.03):
+            raise RuntimeError("routing: channel write selected the wrong rate")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--csound", default=os.environ.get("CSOUND", "csound"))
@@ -206,6 +231,8 @@ def main():
                     check_classic_audio(rate, channels)
                 elif fixture.name == "arrays":
                     check_array_audio(rate, channels)
+                elif fixture.name == "routing":
+                    check_routing_audio(rate, channels)
                 instruments += len(fixture.regions)
     except (RuntimeError, OSError, wave.Error) as error:
         print(f"FAIL: {error}", file=sys.stderr)

@@ -366,10 +366,48 @@ opcode MalCoreMaps(name:S, args:MalValue):MalValue
   xout result
 endop
 
+opcode MalCoreLogic(args:MalValue):MalValue
+  result:MalValue init MalMkValue($MAL_NIL_TYPE)
+  if (args.length != 2) ithen
+    result init MalArityError("core/logic", 2, args.length)
+  else
+    all:i = MalIsTruthy(MalAt(args, 0))
+    forms:MalValue init MalAt(args, 1)
+    if (forms.type != $MAL_LIST_TYPE && forms.type != $MAL_VECTOR_TYPE && \
+        forms.type != $MAL_NIL_TYPE) ithen
+      result init MalMkError("core/logic: expected a sequence")
+    elseif (forms.length == 0) ithen
+      if (all == 1) ithen
+        result init MalMkValue($MAL_TRUE_TYPE)
+      endif
+    else
+      result init MalAt(forms, forms.length - 1)
+      if (forms.length > 1) ithen
+        firstId:i = malGensymCount + 1
+        malGensymCount += forms.length - 1
+        for offset in [0 ... forms.length - 2] do
+          index:i = forms.length - offset - 2
+          name:MalValue init MalMkSymbol(sprintf("G__%.0f", firstId + index))
+          if (all == 1) ithen
+            branch:MalValue init MalAppendValue(MalMkList3(MalMkSymbol("if"), name, result), name)
+          else
+            branch:MalValue init MalAppendValue(MalMkList3(MalMkSymbol("if"), name, name), result)
+          endif
+          result init MalMkList3(MalMkSymbol("let*"), \
+            MalMkList2(name, MalAt(forms, index)), branch)
+        od
+      endif
+    endif
+  endif
+  xout result
+endop
+
 opcode MalApplyCoreBuiltin(fn:MalValue, args:MalValue):MalValue
   name:S init fn.string
   result:MalValue init MalMkError(sprintf("unknown builtin '%s'", name))
-  if (strcmp(name, "reduce") == 0) ithen
+  if (strcmp(name, "core/logic") == 0) ithen
+    result init MalCoreLogic(args)
+  elseif (strcmp(name, "reduce") == 0) ithen
     result init MalCoreReduce(args)
   elseif (strcmp(name, "mapv") == 0) ithen
     result init MalCoreMapv(args)
@@ -544,7 +582,7 @@ opcode MalInstallCoreHelpers(env:MalEnv):MalEnv
     "reverse", "not-empty", "reduce", "reduced", "reduced?", "ensure-reduced", \
     "unreduced", "filter", "remove", "keep", "mapv", "filterv", "every?", \
     "not-every?", "some", "not-any?", "take", "drop", "take-while", \
-    "drop-while", "get-in", "assoc-in", "update", "update-in", "select-keys", "merge"
+    "drop-while", "get-in", "assoc-in", "update", "update-in", "select-keys", "merge", "core/logic"
   for name in names do
     currentEnv init MalEnvSet(currentEnv, name, MalMkBuiltin(name))
   od
@@ -569,14 +607,6 @@ opcode MalInstallCoreHelpers(env:MalEnv):MalEnv
     (let* [all (cons f functions)]
       (fn* (& args) (mapv (fn* (g) (apply g args)) all))))
 
-  (defn core/logic [all? forms]
-    (if (empty? forms) (if all? true nil)
-        (if (= (count forms) 1) (first forms)
-            (let* [name (gensym)]
-              (list 'let* (list name (first forms))
-                    (if all?
-                      (list 'if name (core/logic all? (rest forms)) name)
-                      (list 'if name name (core/logic all? (rest forms)))))))))
   (defmacro and [& forms] (core/logic true forms))
   (defmacro or [& forms] (core/logic false forms))
   (defmacro when [test & body] (list 'if test (cons 'do body) nil))

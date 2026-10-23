@@ -337,6 +337,7 @@ endop
 opcode MalMkCsoundInstrument(name:S, defaults:MalValue):MalValue
   instrument:MalValue init defaults
   instrument.type = $MAL_CSOUND_INSTRUMENT_TYPE
+  instrument.number = 0
   instrument.string init name
   xout instrument
 endop

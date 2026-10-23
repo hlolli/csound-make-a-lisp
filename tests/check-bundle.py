@@ -114,7 +114,7 @@ def check_standalone(csound=None):
         for name in ["check-file-loading.py", "check-csound-interop.py", "check-namespaces.py",
                      "core-helpers.mal", "clojure-forms.mal", "namespaces.mal",
                      "csound-interop.mal", "csound-catalog.mal", "csound-classic.mal",
-                     "csound-arrays.mal"]:
+                     "csound-arrays.mal", "csound-routing.mal"]:
             shutil.copy2(ROOT / "tests" / name, directory / "tests" / name)
 
         checkpoint = (ROOT / "tests/stepA-mal.orc").read_text(encoding="utf-8")
@@ -137,6 +137,14 @@ def check_standalone(csound=None):
         run([csound, "-n", "-d", "-m128", "--orc", "eval-forms.orc"], directory,
             "PASS: multiple forms, session state, reader errors, and recovery")
         print("PASS: bundled region evaluation", flush=True)
+        for name, marker in [
+                ("eval-job.orc", "PASS: cooperative evaluation"),
+                ("eval-job-builtins.orc", "All cooperative builtin comparisons passed")]:
+            source = (ROOT / "tests" / name).read_text(encoding="utf-8")
+            (directory / name).write_text(
+                source.replace(original_include, bundled_include), encoding="utf-8")
+            run([csound, "-n", "-d", "-m128", "--orc", name], directory, marker)
+        print("PASS: bundled resumable evaluation and atom retries", flush=True)
         run([csound, "-n", "-d", "-m128", "--orc", "src/run.orc", "--",
              "tests/namespaces.mal"], directory, " namespace checks")
         sessions = (ROOT / "tests/namespace-sessions.orc").read_text(encoding="utf-8")

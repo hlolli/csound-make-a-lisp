@@ -61,7 +61,7 @@ CsoundQt reconstruction of Stria. Each keeps the source instruments and score.
 Parameter pairs supply names and numeric defaults. Parameters map to Csound
 fields `p4` onward; `p2` and `p3` are available as the note's start and duration.
 An event may omit trailing parameters to use their defaults. The instrument
-name must be a Csound identifier. Its body must be a Csound statement with no
+name must be a Csound identifier or a positive integer. Its body must be a Csound statement with no
 outputs, such as `outs`, `chnmix`, or a `csound/do` sequence.
 
 `csound` is a namespace. You can alias it with
@@ -71,7 +71,27 @@ namespace identifier, so `music.voice/Tone` and `music.bass/Tone` can coexist.
 Pass the instrument value to `csound/event`; its host name is an internal
 detail. Instruments in `user` keep their original Csound names.
 
-Instrument values compare equal with `=` when their Csound names and positional
+Numeric instrument IDs stay unchanged across namespaces. Use them to control
+execution order: Csound runs lower IDs before higher IDs each control block,
+regardless of declaration order. IDs must lie between 1 and 32767. Numeric
+`definst` returns an instrument value without binding a name:
+
+```clojure
+(def Send
+  (csound/definst 100 [frequency 440]
+    (csound/chnmix (csound/poscil 0.02 frequency) "send")))
+```
+
+`csound/source` and `csound/compile-inst` also accept numeric IDs. Choose IDs
+that do not overlap other host instruments; numeric IDs share Csound's global
+instrument space.
+
+For IDs beyond the host's initial instrument range, declare an empty instrument
+at the highest planned ID in the host orchestra before starting Csound. This
+reserves space before MAL runs. The tested Csound build can invalidate running
+user-defined opcodes if `evalstr` expands that range during performance.
+
+Instrument values compare equal with `=` when their Csound IDs or names and positional
 defaults match. Metadata does not affect equality. Redefining the same Csound
 name updates that voice; it does not give older values a separate voice.
 
@@ -103,11 +123,26 @@ then clear the channel for the next control period:
       (csound/chnclear "reverb-send"))))
 ```
 
-Define senders before receivers so Csound runs them in that order each block.
+For named instruments, define senders before receivers so Csound runs them in
+that order each block. Numeric IDs let you set that order directly.
 `chnmix` adds audio to a named channel; `chnclear` accepts one or more channel
 names. `csound/do` accepts only statements with no outputs, may nest, and
 preserves their order. An empty `csound/do` defines a silent body. Shared nodes,
 including statements, still render once; use separate mix calls for two sends.
+
+`chnset` replaces a channel's value. It accepts init, control, audio, or string
+values and returns a statement. Use `chnmix` when several voices feed one audio
+channel. `sprintf` builds a string at instrument initialization from a format
+and one or more numeric init values, such as a bus ID from a p-field:
+
+```clojure
+(def Send
+  (csound/definst 100 [frequency 440 bus 1]
+    (csound/chnmix (csound/poscil 0.02 frequency)
+                   (csound/sprintf "send-%d" bus))))
+```
+
+The current `sprintf` graph signature accepts numeric arguments only.
 
 ## Threading macros
 
@@ -151,7 +186,7 @@ string prefix: `(gensym "value-")`.
 
 ## Rates and signatures
 
-Opcode names live under `csound/`. The catalog has 54 entries:
+Opcode names live under `csound/`. The catalog has 57 entries:
 
 | Family | Opcodes | Output selection |
 | --- | --- | --- |
@@ -160,8 +195,9 @@ Opcode names live under `csound/`. The catalog has 54 entries:
 | Noise | `rand`, `randh`, `randi` | Default to audio; control outputs available |
 | Envelopes | `line`, `linseg`, `expseg`, `expon`, `adsr`, `linen` | Default to audio; control outputs available |
 | Filters and smoothing | `tone`, `butterlp`, `butterhp`, `reson`, `dcblock2`, `portk` | Audio, except `portk` which returns control |
-| Effects and output | `delay`, `vdelay`, `reverb`, `reverbsc`, `comb`, `alpass`, `balance`, `pan2`, `outs` | Audio effects, stereo reverb, stereo or array panning, and an output statement |
-| Channels | `chnget`, `chnmix`, `chnclear` | Reads default to control; init, audio, and string reads available; mix and clear return statements |
+| Effects and output | `delay`, `vdelay`, `flanger`, `reverb`, `reverbsc`, `comb`, `alpass`, `balance`, `pan2`, `outs` | Audio effects, stereo reverb, stereo or array panning, and an output statement |
+| Channels | `chnget`, `chnset`, `chnmix`, `chnclear` | Reads default to control; init, audio, and string reads available; writes, mix, and clear return statements |
+| Strings | `sprintf` | Init string from a format and numeric init arguments |
 | Function-table lookup | `table`, `tablei` | Infer init, control, or audio from the index |
 | Array queries | `sumarray`, `lenarray` | Sum uses the array's numeric rate; length defaults to init with a control option |
 
@@ -194,6 +230,11 @@ Csound's argument units: `delay` uses seconds, while
 [vdelay](https://csound.com/docs/manual/vdelay.html) uses milliseconds for both
 its current and maximum delay. `oscili` currently accepts a numeric table ID;
 omitting it selects Csound's default sine table.
+
+[`flanger`](https://csound.com/docs/manual/flanger.html) takes an audio input,
+an audio-rate delay in seconds, control-rate feedback, and an optional init-rate
+maximum delay in seconds. Its output contains the delayed signal; add the dry
+input when you want a dry/wet mix.
 
 The classic `buzz`, `gbuzz`, and `foscil` entries accept control inputs for
 amplitude and modulation, with init table and phase options. Noise entries
@@ -333,6 +374,59 @@ envelope shape, delay onset, and reverb tails. Run just the catalog fixture with
 ```sh
 python3 tests/check-csound-interop.py --csound "$CSOUND" --fixture catalog
 ```
+
+## Running evaluation in slices
+
+Hosts can spread Lisp evaluation across init passes with the job API. It uses
+the same values, functions, environments, and atoms as `EVAL_ENV`. The usual
+evaluator still runs to completion in one call.
+
+```csound
+job:i = MalEvalJobStart(read_str("(map inc [1 2 3])"), env)
+; In a later init pass, run up to eight evaluator transitions:
+status:i = MalEvalJobStep(job, 8)
+if (status == 1) ithen
+  result:MalValue init MalEvalJobResult(job)
+  MalEvalJobCancel(job)
+endif
+```
+
+Call `Step` again in a later pass while its status is `0`. A budget counts
+evaluator transitions, including function calls, argument evaluation, macro
+expansion, and return handling. It does not count source forms or milliseconds.
+
+| Host opcode | Result |
+| --- | --- |
+| `MalEvalJobStart(ast, env)` | A positive job token, or `-1` when all 16 slots are in use. |
+| `MalEvalJobStep(token, budget)` | `0` while pending, `1` when complete, or `-1` for an unknown token. A nonpositive budget only reads the status. |
+| `MalEvalJobResult(token)` | The completed value, including a Lisp error; an error value if the job is pending or unknown. |
+| `MalEvalJobCancel(token)` | Releases the token, saved frames, and temporary scopes. Unknown tokens have no effect. |
+
+Completed jobs keep their result and slot until `Cancel`. Tokens are not reused,
+so a stale token cannot select a later job. Tail calls release their prior
+temporary scopes as they proceed. Cleanup after a completed job is small;
+cancelling a pending job walks its saved scope stack in one call.
+
+Jobs share state. Definitions and atom writes become visible as they run, and
+cancellation does not undo completed effects. Hosts that need program order
+should run one job at a time. A job's `swap!` retries its function if another
+writer changes the atom between evaluation and commit, even if the writer
+restores the prior value. Keep that function free of side effects.
+
+Load modules before starting jobs. Jobs support `ns` and `require` for loaded
+namespaces, including aliases and refers. They reject new module loads and the
+namespace-aware `load-file` builtin so these cannot enter the synchronous
+evaluator during a slice.
+
+Jobs also accept `eval` as a function value, such as `(map eval forms)` or
+`(apply eval [form])`. The synchronous evaluator currently supports direct
+`(eval form)` calls only. Both evaluate the form in the root environment.
+
+The budget bounds evaluator transitions, not the time spent in one native
+operation. Reading source, copying large collections, building graphs, file
+I/O, and compiling Csound code still run to completion. Choose the slice budget
+from measurements on the target host; this API does not impose a hard audio
+deadline on those operations.
 
 ## Scope
 

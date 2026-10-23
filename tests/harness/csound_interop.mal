@@ -57,7 +57,7 @@
 ;=>TestTone: expected at most 3 arguments, got 4
 
 (csound/definst bad-name [frequency 440] (csound/outs (csound/pan2 (csound/poscil 0.05 frequency) 0.5)))
-;=>csound/definst: name must be a Csound-compatible symbol
+;=>csound/definst: name must be a Csound-compatible symbol or an integer from 1 to 32767
 
 (csound/definst BadParam [p3 1] (csound/outs (csound/pan2 (csound/poscil 0.05 440) 0.5)))
 ;=>csound/definst: p2 and p3 are implicit parameters

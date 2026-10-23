@@ -174,8 +174,8 @@ endop
 
 opcode MalCsoundInstrumentSource(name:MalValue, params:MalValue, graph:MalValue):MalValue
   bindings:MalValue init MalCsoundParamBindings(params)
-  if (MalCsoundIdentifierIsValid(name) == 0) ithen
-    result:MalValue init MalMkError("csound/definst: name must be a Csound-compatible symbol")
+  if (MalCsoundInstrumentNameIsValid(name) == 0) ithen
+    result:MalValue init MalMkError("csound/definst: name must be a Csound-compatible symbol or an integer from 1 to 32767")
   elseif (bindings.type == $MAL_ERROR_TYPE) ithen
     result init bindings
   elseif (graph.type == $MAL_ERROR_TYPE) ithen
@@ -193,7 +193,7 @@ opcode MalCsoundInstrumentSource(name:MalValue, params:MalValue, graph:MalValue)
     elseif (rendered.outputs != 0) ithen
       result init MalMkError("csound/definst: body must end in an output statement")
     else
-      result init MalMkString(sprintf("instr %s\n%sendin\nreturn 1\n", name.string, rendered.statements))
+      result init MalMkString(sprintf("instr %s\n%sendin\nreturn 1\n", MalCsoundInstrumentName(name), rendered.statements))
     endif
   endif
   xout result
@@ -204,11 +204,15 @@ opcode MalCompileCsoundInstrument(name:MalValue, params:MalValue, graph:MalValue
   if (source.type == $MAL_ERROR_TYPE) ithen
     result:MalValue init source
   else
+    identifier:S init MalCsoundInstrumentName(name)
+    defaults:MalValue init MalCsoundDefaults(params)
+    instrumentId:i = name.type == $MAL_NUMBER_TYPE ? name.number : 0
     compiled:i evalstr source.string
     if (compiled != 1) ithen
-      result init MalMkError(sprintf("csound/definst: Csound could not compile instrument '%s'", name.string))
+      result init MalMkError(sprintf("csound/definst: Csound could not compile instrument '%s'", identifier))
     else
-      result init MalMkCsoundInstrument(name.string, MalCsoundDefaults(params))
+      result init MalMkCsoundInstrument(identifier, defaults)
+      result.number = instrumentId
     endif
   endif
   xout result
