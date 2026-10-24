@@ -68,19 +68,22 @@ opcode MalEvalJobPush(slot:i, frame:MalEvalFrame):void
 endop
 
 opcode MalEvalJobPop(slot:i):MalEvalFrame
+  zero:i = 0
   index:i = malEvalJobs[slot].top
   frame:MalEvalFrame init malEvalJobFrames[index]
   malEvalJobs[slot].top = malEvalJobFrameNext[index]
   malEvalJobs[slot].depth = malEvalJobs[slot].depth - 1
   malEvalJobFrameNext[index] = malEvalJobFrameFree
   malEvalJobFrameFree = index
-  empty:MalEvalFrame init 0, 0, MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), 0, 0, 0
+  empty:MalEvalFrame init zero, zero, MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), zero, zero, zero
   malEvalJobFrames[index] init empty
   xout frame
 endop
 
 opcode MalEvalJobOwnEnv(slot:i, id:i):void
-  frame:MalEvalFrame init 9, id, MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), 0, 0, 0
+  kind:i = 9
+  zero:i = 0
+  frame:MalEvalFrame init kind, id, MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), zero, zero, zero
   MalEvalJobPush(slot, frame)
 endop
 
@@ -183,6 +186,7 @@ opcode MalEvalJobNamespace(ast:MalValue, env:MalEnv):MalValue
 endop
 
 opcode MalEvalJobDefine(slot:i, ast:MalValue, asMacro:i, atRoot:i):void
+  zero:i = 0
   head:MalValue init MalAt(ast, 0)
   if (ast.length != 3) ithen
     MalEvalJobReturn(slot, MalArityError(head.string, 2, ast.length - 1))
@@ -201,7 +205,7 @@ opcode MalEvalJobDefine(slot:i, ast:MalValue, asMacro:i, atRoot:i):void
       if (key.type == $MAL_ERROR_TYPE) ithen
         MalEvalJobReturn(slot, key)
       else
-        frame:MalEvalFrame init 0, 0, MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), 0, 0, 0
+        frame:MalEvalFrame init zero, zero, MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), zero, zero, zero
         frame.kind = 6
         frame.env = env.id
         frame.form init MalAt(ast, 2)
@@ -233,6 +237,7 @@ endop
 #include "src/eval-job-builtins.orc"
 
 opcode MalEvalJobEval(slot:i):void
+  zero:i = 0
   ast:MalValue init malEvalJobAsts[slot]
   env:MalEnv init MalEnvHandle(malEvalJobs[slot].env)
   if (malDebugEvalBindingSeen == 1) ithen
@@ -241,7 +246,7 @@ opcode MalEvalJobEval(slot:i):void
       prints "EVAL: %s\n", pr_str(ast)
     endif
   endif
-  frame:MalEvalFrame init 0, env.id, ast, MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), 0, 0, 0
+  frame:MalEvalFrame init zero, env.id, ast, MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), zero, zero, zero
   if (ast.type == $MAL_SYMBOL_TYPE) ithen
     MalEvalJobReturn(slot, MalResolveSymbol(env, ast.string))
   elseif (ast.type == $MAL_VECTOR_TYPE || ast.type == $MAL_HASH_MAP_TYPE) ithen

@@ -64,12 +64,16 @@ and pass the installed browser package to the Node check:
 
 ```sh
 python3 tools/bundle.py --output dist/mal.inc
-node tests/check-web-ide.mjs /path/to/web-ide/node_modules/@csound/browser/dist/csound.js
+node --experimental-wasm-exnref tests/check-web-ide.mjs /path/to/web-ide/node_modules/@csound/browser/dist/csound.js
 ```
 
 This uses the real WebAssembly engine without an audio device. It checks the
-`LispEval` hook, persistent state, errors, source strings, and the example
-instrument. Test the WebMCP tools in the IDE itself as described in the
+`LispEval` hook, persistent state, resumable jobs, errors, source strings, and
+the example instrument. The flag enables Wasm exception references on Node 24.
+With `@csound/browser` 7.0.0-beta39, compiling the bundle also checks the
+workaround for the empty-signature crash fixed by
+[Csound #3464](https://github.com/csound/csound/pull/3464).
+Test the WebMCP tools in the IDE itself as described in the
 [Web-IDE example](../examples/web-ide/README.md).
 
 `just file-loading` checks repeated reads from one call site, empty files,

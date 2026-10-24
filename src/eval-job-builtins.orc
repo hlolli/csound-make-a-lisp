@@ -48,10 +48,11 @@ opcode MalEvalJobBuiltinContinue(slot:i, frame:MalEvalFrame):void
 endop
 
 opcode MalEvalJobBuiltinStart(slot:i, fn:MalValue, args:MalValue):i
+  zero:i = 0
   handled:i = 0
   if (fn.type == $MAL_BUILTIN_TYPE) ithen
     name:S init fn.string
-    frame:MalEvalFrame init 0, 0, MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), 0, 0, 0
+    frame:MalEvalFrame init zero, zero, MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), zero, zero, zero
     frame.env = malEvalJobs[slot].env
     frame.index = 0
     frame.flag = 0

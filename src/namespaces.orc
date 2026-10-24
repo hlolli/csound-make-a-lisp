@@ -41,6 +41,7 @@ opcode MalNsFind(owner:i, name:S):i
 endop
 
 opcode MalNsEnsure(root:MalEnv, name:S, referCore:i):i
+  zero:i = 0
   index:i = MalNsFind(root.id, name)
   if (index < 0) ithen
     capacity:i = lenarray(malNamespaces)
@@ -63,7 +64,7 @@ opcode MalNsEnsure(root:MalEnv, name:S, referCore:i):i
     malNamespaceCount += 1
     empty:MalValue init MalMkValue($MAL_HASH_MAP_TYPE)
     slots:i[] init 0
-    malNamespaces[index] init name, root.id, empty, empty, referCore, 0, malEmptyStrings, slots, 0
+    malNamespaces[index] init name, root.id, empty, empty, referCore, zero, malEmptyStrings, slots, zero
   endif
   xout index
 endop

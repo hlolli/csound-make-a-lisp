@@ -39,7 +39,8 @@ opcode MalCsoundCachePut(identity:i, rendered:MalCsoundRender):void
 endop
 
 opcode MalCsoundRenderValue(value:MalValue):MalCsoundRender
-  result:MalCsoundRender init "", "", 0, ""
+  zero:i = 0
+  result:MalCsoundRender init "", "", zero, ""
   cached:i = 0
   if (value.type == $MAL_NUMBER_TYPE) ithen
     result.expression init MalCsoundNumber(value.number)

@@ -2,6 +2,10 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+;; Pass numeric struct fields through i-rate variables. Literal arguments make
+;; older Csound compilers try an empty init overload, which can crash in Wasm.
+;; Exact field types avoid that lookup until csound/csound#3464 is released.
+
 struct MalValue type:i, number:i, string:S, list:MalValue[], env:MalEnv[], metadata:MalValue[], length:i, isMacro:i, astRef:i
 
 struct MalTokens length:i, tokens:S[]

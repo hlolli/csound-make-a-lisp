@@ -63,6 +63,36 @@ try {
   evaluate(
     '(if (= @counter 1) (println "PASS: recovery") (throw "lost state"))',
   );
+  // A callback suspends and resumes through several frame constructors.
+  const job = api.csoundEvalCode(
+    csound,
+    'return MalEvalJobStart(read_str("(map inc [1 2 3])"), malLiveEnv)\n',
+  );
+  assert.ok(job > 0, "create an evaluation job");
+  let status = 0;
+  let steps = 0;
+  while (status === 0 && steps < 1000) {
+    status = api.csoundEvalCode(csound, `return MalEvalJobStep(${job}, 1)\n`);
+    steps += 1;
+  }
+  assert.equal(status, 1, "finish the evaluation job");
+  assert.ok(steps > 1, "yield between evaluation steps");
+  assert.equal(
+    api.csoundEvalCode(
+      csound,
+      `return (strcmp(pr_str(MalEvalJobResult(${job})), "(2 3 4)") == 0 ? 1 : -1)\n`,
+    ),
+    1,
+    "preserve callback results between steps",
+  );
+  assert.equal(
+    api.csoundEvalCode(
+      csound,
+      `MalEvalJobCancel(${job})\nreturn MalEvalJobStep(${job}, 1)\n`,
+    ),
+    -1,
+    "release the completed job",
+  );
   const source = await readFile(
     new URL("../examples/web-ide/live.clj", import.meta.url),
     "utf8",
@@ -73,7 +103,7 @@ try {
     '(if (= @counter 1) (println "PASS: Web-IDE file and session") (throw "repeated evaluation"))',
   );
   console.log(
-    "PASS: browser engine, multi-form regions, atoms, errors, and instruments",
+    "PASS: browser engine, multi-form regions, atoms, jobs, errors, and instruments",
   );
 } finally {
   api.csoundDestroy(csound);

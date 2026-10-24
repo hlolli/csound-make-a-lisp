@@ -5,8 +5,10 @@
 declare pr_str(ast:MalValue):(S)
 
 opcode MalMkError(message:S):MalValue
-  v:MalValue init $MAL_ERROR_TYPE, 0, message, malEmptyValues, \
-    malEmptyEnvs, malEmptyValues, 0, 0, 0
+  valueType:i = $MAL_ERROR_TYPE
+  zero:i = 0
+  v:MalValue init valueType, zero, message, malEmptyValues, \
+    malEmptyEnvs, malEmptyValues, zero, zero, zero
   xout v
 endop
 

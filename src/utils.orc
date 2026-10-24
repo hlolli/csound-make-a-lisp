@@ -5,8 +5,10 @@
 declare MalEquals(left:MalValue, right:MalValue):(i)
 
 opcode MalEnvHandle(id:i):MalEnv
-  paths:MalValue init $MAL_LIST_TYPE, 0, "", malEmptyValues, malEmptyEnvs, malEmptyValues, 0, 0, 0
-  env:MalEnv init malEmptyStrings, malEmptyValues, malEmptyEnvs, 0, id, 0, "", paths
+  valueType:i = $MAL_LIST_TYPE
+  zero:i = 0
+  paths:MalValue init valueType, zero, "", malEmptyValues, malEmptyEnvs, malEmptyValues, zero, zero, zero
+  env:MalEnv init malEmptyStrings, malEmptyValues, malEmptyEnvs, zero, id, zero, "", paths
   xout env
 endop
 
@@ -51,6 +53,7 @@ opcode MalAppendValue(destination:MalValue, value:MalValue):MalValue
 endop
 
 opcode MalMkReader(tstruct:MalTokens):MalReader
+  zero:i = 0
   malReaderTokens init tstruct.length
 
   if (tstruct.length > 0) ithen
@@ -59,13 +62,14 @@ opcode MalMkReader(tstruct:MalTokens):MalReader
     od
   endif
 
-  reader:MalReader init malReaderTokens[0], 0, tstruct.length, 0
+  reader:MalReader init malReaderTokens[0], zero, tstruct.length, zero
   xout(reader)
 endop
 
 opcode MalMkValue(type:i):MalValue
-  val:MalValue init type, 0, "", malEmptyValues, malEmptyEnvs, \
-    malEmptyValues, 0, 0, 0
+  zero:i = 0
+  val:MalValue init type, zero, "", malEmptyValues, malEmptyEnvs, \
+    malEmptyValues, zero, zero, zero
   xout(val)
 endop
 
@@ -103,14 +107,16 @@ opcode MalAstEnsureCapacity():void
 endop
 
 opcode MalInternAst(value:MalValue):MalValue
+  zero:i = 0
+  one:i = 1
   isCollection:i = value.type == $MAL_LIST_TYPE || \
     value.type == $MAL_VECTOR_TYPE || value.type == $MAL_HASH_MAP_TYPE
 
   if (isCollection == 0 || value.astRef == 1) ithen
     result:MalValue init value
   else
-    node:MalValue init value.type, 0, "", malEmptyValues, malEmptyEnvs, \
-      value.metadata, 0, 0, 0
+    node:MalValue init value.type, zero, "", malEmptyValues, malEmptyEnvs, \
+      value.metadata, zero, zero, zero
 
     if (value.length > 0) ithen
       for index in [0 ... value.length - 1] do
@@ -125,15 +131,17 @@ opcode MalInternAst(value:MalValue):MalValue
     malAstNodes[nodeId] init node
 
     result:MalValue init value.type, nodeId, "", malEmptyValues, \
-      malEmptyEnvs, value.metadata, value.length, 0, 1
+      malEmptyEnvs, value.metadata, value.length, zero, one
   endif
 
   xout result
 endop
 
 opcode MalMkNumber(number:i):MalValue
-  value:MalValue init $MAL_NUMBER_TYPE, number, "", malEmptyValues, \
-    malEmptyEnvs, malEmptyValues, 0, 0, 0
+  valueType:i = $MAL_NUMBER_TYPE
+  zero:i = 0
+  value:MalValue init valueType, number, "", malEmptyValues, \
+    malEmptyEnvs, malEmptyValues, zero, zero, zero
   xout value
 endop
 
@@ -157,14 +165,18 @@ opcode MalWithMeta(value:MalValue, metadataValue:MalValue):MalValue
 endop
 
 opcode MalMkSymbol(name:S):MalValue
-  val:MalValue init $MAL_SYMBOL_TYPE, 0, name, malEmptyValues, \
-    malEmptyEnvs, malEmptyValues, 0, 0, 0
+  valueType:i = $MAL_SYMBOL_TYPE
+  zero:i = 0
+  val:MalValue init valueType, zero, name, malEmptyValues, \
+    malEmptyEnvs, malEmptyValues, zero, zero, zero
   xout val
 endop
 
 opcode MalMkString(value:S):MalValue
-  val:MalValue init $MAL_STRING_TYPE, 0, value, malEmptyValues, \
-    malEmptyEnvs, malEmptyValues, 0, 0, 0
+  valueType:i = $MAL_STRING_TYPE
+  zero:i = 0
+  val:MalValue init valueType, zero, value, malEmptyValues, \
+    malEmptyEnvs, malEmptyValues, zero, zero, zero
   xout val
 endop
 
@@ -184,8 +196,10 @@ opcode MalStringArrayToList(values:S[], startIndex:i):MalValue
 endop
 
 opcode MalMkKeyword(name:S):MalValue
-  val:MalValue init $MAL_KEYWORD_TYPE, 0, name, malEmptyValues, \
-    malEmptyEnvs, malEmptyValues, 0, 0, 0
+  valueType:i = $MAL_KEYWORD_TYPE
+  zero:i = 0
+  val:MalValue init valueType, zero, name, malEmptyValues, \
+    malEmptyEnvs, malEmptyValues, zero, zero, zero
   xout val
 endop
 
@@ -208,6 +222,8 @@ opcode MalMapFindKey(mapValue:MalValue, key:MalValue):i
 endop
 
 opcode MalMapAssoc(mapValue:MalValue, key:MalValue, value:MalValue):MalValue
+  valueType:i = $MAL_HASH_MAP_TYPE
+  zero:i = 0
   keyIndex:i = MalMapFindKey(mapValue, key)
   newLength:i = mapValue.length + (keyIndex < 0 ? 2 : 0)
   entries:MalValue[] init newLength
@@ -225,12 +241,14 @@ opcode MalMapAssoc(mapValue:MalValue, key:MalValue, value:MalValue):MalValue
     entries[keyIndex + 1] init value
   endif
 
-  result:MalValue init $MAL_HASH_MAP_TYPE, 0, "", entries, \
-    malEmptyEnvs, malEmptyValues, newLength, 0, 0
+  result:MalValue init valueType, zero, "", entries, \
+    malEmptyEnvs, malEmptyValues, newLength, zero, zero
   xout result
 endop
 
 opcode MalMapDissoc(mapValue:MalValue, key:MalValue):MalValue
+  valueType:i = $MAL_HASH_MAP_TYPE
+  zero:i = 0
   keyIndex:i = MalMapFindKey(mapValue, key)
 
   if (keyIndex < 0) ithen
@@ -249,8 +267,8 @@ opcode MalMapDissoc(mapValue:MalValue, key:MalValue):MalValue
       od
     endif
 
-    result:MalValue init $MAL_HASH_MAP_TYPE, 0, "", entries, \
-      malEmptyEnvs, malEmptyValues, newLength, 0, 0
+    result:MalValue init valueType, zero, "", entries, \
+      malEmptyEnvs, malEmptyValues, newLength, zero, zero
   endif
 
   xout result
@@ -269,6 +287,8 @@ opcode MalMapGet(mapValue:MalValue, key:MalValue):MalValue
 endop
 
 opcode MalMapKeys(mapValue:MalValue):MalValue
+  valueType:i = $MAL_LIST_TYPE
+  zero:i = 0
   entryCount:i = int(mapValue.length / 2)
   values:MalValue[] init entryCount
 
@@ -278,12 +298,14 @@ opcode MalMapKeys(mapValue:MalValue):MalValue
     od
   endif
 
-  result:MalValue init $MAL_LIST_TYPE, 0, "", values, malEmptyEnvs, \
-    malEmptyValues, entryCount, 0, 0
+  result:MalValue init valueType, zero, "", values, malEmptyEnvs, \
+    malEmptyValues, entryCount, zero, zero
   xout result
 endop
 
 opcode MalMapValues(mapValue:MalValue):MalValue
+  valueType:i = $MAL_LIST_TYPE
+  zero:i = 0
   entryCount:i = int(mapValue.length / 2)
   values:MalValue[] init entryCount
 
@@ -293,8 +315,8 @@ opcode MalMapValues(mapValue:MalValue):MalValue
     od
   endif
 
-  result:MalValue init $MAL_LIST_TYPE, 0, "", values, malEmptyEnvs, \
-    malEmptyValues, entryCount, 0, 0
+  result:MalValue init valueType, zero, "", values, malEmptyEnvs, \
+    malEmptyValues, entryCount, zero, zero
   xout result
 endop
 
@@ -313,6 +335,8 @@ opcode MalNormalizeMap(mapValue:MalValue):MalValue
 endop
 
 opcode MalMkAtom(value:MalValue):MalValue
+  valueType:i = $MAL_ATOM_TYPE
+  zero:i = 0
   capacity:i = lenarray(malAtomValues)
 
   if (malAtomCount >= capacity) ithen
@@ -343,8 +367,8 @@ opcode MalMkAtom(value:MalValue):MalValue
   malAtomValues[atomId] init value
   malAtomVersions[atomId] = 0
 
-  val:MalValue init $MAL_ATOM_TYPE, atomId, "", malEmptyValues, \
-    malEmptyEnvs, malEmptyValues, 0, 0, 0
+  val:MalValue init valueType, atomId, "", malEmptyValues, \
+    malEmptyEnvs, malEmptyValues, zero, zero, zero
   xout val
 endop
 
@@ -359,20 +383,26 @@ opcode MalAtomSetValue(atom:MalValue, value:MalValue):MalValue
 endop
 
 opcode MalMkBuiltin(name:S):MalValue
-  val:MalValue init $MAL_BUILTIN_TYPE, 0, name, malEmptyValues, \
-    malEmptyEnvs, malEmptyValues, 0, 0, 0
+  valueType:i = $MAL_BUILTIN_TYPE
+  zero:i = 0
+  val:MalValue init valueType, zero, name, malEmptyValues, \
+    malEmptyEnvs, malEmptyValues, zero, zero, zero
   xout val
 endop
 
 opcode MalMkBuiltinOperator(name:S):MalValue
-  val:MalValue init $MAL_BUILTIN_OPERATOR_TYPE, 0, name, malEmptyValues, \
-    malEmptyEnvs, malEmptyValues, 0, 0, 0
+  valueType:i = $MAL_BUILTIN_OPERATOR_TYPE
+  zero:i = 0
+  val:MalValue init valueType, zero, name, malEmptyValues, \
+    malEmptyEnvs, malEmptyValues, zero, zero, zero
   xout val
 endop
 
 opcode MalMkBuiltinOpcode(name:S):MalValue
-  val:MalValue init $MAL_BUILTIN_OPCODE_TYPE, 0, name, malEmptyValues, \
-    malEmptyEnvs, malEmptyValues, 0, 0, 0
+  valueType:i = $MAL_BUILTIN_OPCODE_TYPE
+  zero:i = 0
+  val:MalValue init valueType, zero, name, malEmptyValues, \
+    malEmptyEnvs, malEmptyValues, zero, zero, zero
   xout val
 endop
 
@@ -400,6 +430,9 @@ opcode MalFunctionEnsureCapacity():void
 endop
 
 opcode MalMkFunction(params:MalValue, body:MalValue):MalValue
+  valueType:i = $MAL_FUNCTION_TYPE
+  two:i = 2
+  zero:i = 0
   MalFunctionEnsureCapacity()
 
   definition:MalValue MalMkValue $MAL_FUNCTION_TYPE
@@ -410,8 +443,8 @@ opcode MalMkFunction(params:MalValue, body:MalValue):MalValue
   malFunctionCount += 1
   malFunctionDefinitions[functionId] init definition
 
-  handle:MalValue init $MAL_FUNCTION_TYPE, functionId, "", \
-    malEmptyValues, malEmptyEnvs, malEmptyValues, 2, 0, 0
+  handle:MalValue init valueType, functionId, "", \
+    malEmptyValues, malEmptyEnvs, malEmptyValues, two, zero, zero
   xout handle
 endop
 

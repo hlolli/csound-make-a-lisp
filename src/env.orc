@@ -109,11 +109,12 @@ opcode MalEnvStore(env:MalEnv):MalEnv
 endop
 
 opcode MalEnvRetain(env:MalEnv):MalEnv
+  one:i = 1
   resolved:MalEnv MalEnvResolve env
 
   if (resolved.id >= 0 && resolved.persistent == 0) ithen
     resolved init resolved.keys, resolved.values, resolved.outer, \
-      resolved.length, resolved.id, 1, resolved.namespace, resolved.loadPaths
+      resolved.length, resolved.id, one, resolved.namespace, resolved.loadPaths
     resolved MalEnvStore resolved
 
     if (lenarray(resolved.outer) > 0) ithen
@@ -157,15 +158,18 @@ opcode MalEnvTrack(ids:i[], count:i, id:i):(i[], i)
 endop
 
 opcode MalMkEnv():MalEnv
+  zero:i = 0
+  one:i = 1
   ;; TODO: Once Csound supports zero-argument struct init for UDTs, this
   ;; constructor can become a cleaner default-initialized MalEnv.
   id:i MalEnvAllocateId
-  env:MalEnv init malEmptyStrings, malEmptyValues, malEmptyEnvs, 0, id, 1, "", MalMkList1(MalMkString("."))
+  env:MalEnv init malEmptyStrings, malEmptyValues, malEmptyEnvs, zero, id, one, "", MalMkList1(MalMkString("."))
   env MalEnvStore env
   xout env
 endop
 
 opcode MalMkEnvWithOuter(parent:MalEnv):MalEnv
+  zero:i = 0
   id:i MalEnvAllocateId
   parentId:i = parent.id
   registered:i = 0
@@ -179,7 +183,7 @@ opcode MalMkEnvWithOuter(parent:MalEnv):MalEnv
   endif
   outer:MalEnv[] init 1
   outer[0] MalEnvHandle parentId
-  env:MalEnv init malEmptyStrings, malEmptyValues, outer, 0, id, 0, namespace, MalMkValue($MAL_LIST_TYPE)
+  env:MalEnv init malEmptyStrings, malEmptyValues, outer, zero, id, zero, namespace, MalMkValue($MAL_LIST_TYPE)
   env MalEnvStore env
   xout env
 endop
