@@ -366,6 +366,10 @@ instr TEST
   ASSERT_REP("({})", "({})")
   ASSERT_REP("(1 -2 3)", "(1 -2 3)")
   ASSERT_REP("(1 (2 3) 4)", "(1 (2 3) 4)")
+  ASSERT_REP("#_ [:skip] [:keep #_ (skip) 7]", "[:keep 7]")
+  ASSERT_REP("'#_ 1 2", "(quote 2)")
+  ASSERT_REP("#_ #_ 1 2", "nil")
+  ASSERT_REP("#(list)", "(fn* [] (list))")
   REPL("'(123 456)")
   REPL("(nil true false abc)")
   ;; prints "SRES9: %s\n", SRES9

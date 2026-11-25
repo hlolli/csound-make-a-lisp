@@ -4,6 +4,10 @@
 
 declare read_form(reader:MalReader):(MalReadResult)
 
+malAnonymousReaderId@global:i init 0
+malAnonymousReaderArity@global:i init 0
+malAnonymousReaderRest@global:i init 0
+
 opcode isCharWordBoundry(char:i):i
   ires = 0
   if (char == $MAL_NEWLINE_TOKEN || \
@@ -105,8 +109,9 @@ opcode tokenize(input:S):MalTokens
       igoto END
     endif
 
-    ;; test for ~@ token
-    if (ipeek == $MAL_TILDE_TOKEN && ipeek2 == $MAL_AT_TOKEN) ithen
+    if ((ipeek == $MAL_TILDE_TOKEN && ipeek2 == $MAL_AT_TOKEN) || \
+        (ipeek == $MAL_HASH_TOKEN && \
+         (ipeek2 == $MAL_UNDERSCORE_TOKEN || ipeek2 == $MAL_PAREN_OPEN_TOKEN))) ithen
       STokens[itokenCnt] init strcpy(strsub(input, indx, indx + 2))
       itokenCnt += 1
       indx += 2
@@ -312,7 +317,7 @@ opcode read_sequence(reader:MalReader, endToken:S, sequenceType:i):MalReadResult
       if nextValue.type == $MAL_ERROR_TYPE ithen
         newSequence init nextValue
         ierror = 1
-      else
+      elseif nextValue.type != $MAL_DISCARDED_TYPE ithen
         newSequence init MalAppendValue(newSequence, nextValue)
       endif
     endif
@@ -349,23 +354,27 @@ opcode read_hash_map(reader:MalReader, endToken:S):MalReadResult
   xout result
 endop
 
-opcode read_reader_macro(reader:MalReader, macroSymbol:S, macroToken:S):MalReadResult
-  v:MalValue init MalMkValue($MAL_LIST_TYPE)
-  result:MalReadResult init MalMkReadResult(v, reader)
-  reader init MalNextToken(reader)
+opcode MalReadRequired(reader:MalReader, missing:S):MalReadResult
+  current:MalReader init reader
+  value:MalValue init MalMkValue($MAL_DISCARDED_TYPE)
+  while (current.done == 0 && value.type == $MAL_DISCARDED_TYPE) do
+    result:MalReadResult init read_form(current)
+    value init MalReadResultValue(result)
+    current init MalReadResultReader(result)
+  od
+  if (value.type == $MAL_DISCARDED_TYPE) ithen
+    value init MalMkError(missing)
+  endif
+  xout MalMkReadResult(value, current)
+endop
 
-  if reader.done == 1 ithen
-    v init MalMkError(sprintf("expected form after '%s', got EOF", macroToken))
-    result init MalMkReadResult(v, reader)
-  else
-    next:MalReadResult init read_form(reader)
-    nextValue:MalValue init MalReadResultValue(next)
-    if nextValue.type == $MAL_ERROR_TYPE ithen
-      result init next
-    else
-      v init MalMkList2(MalMkSymbol(macroSymbol), nextValue)
-      result init MalMkReadResult(v, MalReadResultReader(next))
-    endif
+opcode read_reader_macro(reader:MalReader, macroSymbol:S, macroToken:S):MalReadResult
+  result:MalReadResult init MalReadRequired(MalNextToken(reader), \
+    sprintf("expected form after '%s', got EOF", macroToken))
+  value:MalValue init MalReadResultValue(result)
+  if (value.type != $MAL_ERROR_TYPE) ithen
+    result init MalMkReadResult(MalMkList2(MalMkSymbol(macroSymbol), value), \
+      MalReadResultReader(result))
   endif
 
   xout result
@@ -380,7 +389,7 @@ opcode read_with_meta(reader:MalReader):MalReadResult
     v init MalMkError("expected metadata after '^', got EOF")
     result init MalMkReadResult(v, reader)
   else
-    meta:MalReadResult init read_form(reader)
+    meta:MalReadResult init MalReadRequired(reader, "expected metadata after '^', got EOF")
     metaValue:MalValue init MalReadResultValue(meta)
     formReader:MalReader init MalReadResultReader(meta)
 
@@ -390,7 +399,7 @@ opcode read_with_meta(reader:MalReader):MalReadResult
       v init MalMkError("expected form after '^' metadata, got EOF")
       result init MalMkReadResult(v, formReader)
     else
-      form:MalReadResult init read_form(formReader)
+      form:MalReadResult init MalReadRequired(formReader, "expected form after '^' metadata, got EOF")
       formValue:MalValue init MalReadResultValue(form)
       if formValue.type == $MAL_ERROR_TYPE ithen
         result init form
@@ -401,6 +410,70 @@ opcode read_with_meta(reader:MalReader):MalReadResult
     endif
   endif
 
+  xout result
+endop
+
+opcode MalAnonymousParameter(index:i):MalValue
+  xout MalMkSymbol(sprintf("p%d__%d#", index, malAnonymousReaderId))
+endop
+
+opcode MalReadAnonymousParameter(token:S):MalValue
+  index:i = 1
+  if (strcmp(token, "%&") == 0) ithen
+    malAnonymousReaderRest = 1
+    index = 0
+  elseif (strlen(token) > 1) ithen
+    digits:S init strsub(token, 1)
+    index = 0
+    for offset in [0 ... strlen(digits) - 1] do
+      digit:i = strchar:i(digits, offset) - 48
+      if (digit < 0 || digit > 9) ithen
+        index = -1
+        break
+      endif
+      index = index * 10 + digit
+    od
+    ;; Clojure compiles up to 20 positional parameters.
+    if (index < 1 || index > 20) ithen
+      index = -1
+    endif
+  endif
+  if (index < 0) ithen
+    result:MalValue init MalMkError("anonymous function: expected %, %n, or %&")
+  else
+    malAnonymousReaderArity = max(malAnonymousReaderArity, index)
+    result init MalAnonymousParameter(index)
+  endif
+  xout result
+endop
+
+opcode MalReadAnonymous(reader:MalReader):MalReadResult
+  if (malAnonymousReaderId != 0) ithen
+    result:MalReadResult init MalMkReadResult( \
+      MalMkError("anonymous function literals cannot be nested"), reader)
+  else
+    malGensymCount += 1
+    malAnonymousReaderId = malGensymCount
+    malAnonymousReaderArity = 0
+    malAnonymousReaderRest = 0
+    result init read_list(reader, ")")
+    body:MalValue init MalReadResultValue(result)
+    if (body.type != $MAL_ERROR_TYPE) ithen
+      params:MalValue init MalMkValue($MAL_VECTOR_TYPE)
+      if (malAnonymousReaderArity > 0) ithen
+        for index in [1 ... malAnonymousReaderArity] do
+          params init MalAppendValue(params, MalAnonymousParameter(index))
+        od
+      endif
+      if (malAnonymousReaderRest == 1) ithen
+        params init MalAppendValue(params, MalMkSymbol("&"))
+        params init MalAppendValue(params, MalAnonymousParameter(0))
+      endif
+      result init MalMkReadResult(MalMkList3(MalMkSymbol("fn*"), params, body), \
+        MalReadResultReader(result))
+    endif
+    malAnonymousReaderId = 0
+  endif
   xout result
 endop
 
@@ -456,8 +529,22 @@ opcode read_form(reader:MalReader):MalReadResult
       result init read_with_meta(reader)
 
     default
-      v init read_atom(reader)
-      result init MalMkReadResult(v, MalNextToken(reader))
+      if (strcmp(Stoken, "#(") == 0) ithen
+        result init MalReadAnonymous(reader)
+      elseif (strcmp(Stoken, "#_") == 0) ithen
+        result init MalReadRequired(MalNextToken(reader), "expected form after '#_', got EOF")
+        v init MalReadResultValue(result)
+        if (v.type != $MAL_ERROR_TYPE) ithen
+          result init MalMkReadResult(MalMkValue($MAL_DISCARDED_TYPE), MalReadResultReader(result))
+        endif
+      else
+        if (istrChar == $MAL_PERCENT_TOKEN && malAnonymousReaderId != 0) ithen
+          v init MalReadAnonymousParameter(Stoken)
+        else
+          v init read_atom(reader)
+        endif
+        result init MalMkReadResult(v, MalNextToken(reader))
+      endif
   endsw
 
   xout result
@@ -469,8 +556,15 @@ opcode read_str(input:S):MalValue
 
   if (tstruct.length > 0) ithen
     reader:MalReader init MalMkReader(tstruct)
-    result:MalReadResult init read_form(reader)
-    returnValue init MalReadResultValue(result)
+    while (reader.done == 0) do
+      result:MalReadResult init read_form(reader)
+      value:MalValue init MalReadResultValue(result)
+      if (value.type != $MAL_DISCARDED_TYPE) ithen
+        returnValue init value
+        break
+      endif
+      reader init MalReadResultReader(result)
+    od
   endif
 
   xout returnValue

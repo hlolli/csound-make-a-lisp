@@ -2128,7 +2128,7 @@ opcode MalEvalFormsEnv(source:S, env:MalEnv):(MalValue, MalEnv)
       reader init MalReadResultReader(form)
       if (value.type == $MAL_ERROR_TYPE) ithen
         ast init value
-      else
+      elseif (value.type != $MAL_DISCARDED_TYPE) ithen
         ast init MalAppendValue(ast, value)
       endif
     od

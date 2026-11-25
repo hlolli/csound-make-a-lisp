@@ -28,6 +28,8 @@
 #define MAL_CSOUND_INSTRUMENT_TYPE #22#
 #define MAL_CSOUND_NODE_TYPE #23#
 #define MAL_REDUCED_TYPE #24#
+// Reader marker for a discarded form. It never reaches evaluation.
+#define MAL_DISCARDED_TYPE #25#
 
 // Csound graph node kinds
 #define MAL_CSOUND_PARAM_NODE #1#
@@ -69,6 +71,9 @@
 #define MAL_BACKSLASH_TOKEN #92#
 #define MAL_COLON_TOKEN #58#
 #define MAL_SEMICOLON_TOKEN #59#
+#define MAL_HASH_TOKEN #35#
+#define MAL_PERCENT_TOKEN #37#
+#define MAL_UNDERSCORE_TOKEN #95#
 
 // error reason
 #define MAL_ILLEGAL_TOKEN_ERROR #-1#
