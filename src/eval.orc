@@ -1358,24 +1358,29 @@ endop
 
 opcode MalEvalSequenceEnv(ast:MalValue, env:MalEnv, startIndex:i, resultType:i):(MalValue, MalEnv)
   result:MalValue init MalMkValue(resultType)
+  size:i = max(0, ast.length - startIndex)
+  values:MalValue[] init size
   currentEnv:MalEnv init MalEnvHandle(env.id)
   index:i = startIndex
-  done:i = 0
 
-  while (index < ast.length && done == 0) do
+  while (index < ast.length) do
     value:MalValue init MalAt(ast, index)
     valueInputEnv:MalEnv init MalEnvHandle(currentEnv.id)
     evaluated:MalValue, currentEnv = MalEvalInternal(value, valueInputEnv)
 
     if (evaluated.type == $MAL_ERROR_TYPE) ithen
       result init evaluated
-      done = 1
-    else
-      result init MalAppendValue(result, evaluated)
+      break
     endif
 
+    values[index - startIndex] init evaluated
     index += 1
   od
+
+  if (result.type != $MAL_ERROR_TYPE) ithen
+    result.list init values
+    result.length = size
+  endif
 
   xout result, currentEnv
 endop
@@ -2054,6 +2059,11 @@ opcode MalEvalInternal(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
               result init bindStatus
               done = 1
             else
+              ;; Binding the callee first preserves any captured scopes.
+              while (transientEnvCount > 0) do
+                transientEnvCount -= 1
+                MalEnvRelease(MalEnvHandle(transientEnvIds[transientEnvCount]))
+              od
               transientEnvId = callEnv.id
               workAst init MalFunctionBody(fn)
               evalEnv init MalEnvHandle(callEnv.id)

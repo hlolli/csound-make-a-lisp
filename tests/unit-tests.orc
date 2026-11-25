@@ -342,6 +342,19 @@ instr TEST_LET_RELEASE
     prints "LET release, Assertion failed: unused scopes remain after evaluation\n"
     exitnow(1)
   endif
+  captured:MalValue init EVAL(read_str("(let [x 41 f (fn [] (+ x 1))] (f))"), env)
+  if (captured.type != $MAL_NUMBER_TYPE || captured.number != 42) ithen
+    prints "Tail call release, Assertion failed: captured scope was lost\n"
+    exitnow(1)
+  endif
+  definition:MalValue init EVAL(read_str("(defn countdown [n] (let [next (- n 1)] (if (= n 0) n (countdown next))))"), env)
+  before:i = malEnvCount
+  depth:i = max(250, malEnvFreeCount + 32)
+  tail:MalValue init EVAL(read_str(sprintf("(countdown %d)", depth)), env)
+  if (tail.type != $MAL_NUMBER_TYPE || tail.number != 0 || malEnvCount > before + 8) ithen
+    prints "Tail call release, Assertion failed: value %s or registry grew from %d to %d\n", pr_str(tail), before, malEnvCount
+    exitnow(1)
+  endif
   prints "LET release, Assertion success\n"
 endin
 
