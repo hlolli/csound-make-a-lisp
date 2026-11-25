@@ -429,15 +429,11 @@ opcode MalFunctionEnsureCapacity():void
   endif
 endop
 
-opcode MalMkFunction(params:MalValue, body:MalValue):MalValue
+opcode MalRegisterFunction(definition:MalValue):MalValue
   valueType:i = $MAL_FUNCTION_TYPE
   two:i = 2
   zero:i = 0
   MalFunctionEnsureCapacity()
-
-  definition:MalValue MalMkValue $MAL_FUNCTION_TYPE
-  definition MalAppendValue definition, params
-  definition MalAppendValue definition, MalInternAst(body)
 
   functionId:i = malFunctionCount
   malFunctionCount += 1
@@ -446,6 +442,13 @@ opcode MalMkFunction(params:MalValue, body:MalValue):MalValue
   handle:MalValue init valueType, functionId, "", \
     malEmptyValues, malEmptyEnvs, malEmptyValues, two, zero, zero
   xout handle
+endop
+
+opcode MalMkFunction(params:MalValue, body:MalValue):MalValue
+  definition:MalValue init MalMkValue($MAL_FUNCTION_TYPE)
+  definition init MalAppendValue(definition, params)
+  definition init MalAppendValue(definition, MalInternAst(body))
+  xout MalRegisterFunction(definition)
 endop
 
 opcode MalFunctionParams(fn:MalValue):MalValue

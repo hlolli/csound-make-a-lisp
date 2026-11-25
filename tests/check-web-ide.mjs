@@ -29,7 +29,12 @@ const project = await readFile(
 );
 const orchestra = project
   .match(/<CsInstruments>([\s\S]*?)<\/CsInstruments>/)[1]
-  .replace('#include "mal.inc"', () => bundle);
+  .replace('#include "mal.inc"', () => bundle) + `
+instr MalTestJobStep
+  status:i = MalEvalJobStep(p4, 1)
+  chnset status, "__web_ide_job_status"
+endin
+`;
 
 function evaluate(source, expected = 1) {
   api.csoundSetStringChannel(csound, "__web_ide_lisp_source", source);
@@ -63,6 +68,9 @@ try {
   evaluate(
     '(if (= @counter 1) (println "PASS: recovery") (throw "lost state"))',
   );
+  evaluate(
+    '(let [seen (atom [])] (doseq [[n] [[1] #_[99] [2] [3]]] (swap! seen conj (#(* % %) n))) (assert (= @seen [1 4 9])))',
+  );
   // A callback suspends and resumes through several frame constructors.
   const job = api.csoundEvalCode(
     csound,
@@ -72,7 +80,11 @@ try {
   let status = 0;
   let steps = 0;
   while (status === 0 && steps < 1000) {
-    status = api.csoundEvalCode(csound, `return MalEvalJobStep(${job}, 1)\n`);
+    // Reuse the job driver across init passes instead of compiling one
+    // global orchestra fragment for each transition.
+    assert.equal(api.csoundInputMessage(csound, `i "MalTestJobStep" 0 0 ${job}`), 0);
+    api.csoundPerformKsmps(csound);
+    status = api.csoundGetControlChannel(csound, "__web_ide_job_status");
     steps += 1;
   }
   assert.equal(status, 1, "finish the evaluation job");

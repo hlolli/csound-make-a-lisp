@@ -1,0 +1,107 @@
+;; This Source Code Form is subject to the terms of the Mozilla Public
+;; License, v. 2.0. If a copy of the MPL was not distributed with this
+;; file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+(def checks (atom 0))
+(defn check [description expected actual]
+  (if (= expected actual)
+    (swap! checks inc)
+    (throw (str description ": expected " (pr-str expected) ", got " (pr-str actual)))))
+
+(check "get reads a vector index" 64 (get [60 64] 1))
+(check "get reads a string index" "b" (get "abc" 1))
+(check "get returns nil for missing keys" nil (get {} :note))
+(check "get returns default for missing keys" 60 (get {} :note 60))
+(check "get keeps present nil" nil (get {:note nil} :note 60))
+(check "get keeps present false" false (get [false] 0 60))
+(check "get returns default for non-integer vector keys" :missing (get [60] 0.5 :missing))
+(check "get returns default for out-of-bounds vector indices" :missing (get [60] 1 :missing))
+(check "get returns default for nil or non-associative values" [:missing :missing]
+       [(get nil :x :missing) (get '(60) 0 :missing)])
+(check "qualified get has the same arities" :missing (clojure.core/get {} :x :missing))
+
+(check "nth returns default for missing items" :missing (nth [60] 1 :missing))
+(check "nth returns default for negative indices" :missing (nth '(60) -1 :missing))
+(check "nth returns default for nil" :missing (nth nil 0 :missing))
+(check "nth on nil with no default returns nil" nil (nth nil 0))
+(check "nth keeps present nil" nil (nth [nil] 0 :missing))
+(check "nth reads a string index" "c" (nth "abc" 2))
+(check "nth still errors without a default" "nth: index out of range"
+       (try* (nth [] 0) (catch* e e)))
+(check "nth still rejects fractional indices" "nth: index must be an integer"
+       (try* (nth [60] 0.5 :missing) (catch* e e)))
+
+(check "keyword call reads its key" 60 (:note {:note 60}))
+(check "keyword call returns default for a missing key" 60 (:note {} 60))
+(check "keyword call returns default for nil" 60 (:note nil 60))
+(check "keyword call keeps present false" false (:note {:note false} 60))
+(check "map call reads a key" 60 ({:note 60} :note))
+(check "map call returns default for a missing key" 60 ({} :note 60))
+(check "map call keeps present nil" nil (apply {:note nil} [:note 60]))
+(check "vector call reads an index" 64 ([60 64] 1))
+(check "vector call errors on bounds" "nth: index out of range"
+       (try* ([60] 1) (catch* e e)))
+(check "lookup values are callable without becoming functions" [false false false]
+       [(fn? :note) (fn? {}) (fn? [])])
+
+(check "map reads multiple collections up to the shortest" '(11 22)
+       (map + [1 2 3] '(10 20)))
+(check "map callbacks can keep distinct argument lists" '((1 3) (2 4))
+       (map list [1 2] [3 4]))
+(check "map returns a list" true (list? (map vector [1] [2] [3])))
+(check "map handles nil in any position" '() (map + [1] nil))
+(check "map can use a keyword callback" '(60 false nil)
+       (map :note [{:note 60} {:note false} {}]))
+(check "map reads strings" '("a" "b") (map identity "ab"))
+(check "map reads map entries" '(60) (map second {:note 60}))
+(check "map forwards callback errors" :bad
+       (try* (map (fn [x y] (throw :bad)) [1] [2]) (catch* e e)))
+
+(check "range supports one, two, and three arguments" '((0 1 2) (2 3 4) (2 4 6))
+       (list (range 3) (range 2 5) (range 2 7 2)))
+(check "range supports descending values" '(5 3 1) (range 5 0 -2))
+(check "range supports fractional steps" '(0 0.25 0.5 0.75) (range 0 1 0.25))
+(check "range excludes an endpoint that rounds to a step" 3 (count (range 0 (+ 0.1 0.2) 0.1)))
+(check "range considers the next step when the ratio rounds down" 2 (count (range -0.01 0.001 0.011)))
+(check "range with no values returns an empty list" '() (range 3 1))
+(check "range rejects unbounded calls" "range: expected 1 to 3 arguments"
+       (try* (range) (catch* e e)))
+(check "range rejects a zero step" "range: step must be nonzero"
+       (try* (range 0 3 0) (catch* e e)))
+(check "range rejects nonnumeric bounds" "range: expected numeric arguments"
+       (try* (range :no) (catch* e e)))
+(check "range rejects lengths that overflow Csound arrays"
+       "range: result exceeds the Csound array size limit"
+       (try* (range 3000000000) (catch* e e)))
+(check "min and max take one or more numbers" [-3 9 6]
+       [(min 4 1 -3 2) (max -5 9 2.5) (max 6)])
+(check "min rejects nonnumbers" "min: expected numeric arguments"
+       (try* (min 3 :bad) (catch* e e)))
+(check "scalar abs supports fractions" 2.5 (abs -2.5))
+(check "quot truncates toward zero" [-2 -2 2] [(quot -7 3) (quot 7 -3) (quot -7 -3)])
+(check "rem follows the dividend and preserves fractions" [-1.5 1.5]
+       [(rem -7.5 3) (rem 7.5 -3)])
+(check "mal division still truncates" 1 (/ 3 2))
+(check "division helpers reject zero" ["quot: division by zero" "rem: division by zero"]
+       [(try* (quot 3 0) (catch* e e)) (try* (rem 3 0) (catch* e e))])
+
+(check "if-not evaluates one branch" :chosen (if-not false :chosen (throw :unreached)))
+(check "if-not handles the else branch" :chosen (if-not :truthy (throw :unreached) :chosen))
+(check "if-not defaults to nil" nil (if-not :truthy (throw :unreached)))
+(check "comment returns nil without evaluating its body" nil (comment (throw :unreached)))
+(check "assert succeeds without evaluating its message" nil (assert true (throw :unreached)))
+(check "assert reports the failing form" "Assert failed: (= 1 2)"
+       (try* (assert (= 1 2)) (catch* e e)))
+(check "assert evaluates a supplied failure message" "Assert failed: missing 60\nfalse"
+       (try* (assert false (str "missing " 60)) (catch* e e)))
+
+(check "if-let supports positional bindings" 60 (if-let [[note] [60]] note :missing))
+(check "when-some supports map bindings" false
+       (when-some [{:keys [note]} {:note false}] note))
+(check "conditional binding stays inside the chosen branch" :outer
+       (let [note :outer] (if-let [[note] nil] note note)))
+(check "conditional destructuring evaluates the source once" [60 1]
+       (let [calls (atom 0)]
+         [(if-let [[note] (do (swap! calls inc) [60])] note) @calls]))
+
+(println (str "PASS: " @checks " Clojure helper checks"))

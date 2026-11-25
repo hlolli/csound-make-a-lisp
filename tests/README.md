@@ -59,6 +59,11 @@ It checks closures, macros, errors, job cancellation, scope cleanup, collection
 callbacks, and an atom update that must retry after another client changes the
 atom. The standalone bundle check runs these fixtures too.
 
+`just clojure-helpers clojure-language` checks eager collection and number
+helpers, destructuring, function arities, reader forms, and iteration. The
+language fixture runs each case with both evaluators. The standalone bundle
+check runs both fixtures.
+
 To test the Web-IDE example against its browser engine, build `dist/mal.inc`
 and pass the installed browser package to the Node check:
 

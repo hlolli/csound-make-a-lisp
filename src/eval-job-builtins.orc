@@ -4,9 +4,32 @@
 
 ;; Each application below returns to the job dispatcher before running Lisp.
 ;; Frames 100-108 belong to these builtin continuations.
+;; Collection frames keep the input handle in aux.number and the result's
+;; newest item or reduce accumulator in extra.number. data tracks the result
+;; type and item count. The input starts with the callback and its collections.
+opcode MalEvalJobBuiltinItem(input:i, column:i, index:i):MalValue
+  offset:i = column + 1
+  if (malEvalJobCollectionValues[input].list[offset].astRef == 1) ithen
+    node:i = malEvalJobCollectionValues[input].list[offset].number
+    result:MalValue init malAstNodes[node].list[index]
+  else
+    result:MalValue init malEvalJobCollectionValues[input].list[offset].list[index]
+  endif
+  xout result
+endop
+
+opcode MalEvalJobBuiltinDiscard(frame:MalEvalFrame):void
+  if ((frame.kind >= 100 && frame.kind <= 103) || frame.kind == 106) ithen
+    MalEvalJobDiscardCollection(frame.aux.number)
+    MalEvalJobDiscardCollection(frame.extra.number)
+  endif
+endop
+
 opcode MalEvalJobBuiltinContinue(slot:i, frame:MalEvalFrame):void
   malEvalJobs[slot].env = frame.env
+  input:i = frame.aux.number
   if (frame.index >= frame.limit) ithen
+    MalEvalJobDiscardCollection(input)
     if (frame.kind == 103) ithen
       name:S init frame.extra.string
       if (strcmp(name, "every?") == 0 || strcmp(name, "not-any?") == 0) ithen
@@ -16,33 +39,42 @@ opcode MalEvalJobBuiltinContinue(slot:i, frame:MalEvalFrame):void
       elseif (strcmp(name, "some") == 0) ithen
         MalEvalJobReturn(slot, MalMkValue($MAL_NIL_TYPE))
       else
-        MalEvalJobReturn(slot, frame.data)
+        MalEvalJobReturn(slot, MalEvalJobFinishCollection(frame.extra.number, frame.data.length, frame.data.type))
       endif
+    elseif (frame.kind == 102) ithen
+      MalEvalJobReturn(slot, malEvalJobCollectionValues[frame.extra.number])
+      MalEvalJobDiscardCollection(frame.extra.number)
     else
-      MalEvalJobReturn(slot, frame.data)
+      MalEvalJobReturn(slot, MalEvalJobFinishCollection(frame.extra.number, frame.data.length, frame.data.type))
     endif
   else
     MalEvalJobPush(slot, frame)
+    fn:MalValue init malEvalJobCollectionValues[input].list[0]
     if (frame.kind == 100) ithen
-      MalEvalJobSetApply(slot, frame.form, MalMkList1(MalAt(frame.aux, frame.index)))
+      MalEvalJobSetApply(slot, fn, MalMkList1(MalEvalJobBuiltinItem(input, 0, frame.index)))
     elseif (frame.kind == 101) ithen
       callArgs:MalValue init MalMkValue($MAL_LIST_TYPE)
-      for column in [0 ... frame.aux.length - 1] do
-        callArgs init MalAppendValue(callArgs, MalAt(MalAt(frame.aux, column), frame.index))
+      columns:i = malEvalJobCollectionValues[input].length - 1
+      values:MalValue[] init columns
+      for column in [0 ... columns - 1] do
+        values[column] init MalEvalJobBuiltinItem(input, column, frame.index)
       od
-      MalEvalJobSetApply(slot, frame.form, callArgs)
+      callArgs.list init values
+      callArgs.length = columns
+      MalEvalJobSetApply(slot, fn, callArgs)
     elseif (frame.kind == 102) ithen
-      MalEvalJobSetApply(slot, frame.form, MalMkList2(frame.data, MalAt(frame.aux, frame.index)))
+      accumulator:MalValue init malEvalJobCollectionValues[frame.extra.number]
+      MalEvalJobSetApply(slot, fn, MalMkList2(accumulator, MalEvalJobBuiltinItem(input, 0, frame.index)))
     elseif (frame.kind == 103) ithen
       if (frame.flag == 1) ithen
         ;; drop-while stops calling its predicate after the first false result.
         MalEvalJobReturn(slot, MalMkBool(0))
       else
-        MalEvalJobSetApply(slot, frame.form, MalMkList1(MalAt(frame.aux, frame.index)))
+        MalEvalJobSetApply(slot, fn, MalMkList1(MalEvalJobBuiltinItem(input, 0, frame.index)))
       endif
     else
       ;; take/drop copy one item per dispatcher step.
-      MalEvalJobReturn(slot, MalAt(frame.aux, frame.index))
+      MalEvalJobReturn(slot, MalEvalJobBuiltinItem(input, 0, frame.index))
     endif
   endif
 endop
@@ -56,6 +88,7 @@ opcode MalEvalJobBuiltinStart(slot:i, fn:MalValue, args:MalValue):i
     frame.env = malEvalJobs[slot].env
     frame.index = 0
     frame.flag = 0
+    frame.extra.number = -1
 
     if (strcmp(name, "apply") == 0 && lenarray(fn.env) == 0) ithen
       handled = 1
@@ -67,7 +100,7 @@ opcode MalEvalJobBuiltinStart(slot:i, fn:MalValue, args:MalValue):i
         MalEvalJobSetApply(slot, MalAt(args, 0), MalFlattenApplyArgs(args))
       endif
 
-    elseif (strcmp(name, "map") == 0 && lenarray(fn.env) == 0) ithen
+    elseif (strcmp(name, "map") == 0 && fn.number == 0 && lenarray(fn.env) == 0) ithen
       handled = 1
       if (args.length != 2) ithen
         MalEvalJobReturn(slot, MalArityError(name, 2, args.length))
@@ -82,38 +115,41 @@ opcode MalEvalJobBuiltinStart(slot:i, fn:MalValue, args:MalValue):i
           MalEvalJobReturn(slot, MalMkError("map: second argument must be list or vector"))
         else
           frame.kind = 100
-          frame.form init MalAt(args, 0)
-          frame.aux init sequence
+          frame.aux.number = MalEvalJobStoreCollectionValue(MalMkList2(MalAt(args, 0), sequence), -1)
           frame.data init MalMkValue($MAL_LIST_TYPE)
           frame.limit = sequence.length
           MalEvalJobBuiltinContinue(slot, frame)
         endif
       endif
 
-    elseif (strcmp(name, "mapv") == 0 && lenarray(fn.env) == 0) ithen
+    elseif ((strcmp(name, "mapv") == 0 || (strcmp(name, "map") == 0 && fn.number == 1)) && lenarray(fn.env) == 0) ithen
       handled = 1
       if (args.length < 2) ithen
-        MalEvalJobReturn(slot, MalMkError("mapv: expected a function and at least one collection"))
+        MalEvalJobReturn(slot, MalMkError(sprintf("%s: expected a function and at least one collection", name)))
       else
         collections:MalValue init MalMkValue($MAL_LIST_TYPE)
+        count:i = args.length
+        inputs:MalValue[] init count
+        inputs[0] init MalAt(args, 0)
         size:i = -1
         failure:MalValue init MalMkValue($MAL_NIL_TYPE)
-        for index in [1 ... args.length - 1] do
-          sequence:MalValue init MalSeq(MalAt(args, index))
+        for index in [1 ... count - 1] do
+          sequence:MalValue init MalCoreMapInput(MalAt(args, index))
           if (sequence.type == $MAL_ERROR_TYPE) ithen
             failure init sequence
             break
           endif
-          collections init MalAppendValue(collections, sequence)
+          inputs[index] init sequence
           size = size < 0 ? sequence.length : min(size, sequence.length)
         od
         if (failure.type == $MAL_ERROR_TYPE) ithen
           MalEvalJobReturn(slot, failure)
         else
           frame.kind = 101
-          frame.form init MalAt(args, 0)
-          frame.aux init collections
-          frame.data init MalMkValue($MAL_VECTOR_TYPE)
+          collections.list init inputs
+          collections.length = count
+          frame.aux.number = MalEvalJobStoreCollectionValue(collections, -1)
+          frame.data init MalMkValue(strcmp(name, "mapv") == 0 ? $MAL_VECTOR_TYPE : $MAL_LIST_TYPE)
           frame.limit = size
           MalEvalJobBuiltinContinue(slot, frame)
         endif
@@ -132,15 +168,15 @@ opcode MalEvalJobBuiltinStart(slot:i, fn:MalValue, args:MalValue):i
           MalEvalJobSetApply(slot, MalAt(args, 0), MalMkValue($MAL_LIST_TYPE))
         else
           frame.kind = 102
-          frame.form init MalAt(args, 0)
-          frame.aux init sequence
+          frame.aux.number = MalEvalJobStoreCollectionValue(MalMkList2(MalAt(args, 0), sequence), -1)
           frame.limit = sequence.length
           if (args.length == 3) ithen
-            frame.data init MalAt(args, 1)
+            initial:MalValue init MalAt(args, 1)
           else
-            frame.data init MalAt(sequence, 0)
+            initial:MalValue init MalAt(sequence, 0)
             frame.index = 1
           endif
+          frame.extra.number = MalEvalJobStoreCollectionValue(initial, -1)
           MalEvalJobBuiltinContinue(slot, frame)
         endif
       endif
@@ -159,9 +195,9 @@ opcode MalEvalJobBuiltinStart(slot:i, fn:MalValue, args:MalValue):i
           MalEvalJobReturn(slot, sequence)
         else
           frame.kind = 103
-          frame.form init MalAt(args, 0)
-          frame.aux init sequence
+          frame.aux.number = MalEvalJobStoreCollectionValue(MalMkList2(MalAt(args, 0), sequence), -1)
           frame.extra init MalMkString(name)
+          frame.extra.number = -1
           frame.data init MalMkValue(strcmp(name, "filterv") == 0 ? $MAL_VECTOR_TYPE : $MAL_LIST_TYPE)
           frame.limit = sequence.length
           MalEvalJobBuiltinContinue(slot, frame)
@@ -242,7 +278,7 @@ opcode MalEvalJobBuiltinStart(slot:i, fn:MalValue, args:MalValue):i
           size:i = min(sequence.length, max(0, ceil(amount.number)))
           frame.kind = 106
           frame.data init MalMkValue($MAL_LIST_TYPE)
-          frame.aux init sequence
+          frame.aux.number = MalEvalJobStoreCollectionValue(MalMkList2(MalMkValue($MAL_NIL_TYPE), sequence), -1)
           frame.index = strcmp(name, "take") == 0 ? 0 : size
           frame.limit = strcmp(name, "take") == 0 ? size : sequence.length
           MalEvalJobBuiltinContinue(slot, frame)
@@ -314,16 +350,19 @@ endop
 opcode MalEvalJobBuiltinResume(slot:i, frame:MalEvalFrame, value:MalValue):void
   malEvalJobs[slot].env = frame.env
   if (value.type == $MAL_ERROR_TYPE) ithen
+    MalEvalJobBuiltinDiscard(frame)
     MalEvalJobReturn(slot, value)
   elseif (frame.kind == 100 || frame.kind == 101 || frame.kind == 106) ithen
-    frame.data init MalAppendValue(frame.data, value)
+    frame.extra.number = MalEvalJobStoreCollectionValue(value, frame.extra.number)
+    frame.data.length += 1
     frame.index += 1
     MalEvalJobBuiltinContinue(slot, frame)
   elseif (frame.kind == 102) ithen
     if (value.type == $MAL_REDUCED_TYPE) ithen
+      MalEvalJobBuiltinDiscard(frame)
       MalEvalJobReturn(slot, MalAt(value, 0))
     else
-      frame.data init value
+      malEvalJobCollectionValues[frame.extra.number] init value
       frame.index += 1
       MalEvalJobBuiltinContinue(slot, frame)
     endif
@@ -334,6 +373,7 @@ opcode MalEvalJobBuiltinResume(slot:i, frame:MalEvalFrame, value:MalValue):void
     if (strcmp(name, "some") == 0 || strcmp(name, "not-any?") == 0) ithen
       if (truth == 1) ithen
         done = 1
+        MalEvalJobBuiltinDiscard(frame)
         if (strcmp(name, "some") == 0) ithen
           MalEvalJobReturn(slot, value)
         else
@@ -343,11 +383,13 @@ opcode MalEvalJobBuiltinResume(slot:i, frame:MalEvalFrame, value:MalValue):void
     elseif (strcmp(name, "every?") == 0 || strcmp(name, "not-every?") == 0) ithen
       if (truth == 0) ithen
         done = 1
+        MalEvalJobBuiltinDiscard(frame)
         MalEvalJobReturn(slot, MalMkBool(strcmp(name, "not-every?") == 0 ? 1 : 0))
       endif
     elseif (strcmp(name, "take-while") == 0 && truth == 0) ithen
       done = 1
-      MalEvalJobReturn(slot, frame.data)
+      MalEvalJobDiscardCollection(frame.aux.number)
+      MalEvalJobReturn(slot, MalEvalJobFinishCollection(frame.extra.number, frame.data.length, frame.data.type))
     else
       include:i = truth
       if (strcmp(name, "keep") == 0) ithen
@@ -362,10 +404,12 @@ opcode MalEvalJobBuiltinResume(slot:i, frame:MalEvalFrame, value:MalValue):void
       endif
       if (include == 1) ithen
         if (strcmp(name, "keep") == 0) ithen
-          frame.data init MalAppendValue(frame.data, value)
+          item:MalValue init value
         else
-          frame.data init MalAppendValue(frame.data, MalAt(frame.aux, frame.index))
+          item:MalValue init MalEvalJobBuiltinItem(frame.aux.number, 0, frame.index)
         endif
+        frame.extra.number = MalEvalJobStoreCollectionValue(item, frame.extra.number)
+        frame.data.length += 1
       endif
     endif
     if (done == 0) ithen

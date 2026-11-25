@@ -112,7 +112,7 @@ def check_standalone(csound=None):
             (directory / "src" / name).write_text(
                 host.replace(original_include, bundled_include), encoding="utf-8")
         for name in ["check-file-loading.py", "check-csound-interop.py", "check-namespaces.py",
-                     "core-helpers.mal", "clojure-forms.mal", "namespaces.mal",
+                     "core-helpers.mal", "clojure-forms.mal", "clojure-helpers.mal", "namespaces.mal",
                      "csound-interop.mal", "csound-catalog.mal", "csound-classic.mal",
                      "csound-arrays.mal", "csound-routing.mal"]:
             shutil.copy2(ROOT / "tests" / name, directory / "tests" / name)
@@ -130,6 +130,9 @@ def check_standalone(csound=None):
         run([csound, "-n", "-d", "-m128", "--orc", "src/run.orc", "--",
              "tests/clojure-forms.mal"], directory, " Clojure form and immutability checks")
         print("PASS: bundled Clojure forms, immutable values, and atoms", flush=True)
+        run([csound, "-n", "-d", "-m128", "--orc", "src/run.orc", "--",
+             "tests/clojure-helpers.mal"], directory, "Clojure helper checks")
+        print("PASS: bundled Clojure collection and number helpers", flush=True)
 
         forms = (ROOT / "tests/eval-forms.orc").read_text(encoding="utf-8")
         (directory / "eval-forms.orc").write_text(
@@ -138,6 +141,7 @@ def check_standalone(csound=None):
             "PASS: multiple forms, session state, reader errors, and recovery")
         print("PASS: bundled region evaluation", flush=True)
         for name, marker in [
+                ("clojure-language.orc", "PASS: Clojure reader, binding, arity, and iteration forms"),
                 ("eval-job.orc", "PASS: cooperative evaluation"),
                 ("eval-job-builtins.orc", "All cooperative builtin comparisons passed")]:
             source = (ROOT / "tests" / name).read_text(encoding="utf-8")

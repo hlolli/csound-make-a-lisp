@@ -48,6 +48,19 @@ opcode AssertJobBuiltinExpected(source:S, expected:S, env:MalEnv):void
   prints "JOB BUILTIN passed: %s\n", source
 endop
 
+opcode AssertJobCollectionsReleased():void
+  node:i = malEvalJobCollectionFree
+  released:i = 0
+  while (node >= 0 && released < malEvalJobCollectionCount) do
+    node = malEvalJobCollectionLinks[node]
+    released += 1
+  od
+  if (node != -1 || released != malEvalJobCollectionCount) ithen
+    prints "JOB BUILTIN failed: collection storage remained in use\n"
+    exitnow(1)
+  endif
+endop
+
 instr TEST
   env:MalEnv init MalMkCsoundEnv()
   AssertJobBuiltin("(apply + 1 2 [3 4])", env)
@@ -60,6 +73,13 @@ instr TEST
   AssertJobBuiltin("(map inc nil)", env)
   AssertJobBuiltin("(map inc [1 :bad 3])", env)
   AssertJobBuiltin("(map inc)", env)
+  AssertJobBuiltinExpected("(map + [1 2 3] [10 20])", "(11 22)", env)
+  AssertJobBuiltinExpected("(map identity nil)", "()", env)
+  AssertJobBuiltinExpected("(map :a [{:a 1} {:a false} {}])", "(1 false nil)", env)
+  AssertJobBuiltinExpected("(apply {:a nil} [:a :fallback])", "nil", env)
+  AssertJobBuiltinExpected("(get [nil false] 1 :fallback)", "false", env)
+  AssertJobBuiltinExpected("(nth [] 0 :fallback)", ":fallback", env)
+  AssertJobBuiltin("(mapv (fn [x] (map inc x)) '([1 2] [3 4]))", env)
   AssertJobBuiltin("(mapv + [1 2 3] [10 20])", env)
   AssertJobBuiltin("(mapv (fn [x] x) \"abc\")", env)
   AssertJobBuiltin("(mapv 12 nil [1 2])", env)
@@ -116,6 +136,8 @@ instr TEST
   AssertJobBuiltin("(update-in {})", env)
   AssertJobBuiltin("(try* (filter (fn [x] (throw :bad)) [1 2]) (catch* e e))", env)
   AssertJobBuiltin("(try* (map (fn [x] (throw :bad)) [1 2]) (catch* e e))", env)
+  AssertJobBuiltinExpected("(try* (mapv inc [1 :bad 3]) (catch* e :caught))", ":caught", env)
+  AssertJobBuiltinExpected("(try* [1 (throw :bad) 3] (catch* e e))", ":bad", env)
   AssertJobBuiltin("(let [x 2] (list (eval '(+ 3 4)) x))", env)
   AssertJobBuiltin("(eval)", env)
   AssertJobBuiltin("(require 'csound)", env)
@@ -129,6 +151,42 @@ instr TEST
   AssertJobBuiltinExpected("(apply eval ['(+ 1 2)])", "3", env)
   AssertJobBuiltinExpected("(map eval ['(+ 1 2) '(+ 3 4)])", "(3 7)", env)
   AssertJobBuiltinExpected("(let [x 9] (list (apply eval ['(+ 1 2)]) x))", "(3 9)", env)
+  AssertJobCollectionsReleased()
+
+  size:i = lenarray(malEvalJobCollectionValues) + 1
+  elements:MalValue[] init size
+  for index in [0 ... size - 1] do
+    elements[index] init MalMkNumber(index)
+  od
+  items:MalValue init MalMkValue($MAL_VECTOR_TYPE)
+  items.list init elements
+  items.length = size
+  env init MalEnvSet(env, "items", items)
+  first:i = MalEvalJobStart(read_str("(mapv inc items)"), env)
+  second:i = MalEvalJobStart(read_str("(mapv dec items)"), env)
+  firstStatus:i = MalEvalJobStep(first, 100)
+  secondStatus:i = MalEvalJobStep(second, 100)
+  if (firstStatus != 0 || secondStatus != 0) ithen
+    prints "JOB BUILTIN failed: expected two partially evaluated collections\n"
+    exitnow(1)
+  endif
+  MalEvalJobCancel(first)
+  secondStatus = MalEvalJobStep(second, size * 30)
+  collection:MalValue init MalEvalJobResult(second)
+  if (secondStatus != 1 || collection.type != $MAL_VECTOR_TYPE || collection.length != size) ithen
+    prints "JOB BUILTIN failed: cancelled sibling interrupted the surviving collection\n"
+    exitnow(1)
+  endif
+  for index in [0 ... size - 1] do
+    item:MalValue init MalAt(collection, index)
+    if (item.type != $MAL_NUMBER_TYPE || item.number != index - 1) ithen
+      prints "JOB BUILTIN failed: wrong surviving collection item at %d\n", index
+      exitnow(1)
+    endif
+  od
+  AssertJobCollectionsReleased()
+  MalEvalJobCancel(second)
+  prints "JOB BUILTIN passed: cancelling one collection leaves another job running\n"
 
   shared:MalValue init MalMkAtom(MalMkNumber(0))
   calls:MalValue init MalMkAtom(MalMkNumber(0))

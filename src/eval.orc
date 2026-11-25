@@ -3,9 +3,12 @@
 ;; file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 declare MalEvalInternal(result:MalValue, nextEnv:MalEnv):(MalValue, MalEnv)
+declare MalEvalTail(ast:MalValue, env:MalEnv, target:MalValue, clause:i):(MalValue, MalEnv)
 declare MalApply(fn:MalValue, args:MalValue):(MalValue)
 declare MalQuasiquote(ast:MalValue):(MalValue)
 declare MalEvalSourceEnv(source:S, env:MalEnv):(MalValue, MalEnv)
+declare MalExpandIteration(kind:MalValue, args:MalValue):MalValue
+declare MalMapBindingSource(value:MalValue):MalValue
 
 opcode MalApplyBuiltinOperator(fn:MalValue, args:MalValue):MalValue
   result:MalValue init MalMkValue($MAL_NUMBER_TYPE)
@@ -149,34 +152,6 @@ opcode MalFlattenApplyArgs(args:MalValue):MalValue
   result:MalValue init MalMkValue($MAL_LIST_TYPE)
   result.list init values
   result.length = flattenedLength
-  xout result
-endop
-
-opcode MalMapSequence(fn:MalValue, sequence:MalValue):MalValue
-  values:MalValue[] init sequence.length
-  result:MalValue init MalMkValue($MAL_LIST_TYPE)
-  failed:i = 0
-
-  if (sequence.length > 0) ithen
-    for index in [0 ... sequence.length - 1] do
-      callArgs:MalValue init MalMkList1(MalAt(sequence, index))
-      mapped:MalValue init MalApply(fn, callArgs)
-
-      if (mapped.type == $MAL_ERROR_TYPE) ithen
-        result init mapped
-        failed = 1
-        break
-      endif
-
-      values[index] init mapped
-    od
-  endif
-
-  if (failed == 0) ithen
-    result.list init values
-    result.length = sequence.length
-  endif
-
   xout result
 endop
 
@@ -530,7 +505,9 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
     endif
 
   elseif (strcmp(fn.string, "map") == 0) ithen
-    if (args.length != 2) ithen
+    if (fn.number == 1) ithen
+      result init MalCoreMap(fn.string, args, $MAL_LIST_TYPE)
+    elseif (args.length != 2) ithen
       result init MalArityError(fn.string, 2, args.length)
     else
       targetFn:MalValue init MalAt(args, 0)
@@ -544,7 +521,7 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
       elseif (MalIsSequential(sequence) == 0) ithen
         result init MalMkError("map: second argument must be list or vector")
       else
-        result init MalMapSequence(targetFn, sequence)
+        result init MalCoreMap(fn.string, MalMkList2(targetFn, sequence), $MAL_LIST_TYPE)
       endif
     endif
 
@@ -696,20 +673,28 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
     endif
 
   elseif (strcmp(fn.string, "get") == 0) ithen
-    if (args.length != 2) ithen
-      result init MalArityError(fn.string, 2, args.length)
+    hasFallback:i = fn.number == 1 && args.length == 3
+    if (args.length != 2 && hasFallback == 0) ithen
+      if (fn.number == 1) ithen
+        result init MalMkError("get: expected 2 or 3 arguments")
+      else
+        result init MalArityError(fn.string, 2, args.length)
+      endif
     else
-      mapValue:MalValue init MalAt(args, 0)
+      collection:MalValue init MalAt(args, 0)
       key:MalValue init MalAt(args, 1)
 
-      if (MalIsCsoundArray(mapValue) == 1) ithen
-        result init MalCsoundArrayRead(mapValue, key, "get")
-      elseif (mapValue.type == $MAL_NIL_TYPE) ithen
-        result init MalMkValue($MAL_NIL_TYPE)
-      elseif (mapValue.type != $MAL_HASH_MAP_TYPE) ithen
+      if (MalIsCsoundArray(collection) == 1) ithen
+        result init MalCsoundArrayRead(collection, key, "get")
+      elseif (fn.number == 0 && collection.type != $MAL_HASH_MAP_TYPE && collection.type != $MAL_NIL_TYPE) ithen
         result init MalMkError("get: first argument must be a hash map or nil")
       else
-        result init MalMapGet(mapValue, key)
+        value:MalValue, found:i = MalCoreLookup(collection, key)
+        if (found == 1) ithen
+          result init value
+        elseif (hasFallback == 1) ithen
+          result init MalAt(args, 2)
+        endif
       endif
     endif
 
@@ -863,26 +848,21 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
     endif
 
   elseif (strcmp(fn.string, "nth") == 0) ithen
-    if (args.length != 2) ithen
-      result init MalArityError(fn.string, 2, args.length)
+    hasFallback:i = fn.number == 1 && args.length == 3
+    if (args.length != 2 && hasFallback == 0) ithen
+      if (fn.number == 1) ithen
+        result init MalMkError("nth: expected 2 or 3 arguments")
+      else
+        result init MalArityError(fn.string, 2, args.length)
+      endif
     else
       sequence:MalValue init MalAt(args, 0)
       indexValue:MalValue init MalAt(args, 1)
-
-      if (MalIsCsoundArray(sequence) == 1) ithen
-        result init MalCsoundArrayRead(sequence, indexValue, "nth")
-      elseif (MalIsSequential(sequence) == 0) ithen
-        result init MalMkError("nth: first argument must be list or vector")
-      elseif (indexValue.type != $MAL_NUMBER_TYPE) ithen
-        result init MalMkError("nth: index must be a number")
-      elseif (indexValue.number != int(indexValue.number)) ithen
-        result init MalMkError("nth: index must be an integer")
-      elseif (indexValue.number < 0 || indexValue.number >= sequence.length) ithen
-        result init MalMkError("nth: index out of range")
-      else
-        index:i = indexValue.number
-        result init MalAt(sequence, index)
+      fallback:MalValue init MalMkValue($MAL_NIL_TYPE)
+      if (hasFallback == 1) ithen
+        fallback init MalAt(args, 2)
       endif
+      result init MalCoreNth(sequence, indexValue, fallback, hasFallback, fn.number)
     endif
 
   elseif (strcmp(fn.string, "first") == 0) ithen
@@ -1245,6 +1225,21 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
     prints "%s\n", output
     result init MalMkValue($MAL_NIL_TYPE)
 
+  elseif (strcmp(fn.string, "__mal-map-binding") == 0) ithen
+    if (args.length == 1) ithen
+      result init MalMapBindingSource(MalAt(args, 0))
+    else
+      result init MalArityError(fn.string, 1, args.length)
+    endif
+
+  elseif (strcmp(fn.string, "core/iteration") == 0) ithen
+    if (args.length != 2) ithen
+      result init MalArityError(fn.string, 2, args.length)
+    elseif (MalIsSequential(MalAt(args, 1)) == 1) ithen
+      result init MalExpandIteration(MalAt(args, 0), MalAt(args, 1))
+    else
+      result init MalMkError("core/iteration: expected a macro name and argument list")
+    endif
   else
     result init MalApplyCoreBuiltin(fn, args)
   endif
@@ -1269,14 +1264,47 @@ opcode MalRestParamIndex(params:MalValue):i
   xout result
 endop
 
-opcode MalBindFunctionEnv(fn:MalValue, args:MalValue):(MalValue, MalEnv)
+opcode MalFunctionClause(fn:MalValue, count:i):i
+  selected:i = -1
+  index:i = 0
+  while (index < malFunctionDefinitions[fn.number].length) do
+    params:MalValue init malFunctionDefinitions[fn.number].list[index]
+    restIndex:i = MalRestParamIndex(params)
+    if (restIndex < 0 && count == params.length) ithen
+      selected = index
+      break
+    elseif (restIndex >= 0 && count >= restIndex) ithen
+      selected = index
+    endif
+    index += 2
+  od
+  xout selected
+endop
+
+opcode MalFunctionClauseBody(fn:MalValue, clause:i):MalValue
+  xout malFunctionDefinitions[fn.number].list[clause + 1]
+endop
+
+opcode MalRecurArgumentCount(fn:MalValue, clause:i):i
+  params:MalValue init malFunctionDefinitions[fn.number].list[clause]
+  restIndex:i = MalRestParamIndex(params)
+  count:i = restIndex >= 0 ? restIndex + 1 : params.length
+  xout count
+endop
+
+opcode MalBindFunctionCall(fn:MalValue, args:MalValue, clause:i, recurCall:i):(MalValue, MalEnv)
   result:MalValue init MalMkValue($MAL_NIL_TYPE)
   callEnv:MalEnv init MalEnvHandle(-1)
-  params:MalValue init MalFunctionParams(fn)
+  params:MalValue init malFunctionDefinitions[fn.number].list[max(0, clause)]
   restIndex:i = MalRestParamIndex(params)
   requiredCount:i = restIndex >= 0 ? restIndex : params.length
+  recurCount:i = restIndex >= 0 ? requiredCount + 1 : requiredCount
 
-  if (restIndex < 0 && args.length != params.length) ithen
+  if (recurCall == 1 && args.length != recurCount) ithen
+    result init MalArityError("recur", recurCount, args.length)
+  elseif (clause < 0 && malFunctionDefinitions[fn.number].length > 2) ithen
+    result init MalMkError(sprintf("fn: no arity accepts %d arguments", args.length))
+  elseif (recurCall == 0 && restIndex < 0 && args.length != params.length) ithen
     result init MalMkError(sprintf("fn*: expected %d arguments, got %d", \
       params.length, args.length))
   elseif (restIndex >= 0 && args.length < requiredCount) ithen
@@ -1293,6 +1321,11 @@ opcode MalBindFunctionEnv(fn:MalValue, args:MalValue):(MalValue, MalEnv)
       callEnv init MalEnvStore(callEnv)
     endif
 
+    name:S init malFunctionDefinitions[fn.number].string
+    if (strlen(name) > 0) ithen
+      callEnv init MalEnvSet(callEnv, name, fn)
+    endif
+
     if (requiredCount > 0) ithen
       for index in [0 ... requiredCount - 1] do
         param:MalValue init MalAt(params, index)
@@ -1305,7 +1338,9 @@ opcode MalBindFunctionEnv(fn:MalValue, args:MalValue):(MalValue, MalEnv)
       restName:MalValue init MalAt(params, restIndex + 1)
       restValues:MalValue init MalMkValue($MAL_LIST_TYPE)
 
-      if (args.length > requiredCount) ithen
+      if (recurCall == 1) ithen
+        restValues init MalAt(args, requiredCount)
+      elseif (args.length > requiredCount) ithen
         for index in [requiredCount ... args.length - 1] do
           arg:MalValue init MalAt(args, index)
           restValues init MalAppendValue(restValues, arg)
@@ -1321,12 +1356,13 @@ opcode MalBindFunctionEnv(fn:MalValue, args:MalValue):(MalValue, MalEnv)
 endop
 
 opcode MalApplyFunction(fn:MalValue, args:MalValue):MalValue
-  result:MalValue, callEnv:MalEnv = MalBindFunctionEnv(fn, args)
+  clause:i = MalFunctionClause(fn, args.length)
+  result:MalValue, callEnv:MalEnv = MalBindFunctionCall(fn, args, clause, 0)
 
   if (result.type != $MAL_ERROR_TYPE) ithen
-    body:MalValue init MalFunctionBody(fn)
+    body:MalValue init MalFunctionClauseBody(fn, clause)
     bodyInputEnv:MalEnv init MalEnvHandle(callEnv.id)
-    result, callEnv = MalEvalInternal(body, bodyInputEnv)
+    result, callEnv = MalEvalTail(body, bodyInputEnv, fn, clause)
   endif
 
   MalEnvRelease(callEnv)
@@ -1349,6 +1385,8 @@ opcode MalApply(fn:MalValue, args:MalValue):MalValue
     result:MalValue init MalApplyFunction(fn, args)
   elseif (fn.type == $MAL_CSOUND_INSTRUMENT_TYPE) ithen
     result:MalValue init MalScheduleCsoundInstrument(fn, args, 0, 1)
+  elseif (fn.type == $MAL_KEYWORD_TYPE || fn.type == $MAL_HASH_MAP_TYPE || fn.type == $MAL_VECTOR_TYPE) ithen
+    result:MalValue init MalCoreApplyLookup(fn, args)
   else
     result:MalValue init MalMkError(sprintf("cannot apply %s", pr_str(fn)))
   endif
@@ -1662,6 +1700,7 @@ opcode MalEvalFn(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
 endop
 
 #include "src/forms.orc"
+#include "src/iteration.orc"
 
 opcode MalEvalIf(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   result:MalValue init MalMkValue($MAL_NIL_TYPE)
@@ -1769,6 +1808,11 @@ endop
 ;; Internal calls carry registry handles. The public evaluator resolves its
 ;; returned environment once, instead of copying all bindings at every form.
 opcode MalEvalInternal(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
+  result:MalValue, currentEnv:MalEnv = MalEvalTail(ast, env, MalMkValue($MAL_NIL_TYPE), -1)
+  xout result, currentEnv
+endop
+
+opcode MalEvalTail(ast:MalValue, env:MalEnv, target:MalValue, clause:i):(MalValue, MalEnv)
   result:MalValue init ast
   workAst:MalValue init ast
   evalEnv:MalEnv init MalEnvHandle(env.id)
@@ -1776,6 +1820,8 @@ opcode MalEvalInternal(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
   recursiveInputEnv:MalEnv init MalEnvHandle(env.id)
   transientEnvIds:i[] init 0
   transientEnvCount:i = 0
+  recurFn:MalValue init target
+  recurClause:i = clause
   done:i = 0
 
   while (done == 0) do
@@ -1831,11 +1877,8 @@ opcode MalEvalInternal(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
         done = 1
 
       elseif (MalIsSymbolNamed(head, "fn") == 1) ithen
-        workAst init MalExpandFn(workAst, 1, "fn")
-        if (workAst.type == $MAL_ERROR_TYPE) ithen
-          result init workAst
-          done = 1
-        endif
+        result init MalClojureFn(workAst, evalEnv)
+        done = 1
 
       elseif (head.type == $MAL_SYMBOL_TYPE && strcmp(head.string, "fn*") == 0) ithen
         recursiveInputEnv init MalEnvHandle(evalEnv.id)
@@ -1879,6 +1922,7 @@ opcode MalEvalInternal(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
                   catchEnv, catchBinding.string, catchValue)
                 workAst init MalAt(catchClause, 2)
                 evalEnv init MalEnvHandle(catchEnv.id)
+                recurFn init MalMkValue($MAL_NIL_TYPE)
               else
                 result init tryResult
                 done = 1
@@ -1942,12 +1986,12 @@ opcode MalEvalInternal(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
         immutableLet:i = MalIsSymbolNamed(head, "let")
         if (immutableLet == 1) ithen
           ;; Validate every binding before running any of their value forms.
-          body:MalValue init MalLetBody(workAst)
-          if (body.type == $MAL_ERROR_TYPE) ithen
-            result init body
+          expanded:MalValue init MalExpandLet(workAst)
+          if (expanded.type == $MAL_ERROR_TYPE) ithen
+            result init expanded
             done = 1
           else
-            workAst init MalMkList3(head, MalAt(workAst, 1), body)
+            workAst init expanded
           endif
         endif
         letEnv:MalEnv init MalMkEnvWithOuter(evalEnv)
@@ -2015,13 +2059,27 @@ opcode MalEvalInternal(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
         endif
 
       else
-        recursiveInputEnv init MalEnvHandle(evalEnv.id)
-        fn:MalValue, evalEnv = MalEvalInternal(head, recursiveInputEnv)
+        recurCall:i = MalIsSymbolNamed(head, "recur")
+        if (recurCall == 1) ithen
+          if (recurFn.type != $MAL_FUNCTION_TYPE) ithen
+            fn:MalValue init MalMkError("recur must be in tail position of a loop or function")
+          else
+            expected:i = MalRecurArgumentCount(recurFn, recurClause)
+            if (workAst.length - 1 != expected) ithen
+              fn init MalArityError("recur", expected, workAst.length - 1)
+            else
+              fn init recurFn
+            endif
+          endif
+        else
+          recursiveInputEnv init MalEnvHandle(evalEnv.id)
+          fn, evalEnv = MalEvalInternal(head, recursiveInputEnv)
+        endif
 
         if (fn.type == $MAL_ERROR_TYPE) ithen
           result init fn
           done = 1
-        elseif (MalIsMacro(fn) == 1) ithen
+        elseif (recurCall == 0 && MalIsMacro(fn) == 1) ithen
           rawArgs:MalValue init MalUnevaluatedArgs(workAst)
           expansion:MalValue init MalApplyFunction(fn, rawArgs)
 
@@ -2053,7 +2111,8 @@ opcode MalEvalInternal(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
               done = 1
             endif
           elseif (fn.type == $MAL_FUNCTION_TYPE) ithen
-            bindStatus:MalValue, callEnv:MalEnv = MalBindFunctionEnv(fn, args)
+            callClause:i = recurCall == 1 ? recurClause : MalFunctionClause(fn, args.length)
+            bindStatus:MalValue, callEnv:MalEnv = MalBindFunctionCall(fn, args, callClause, recurCall)
 
             if (bindStatus.type == $MAL_ERROR_TYPE) ithen
               result init bindStatus
@@ -2065,8 +2124,10 @@ opcode MalEvalInternal(ast:MalValue, env:MalEnv):(MalValue, MalEnv)
                 MalEnvRelease(MalEnvHandle(transientEnvIds[transientEnvCount]))
               od
               transientEnvId = callEnv.id
-              workAst init MalFunctionBody(fn)
+              workAst init MalFunctionClauseBody(fn, callClause)
               evalEnv init MalEnvHandle(callEnv.id)
+              recurFn init fn
+              recurClause = callClause
             endif
           else
             result init MalApply(fn, args)
@@ -2232,6 +2293,7 @@ opcode MalMkStepAEnv():MalEnv
   endif
 
   env init MalInstallCoreHelpers(env)
+  env init MalInstallIterationForms(env)
   env init MalInstallThreadingMacros(env)
   env init MalInstallNamespaces(env)
   xout env

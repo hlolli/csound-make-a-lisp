@@ -7,7 +7,7 @@
 ;; time. Jobs share ordinary environments and atoms, so writes remain visible
 ;; between steps. Cancellation releases scopes; it does not undo writes.
 ;; Core frames: 1 collection/arguments, 2 if, 3 do, 4 let binding, 5 call
-;; head, 6 definition, 7 try, 8 macro expansion, 9 scope cleanup. Builtin
+;; head, 6 definition, 7 try, 8 macro expansion, 9 scope cleanup, 10 catch. Builtin
 ;; continuations use kinds 100 and above.
 struct MalEvalFrame kind:i, env:i, form:MalValue, data:MalValue, aux:MalValue, extra:MalValue, index:i, limit:i, flag:i
 struct MalEvalJob id:i, status:i, env:i, mode:i, top:i, depth:i
@@ -20,10 +20,81 @@ malEvalJobAsts@global:MalValue[] init 16
 malEvalJobValues@global:MalValue[] init 16
 malEvalJobFunctions@global:MalValue[] init 16
 malEvalJobArguments@global:MalValue[] init 16
+malEvalJobCallClause@global:i[] init 16
 malEvalJobFrames@global:MalEvalFrame[] init 256
 malEvalJobFrameNext@global:i[] init 256
 malEvalJobFrameCount@global:i init 0
 malEvalJobFrameFree@global:i init -1
+malEvalJobCollectionValues@global:MalValue[] init 256
+malEvalJobCollectionLinks@global:i[] init 256
+malEvalJobCollectionCount@global:i init 0
+malEvalJobCollectionFree@global:i init -1
+
+;; Store collection inputs once and accumulate result items in reverse order.
+;; Continuation frames carry handles so push and pop only copy small values.
+opcode MalEvalJobStoreCollectionValue(value:MalValue, next:i):i
+  index:i = malEvalJobCollectionFree
+  if (index >= 0) ithen
+    malEvalJobCollectionFree = malEvalJobCollectionLinks[index]
+  else
+    index = malEvalJobCollectionCount
+    capacity:i = lenarray(malEvalJobCollectionValues)
+    if (index >= capacity) ithen
+      values:MalValue[] init malEvalJobCollectionValues
+      links:i[] init malEvalJobCollectionLinks
+      malEvalJobCollectionValues init capacity * 2
+      malEvalJobCollectionLinks init capacity * 2
+      for offset in [0 ... capacity - 1] do
+        malEvalJobCollectionValues[offset] init values[offset]
+        malEvalJobCollectionLinks[offset] = links[offset]
+      od
+    endif
+    malEvalJobCollectionCount += 1
+  endif
+  malEvalJobCollectionValues[index] init value
+  malEvalJobCollectionLinks[index] = next
+  xout index
+endop
+
+opcode MalEvalJobReleaseCollectionValue(index:i):i
+  next:i = malEvalJobCollectionLinks[index]
+  malEvalJobCollectionValues[index] init MalMkValue($MAL_NIL_TYPE)
+  malEvalJobCollectionLinks[index] = malEvalJobCollectionFree
+  malEvalJobCollectionFree = index
+  xout next
+endop
+
+opcode MalEvalJobDiscardCollection(head:i):void
+  index:i = head
+  while (index >= 0) do
+    index = MalEvalJobReleaseCollectionValue(index)
+  od
+endop
+
+opcode MalEvalJobFinishCollection(head:i, size:i, type:i):MalValue
+  result:MalValue init MalMkValue(type)
+  if (size > 0) ithen
+    values:MalValue[] init size
+    index:i = head
+    for offset in [0 ... size - 1] do
+      values[size - offset - 1] init malEvalJobCollectionValues[index]
+      index = MalEvalJobReleaseCollectionValue(index)
+    od
+    result.list init values
+    result.length = size
+  endif
+  xout result
+endop
+
+opcode MalEvalJobCollectionAt(input:i, index:i):MalValue
+  if (malEvalJobCollectionValues[input].astRef == 1) ithen
+    node:i = malEvalJobCollectionValues[input].number
+    result:MalValue init malAstNodes[node].list[index]
+  else
+    result:MalValue init malEvalJobCollectionValues[input].list[index]
+  endif
+  xout result
+endop
 
 opcode MalEvalJobSlot(id:i):i
   result:i = -1
@@ -87,6 +158,15 @@ opcode MalEvalJobOwnEnv(slot:i, id:i):void
   MalEvalJobPush(slot, frame)
 endop
 
+opcode MalEvalJobOwnCall(slot:i):void
+  kind:i = 9
+  zero:i = 0
+  frame:MalEvalFrame init kind, malEvalJobs[slot].env, malEvalJobFunctions[slot], \
+    MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), MalMkValue($MAL_NIL_TYPE), \
+    malEvalJobCallClause[slot], zero, zero
+  MalEvalJobPush(slot, frame)
+endop
+
 opcode MalEvalJobSetEval(slot:i, ast:MalValue, env:i):void
   malEvalJobAsts[slot] init ast
   malEvalJobs[slot].env = env
@@ -96,6 +176,7 @@ endop
 opcode MalEvalJobSetApply(slot:i, fn:MalValue, args:MalValue):void
   malEvalJobFunctions[slot] init fn
   malEvalJobArguments[slot] init args
+  malEvalJobCallClause[slot] = -1
   malEvalJobs[slot].mode = 2
 endop
 
@@ -106,6 +187,19 @@ endop
 
 opcode MalEvalJobFail(slot:i, message:S):void
   MalEvalJobReturn(slot, MalMkError(message))
+endop
+
+;; Kind 1 keeps the source in extra.number and the result handle in limit.
+opcode MalEvalJobSequenceStart(slot:i, frame:MalEvalFrame):void
+  first:MalValue init MalAt(frame.form, frame.index)
+  frame.extra.number = MalEvalJobStoreCollectionValue(frame.form, -1)
+  frame.form init MalMkValue($MAL_NIL_TYPE)
+  frame.limit = -1
+  if (frame.data.type == $MAL_HASH_MAP_TYPE) ithen
+    frame.limit = MalEvalJobStoreCollectionValue(frame.data, -1)
+  endif
+  MalEvalJobPush(slot, frame)
+  MalEvalJobSetEval(slot, first, frame.env)
 endop
 
 ;; Loading an unseen module would enter the synchronous evaluator. Already
@@ -236,6 +330,39 @@ endop
 
 #include "src/eval-job-builtins.orc"
 
+opcode MalEvalJobRecur(slot:i, frame:MalEvalFrame):void
+  index:i = malEvalJobs[slot].top
+  target:MalValue init MalMkValue($MAL_NIL_TYPE)
+  clause:i = -1
+  while (index >= 0) do
+    if (malEvalJobFrames[index].kind != 9) ithen
+      break
+    endif
+    if (malEvalJobFrames[index].form.type == $MAL_FUNCTION_TYPE) ithen
+      target init malEvalJobFrames[index].form
+      clause = malEvalJobFrames[index].index
+      break
+    endif
+    index = malEvalJobFrameNext[index]
+  od
+  if (clause < 0) ithen
+    MalEvalJobFail(slot, "recur must be in tail position of a loop or function")
+  elseif (frame.form.length - 1 != MalRecurArgumentCount(target, clause)) ithen
+    MalEvalJobReturn(slot, MalArityError("recur", MalRecurArgumentCount(target, clause), frame.form.length - 1))
+  elseif (frame.form.length == 1) ithen
+    MalEvalJobSetApply(slot, target, MalMkValue($MAL_LIST_TYPE))
+    malEvalJobCallClause[slot] = clause
+  else
+    frame.kind = 1
+    frame.aux init target
+    frame.data init MalMkValue($MAL_LIST_TYPE)
+    frame.data.number = clause
+    frame.index = 1
+    frame.flag = 2
+    MalEvalJobSequenceStart(slot, frame)
+  endif
+endop
+
 opcode MalEvalJobEval(slot:i):void
   zero:i = 0
   ast:MalValue init malEvalJobAsts[slot]
@@ -256,8 +383,7 @@ opcode MalEvalJobEval(slot:i):void
       frame.kind = 1
       frame.data init MalMkValue(ast.type)
       frame.index = ast.type == $MAL_HASH_MAP_TYPE ? 1 : 0
-      MalEvalJobPush(slot, frame)
-      MalEvalJobSetEval(slot, MalAt(ast, frame.index), env.id)
+      MalEvalJobSequenceStart(slot, frame)
     endif
   elseif (ast.type != $MAL_LIST_TYPE) ithen
     MalEvalJobReturn(slot, ast)
@@ -283,28 +409,14 @@ opcode MalEvalJobEval(slot:i):void
     elseif (MalIsSymbolNamed(head, "def") == 1 || MalIsSymbolNamed(head, "def!") == 1 || MalIsSymbolNamed(head, "defmacro!") == 1) ithen
       MalEvalJobDefine(slot, ast, MalIsSymbolNamed(head, "defmacro!"), MalIsSymbolNamed(head, "def"))
     elseif (MalIsSymbolNamed(head, "defn") == 1 || MalIsSymbolNamed(head, "defmacro") == 1) ithen
-      if (ast.length < 3) ithen
-        MalEvalJobFail(slot, sprintf("%s: expected a name, parameter vector, and body", head.string))
-      else
-        name:MalValue init MalAt(ast, 1)
-        if (name.type != $MAL_SYMBOL_TYPE) ithen
-          MalEvalJobFail(slot, sprintf("%s: first argument must be a symbol", head.string))
-        else
-          expanded:MalValue init MalExpandFn(ast, 2, head.string)
-          if (expanded.type == $MAL_ERROR_TYPE) ithen
-            MalEvalJobReturn(slot, expanded)
-          else
-            MalEvalJobDefine(slot, MalMkList3(head, name, expanded), MalIsSymbolNamed(head, "defmacro"), 1)
-          endif
-        endif
-      endif
-    elseif (MalIsSymbolNamed(head, "fn") == 1) ithen
-      expanded:MalValue init MalExpandFn(ast, 1, "fn")
+      expanded:MalValue init MalExpandNamedDefinition(ast)
       if (expanded.type == $MAL_ERROR_TYPE) ithen
         MalEvalJobReturn(slot, expanded)
       else
-        MalEvalJobSetEval(slot, expanded, env.id)
+        MalEvalJobDefine(slot, expanded, MalIsSymbolNamed(head, "defmacro"), 1)
       endif
+    elseif (MalIsSymbolNamed(head, "fn") == 1) ithen
+      MalEvalJobReturn(slot, MalClojureFn(ast, env))
     elseif (MalIsSymbolNamed(head, "fn*") == 1) ithen
       value:MalValue, unused:MalEnv = MalEvalFn(ast, env)
       MalEvalJobReturn(slot, value)
@@ -329,18 +441,16 @@ opcode MalEvalJobEval(slot:i):void
       endif
     elseif (MalIsSymbolNamed(head, "let*") == 1 || MalIsSymbolNamed(head, "let") == 1) ithen
       immutable:i = MalIsSymbolNamed(head, "let")
-      body:MalValue init MalMkValue($MAL_NIL_TYPE)
+      expanded init ast
       if (immutable == 1) ithen
-        body init MalLetBody(ast)
+        expanded init MalExpandLet(ast)
       elseif (ast.length != 3) ithen
-        body init MalArityError("let*", 2, ast.length - 1)
-      else
-        body init MalAt(ast, 2)
+        expanded init MalArityError("let*", 2, ast.length - 1)
       endif
-      if (body.type == $MAL_ERROR_TYPE) ithen
-        MalEvalJobReturn(slot, body)
+      if (expanded.type == $MAL_ERROR_TYPE) ithen
+        MalEvalJobReturn(slot, expanded)
       else
-        bindings:MalValue init MalAt(ast, 1)
+        bindings:MalValue init MalAt(expanded, 1)
         if (MalIsSequential(bindings) == 0) ithen
           MalEvalJobFail(slot, "let*: bindings must be list or vector")
         elseif (bindings.length % 2 != 0) ithen
@@ -350,7 +460,7 @@ opcode MalEvalJobEval(slot:i):void
           MalEvalJobOwnEnv(slot, letEnv.id)
           frame.kind = 4
           frame.env = letEnv.id
-          frame.form init body
+          frame.form init MalAt(expanded, 2)
           frame.data init bindings
           frame.flag = immutable
           MalEvalJobLetNext(slot, frame)
@@ -377,6 +487,8 @@ opcode MalEvalJobEval(slot:i):void
           endif
         endif
       endif
+    elseif (MalIsSymbolNamed(head, "recur") == 1) ithen
+      MalEvalJobRecur(slot, frame)
     else
       frame.kind = 5
       MalEvalJobPush(slot, frame)
@@ -395,32 +507,55 @@ opcode MalEvalJobResume(slot:i):void
     malEvalJobs[slot].env = frame.env
     if (frame.kind == 9) ithen
       MalEnvRelease(MalEnvHandle(frame.env))
+    elseif (frame.kind >= 100) ithen
+      MalEvalJobBuiltinResume(slot, frame, value)
     elseif (value.type == $MAL_ERROR_TYPE) ithen
       if (frame.kind == 7) ithen
         catchEnv:MalEnv init MalMkEnvWithOuter(MalEnvHandle(frame.env))
         MalEvalJobOwnEnv(slot, catchEnv.id)
         binding:MalValue init MalAt(frame.form, 1)
         catchEnv init MalEnvSet(catchEnv, binding.string, MalErrorPayload(value))
+        frame.kind = 10
+        frame.env = catchEnv.id
+        MalEvalJobPush(slot, frame)
         MalEvalJobSetEval(slot, MalAt(frame.form, 2), catchEnv.id)
+      elseif (frame.kind == 1) ithen
+        MalEvalJobDiscardCollection(frame.extra.number)
+        MalEvalJobDiscardCollection(frame.limit)
       endif
-    elseif (frame.kind >= 100) ithen
-      MalEvalJobBuiltinResume(slot, frame, value)
     elseif (frame.kind == 1) ithen
       ;; Vectors, map values, and call arguments retain left-to-right order.
+      input:i = frame.extra.number
       if (frame.data.type == $MAL_HASH_MAP_TYPE) ithen
-        frame.data init MalMapAssoc(frame.data, MalAt(frame.form, frame.index - 1), value)
+        key:MalValue init MalEvalJobCollectionAt(input, frame.index - 1)
+        mapValue:MalValue init MalMapAssoc(malEvalJobCollectionValues[frame.limit], key, value)
+        malEvalJobCollectionValues[frame.limit] init mapValue
         frame.index += 2
       else
-        frame.data init MalAppendValue(frame.data, value)
+        frame.limit = MalEvalJobStoreCollectionValue(value, frame.limit)
+        frame.data.length += 1
         frame.index += 1
       endif
-      if (frame.index < frame.form.length) ithen
+      if (frame.index < malEvalJobCollectionValues[input].length) ithen
         MalEvalJobPush(slot, frame)
-        MalEvalJobSetEval(slot, MalAt(frame.form, frame.index), frame.env)
-      elseif (frame.flag == 1) ithen
-        MalEvalJobSetApply(slot, frame.aux, frame.data)
+        MalEvalJobSetEval(slot, MalEvalJobCollectionAt(input, frame.index), frame.env)
       else
-        MalEvalJobReturn(slot, frame.data)
+        MalEvalJobDiscardCollection(input)
+        clause:i = frame.data.number
+        if (frame.data.type == $MAL_HASH_MAP_TYPE) ithen
+          frame.data init malEvalJobCollectionValues[frame.limit]
+          MalEvalJobDiscardCollection(frame.limit)
+        else
+          frame.data init MalEvalJobFinishCollection(frame.limit, frame.data.length, frame.data.type)
+        endif
+        if (frame.flag > 0) ithen
+          MalEvalJobSetApply(slot, frame.aux, frame.data)
+          if (frame.flag == 2) ithen
+            malEvalJobCallClause[slot] = clause
+          endif
+        else
+          MalEvalJobReturn(slot, frame.data)
+        endif
       endif
     elseif (frame.kind == 2) ithen
       if (MalIsTruthy(value) == 1) ithen
@@ -461,8 +596,7 @@ opcode MalEvalJobResume(slot:i):void
         frame.data init MalMkValue($MAL_LIST_TYPE)
         frame.index = 1
         frame.flag = 1
-        MalEvalJobPush(slot, frame)
-        MalEvalJobSetEval(slot, MalAt(frame.form, 1), frame.env)
+        MalEvalJobSequenceStart(slot, frame)
       endif
     elseif (frame.kind == 6) ithen
       if (frame.flag == 1 && value.type != $MAL_FUNCTION_TYPE) ithen
@@ -488,13 +622,19 @@ opcode MalEvalJobApply(slot:i):void
   fn:MalValue init malEvalJobFunctions[slot]
   args:MalValue init malEvalJobArguments[slot]
   if (fn.type == $MAL_FUNCTION_TYPE) ithen
-    result:MalValue, callEnv:MalEnv = MalBindFunctionEnv(fn, args)
+    clause:i = malEvalJobCallClause[slot]
+    recurCall:i = clause >= 0
+    if (recurCall == 0) ithen
+      clause = MalFunctionClause(fn, args.length)
+    endif
+    result:MalValue, callEnv:MalEnv = MalBindFunctionCall(fn, args, clause, recurCall)
     if (result.type == $MAL_ERROR_TYPE) ithen
       MalEvalJobReturn(slot, result)
     else
       ;; Bind first: a returned closure may retain the preceding scope. Then
       ;; discard only tail-position cleanup frames before entering the body.
-      MalEvalJobSetEval(slot, MalFunctionBody(fn), callEnv.id)
+      malEvalJobCallClause[slot] = clause
+      MalEvalJobSetEval(slot, MalFunctionClauseBody(fn, clause), callEnv.id)
       malEvalJobs[slot].mode = 4
     endif
   elseif (MalEvalJobBuiltinStart(slot, fn, args) == 0) ithen
@@ -551,7 +691,7 @@ opcode MalEvalJobStep(id:i, budget:i):i
           frame:MalEvalFrame init MalEvalJobPop(slot)
           MalEnvRelease(MalEnvHandle(frame.env))
         else
-          MalEvalJobOwnEnv(slot, malEvalJobs[slot].env)
+          MalEvalJobOwnCall(slot)
           malEvalJobs[slot].mode = 0
         endif
       endif
@@ -586,6 +726,11 @@ opcode MalEvalJobCancel(id:i):void
       frame:MalEvalFrame init MalEvalJobPop(slot)
       if (frame.kind == 9) ithen
         MalEnvRelease(MalEnvHandle(frame.env))
+      elseif (frame.kind == 1) ithen
+        MalEvalJobDiscardCollection(frame.extra.number)
+        MalEvalJobDiscardCollection(frame.limit)
+      elseif (frame.kind >= 100) ithen
+        MalEvalJobBuiltinDiscard(frame)
       endif
     od
     malEvalJobs[slot].id = 0

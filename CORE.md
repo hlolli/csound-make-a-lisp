@@ -22,10 +22,24 @@ Csound MAL adds these forms:
 | `(let [name value ...] body...)` | Bind local names in order. |
 
 Functions and macros accept `& rest-args`. Each body runs in order and returns
-its last value, or `nil` for an empty body. Names must be symbols. Parameter
-and binding lists use vectors. This is a small Clojure subset: it does not
-support destructuring, multiple arities, named `fn`, docstrings, or attribute
-maps. `def` requires a value; the interpreter has no Var objects.
+its last value, or `nil` for an empty body. Parameter and binding lists use
+vectors. `fn` accepts an optional local name for recursion. `fn`, `defn`, and
+`defmacro` accept arity clauses such as `([x] x)` and `([x y] (+ x y))`.
+An exact fixed arity takes precedence over a variadic clause. Docstrings,
+attribute maps, and Var objects are outside this subset. `def` requires a value.
+
+Use vector and map destructuring in `let`, parameters, conditional bindings,
+and loop bindings. Vector patterns accept `&` and `:as`. Map patterns accept
+explicit keys, `:keys`, `:strs`, `:syms`, `:or`, and `:as`. Patterns can nest.
+Map patterns also accept key/value lists with an optional final map. This
+lets a rest parameter receive keyword arguments.
+
+```clojure
+(let [[beat duration & extra] [0 2 0.5]
+      {:keys [pitch pan] :or {pan 0.5}} {:pitch 67}]
+  [beat duration extra pitch pan])
+;; [0 2 (0.5) 67 0.5]
+```
 
 `def`, `defn`, and `defmacro` write to the current namespace, even inside
 a function or `let`. A function keeps the namespace where it was defined.
@@ -154,10 +168,10 @@ The earlier MAL learning steps keep their original global environment.
 
 | Use | Functions |
 | --- | --- |
-| Numbers and truth values | `inc`, `dec`, `mod`, `zero?`, `pos?`, `neg?`, `some?`, `boolean`, `not=` |
+| Numbers and truth values | `inc`, `dec`, `mod`, `quot`, `rem`, `min`, `max`, `abs`, `zero?`, `pos?`, `neg?`, `some?`, `boolean`, `not=` |
 | Compose functions | `identity`, `constantly`, `complement`, `partial`, `comp`, `juxt` |
 | Read sequences | `next`, `second`, `last`, `butlast`, `reverse`, `not-empty` |
-| Transform collections | `reduce`, `filter`, `remove`, `keep`, `mapv`, `filterv` |
+| Transform collections | `reduce`, `filter`, `remove`, `keep`, `map`, `mapv`, `filterv` |
 | Test collections | `every?`, `not-every?`, `some`, `not-any?` |
 | Select sequence items | `take`, `drop`, `take-while`, `drop-while` |
 | Work with nested data | `get-in`, `assoc-in`, `update`, `update-in`, `select-keys`, `merge` |
@@ -195,10 +209,17 @@ For example, `(mod 4 3)` returns `1` and `(mod -1 3)` returns `2`. A zero diviso
 raises an error. Use `(nth items (mod step (count items)))` to wrap an index
 through a nonempty vector; `nth` itself still checks its bounds.
 
-`mapv` accepts several collections and stops at the shortest one. `keep` drops
-only `nil`; `some` returns the first truthy predicate result. `get-in` accepts
-a default for missing keys. Nested updates support maps and vectors and create
-missing map levels. `seq` turns a map into a list of key/value vectors.
+`map` and `mapv` accept several collections and stop at the shortest one.
+`map` returns a list and `mapv` returns a vector. Both treat `nil` as empty.
+`keep` drops only `nil`, and `some` returns the first truthy predicate result.
+`get`, `nth`, and `get-in` accept a fallback for missing keys or indexes.
+Call a keyword on a map with `(:pitch note)`, a map with `(note :pitch)`,
+or a vector with `(notes 0)`. Nested updates create missing map levels.
+`seq` turns a map into a list of key/value vectors.
+
+`quot` truncates the quotient towards zero. `rem` returns the remainder with
+the dividend's sign. Both report a zero divisor. `abs`, `min`, and `max` work
+on scalar numbers.
 
 `reduce` accepts a function and collection, with an optional initial value
 between them. Return `(reduced value)` from the function to stop. Use `deref`
@@ -207,7 +228,8 @@ or `unreduced` to unwrap that value outside a reduction.
 ## Conditionals
 
 `and` and `or` stop once the result is known and return the deciding value.
-`when` and `when-not` accept several body forms. `if-let` and `when-let` bind
+`if-not` inverts the branch test. `when` and `when-not` accept several body forms.
+`if-let` and `when-let` bind
 a truthy value; `if-some` and `when-some` bind any value except `nil`.
 
 ```clojure
@@ -221,6 +243,33 @@ a truthy value; `if-some` and `when-some` bind any value except `nil`.
   (get voice :amplitude))
 ```
 
-Bindings use `[name expression]`. The expression runs once, and the name stays
-within the selected body. The seven [threading macros](INTEROP.md#threading-macros)
+Bindings use `[pattern expression]`. The expression runs once and the bound
+names stay within the selected body. `comment` returns `nil` and skips its
+body. `assert` throws a MAL error on a false or `nil` test and accepts an
+optional message. The seven [threading macros](INTEROP.md#threading-macros)
 work with these helpers and with Csound graphs.
+
+## Iteration and reader forms
+
+`range` builds an eager, finite list. It takes `end`, `start end`, or
+`start end step`. The end is exclusive and the step must be nonzero.
+`dotimes` binds a counter from zero up to the count and returns `nil`.
+`doseq` runs its body for each item and returns `nil`. It accepts nested
+bindings and `:let`, `:when`, and `:while` modifiers.
+
+```clojure
+(doseq [[start pitch] [[0 60] [0.5 67]]]
+  (play-note start pitch))
+
+(loop [n 5 acc 1]
+  (if (zero? n) acc (recur (dec n) (* n acc))))
+;; 120
+```
+
+`recur` resumes the nearest loop or function arity in tail position. Supply
+one value for each binding, including one for the rest binding in a variadic
+function. The interpreter checks tail position when it evaluates the form.
+
+`#(...)` reads an anonymous function. Use `%` or `%1` for its first argument,
+`%2` through `%20` for later ones, and `%&` for the rest. `#_` discards the
+next form while reading, including inside collections.

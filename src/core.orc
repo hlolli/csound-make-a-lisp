@@ -45,6 +45,69 @@ opcode MalCoreLookup(collection:MalValue, key:MalValue):(MalValue, i)
   xout result, found
 endop
 
+opcode MalCoreNth(sequence:MalValue, index:MalValue, fallback:MalValue, hasFallback:i, extended:i):MalValue
+  result:MalValue init MalMkValue($MAL_NIL_TYPE)
+  indexedString:i = extended == 1 && sequence.type == $MAL_STRING_TYPE
+  indexedNil:i = extended == 1 && sequence.type == $MAL_NIL_TYPE
+  if (MalIsCsoundArray(sequence) == 1) ithen
+    result init MalCsoundArrayRead(sequence, index, "nth")
+  elseif (MalIsSequential(sequence) == 0 && indexedString == 0 && indexedNil == 0) ithen
+    message:S init extended == 1 ? "nth: expected a list, vector, string, Csound array, or nil" : "nth: first argument must be list or vector"
+    result init MalMkError(message)
+  elseif (index.type != $MAL_NUMBER_TYPE) ithen
+    result init MalMkError("nth: index must be a number")
+  elseif (index.number != int(index.number)) ithen
+    result init MalMkError("nth: index must be an integer")
+  elseif (indexedNil == 1) ithen
+    result init fallback
+  else
+    size:i = indexedString == 1 ? strlen(sequence.string) : sequence.length
+    if (index.number < 0 || index.number >= size) ithen
+      if (hasFallback == 1) ithen
+        result init fallback
+      else
+        result init MalMkError("nth: index out of range")
+      endif
+    elseif (indexedString == 1) ithen
+      result init MalMkString(strsub(sequence.string, index.number, index.number + 1))
+    else
+      result init MalAt(sequence, index.number)
+    endif
+  endif
+  xout result
+endop
+
+opcode MalCoreApplyLookup(fn:MalValue, args:MalValue):MalValue
+  result:MalValue init MalMkValue($MAL_NIL_TYPE)
+  if (fn.type == $MAL_VECTOR_TYPE) ithen
+    if (args.length != 1) ithen
+      result init MalArityError("vector call", 1, args.length)
+    else
+      result init MalCoreNth(fn, MalAt(args, 0), result, 0, 0)
+    endif
+  elseif (args.length != 1 && args.length != 2) ithen
+    name:S init fn.type == $MAL_KEYWORD_TYPE ? "keyword" : "map"
+    result init MalMkError(sprintf("%s call: expected 1 or 2 arguments", name))
+  else
+    collection:MalValue init fn
+    key:MalValue init MalAt(args, 0)
+    if (fn.type == $MAL_KEYWORD_TYPE) ithen
+      collection init key
+      key init fn
+    endif
+    if (args.length == 2) ithen
+      result init MalAt(args, 1)
+    endif
+    if (collection.type == $MAL_HASH_MAP_TYPE) ithen
+      value:MalValue, found:i = MalCoreLookup(collection, key)
+      if (found == 1) ithen
+        result init value
+      endif
+    endif
+  endif
+  xout result
+endop
+
 opcode MalCoreAssoc(collection:MalValue, key:MalValue, value:MalValue):MalValue
   result:MalValue init MalMkError("expected a map, vector, or nil")
   if (MalIsCsoundArray(collection) == 1) ithen
@@ -230,15 +293,24 @@ opcode MalCoreSelect(name:S, args:MalValue):MalValue
   xout result
 endop
 
-opcode MalCoreMapv(args:MalValue):MalValue
-  result:MalValue init MalMkError("mapv: expected a function and at least one collection")
+opcode MalCoreMapInput(collection:MalValue):MalValue
+  result:MalValue init collection
+  if (MalIsSequential(collection) == 0) ithen
+    result init MalSeq(collection)
+  endif
+  xout result
+endop
+
+opcode MalCoreMap(name:S, args:MalValue, resultType:i):MalValue
+  result:MalValue init MalMkError(sprintf("%s: expected a function and at least one collection", name))
   if (args.length >= 2) ithen
+    fn:MalValue init MalAt(args, 0)
     collectionCount:i = args.length - 1
     collections:MalValue[] init collectionCount
     size:i = -1
     failed:i = 0
     for index in [0 ... collectionCount - 1] do
-      collection:MalValue init MalSeq(MalAt(args, index + 1))
+      collection:MalValue init MalCoreMapInput(MalAt(args, index + 1))
       if (collection.type == $MAL_ERROR_TYPE) ithen
         result init collection
         failed = 1
@@ -250,12 +322,15 @@ opcode MalCoreMapv(args:MalValue):MalValue
     if (failed == 0) ithen
       values:MalValue[] init size
       if (size > 0) ithen
+        callValues:MalValue[] init collectionCount
         for index in [0 ... size - 1] do
           callArgs:MalValue init MalMkValue($MAL_LIST_TYPE)
           for column in [0 ... collectionCount - 1] do
-            callArgs init MalAppendValue(callArgs, MalAt(collections[column], index))
+            callValues[column] init MalAt(collections[column], index)
           od
-          value:MalValue init MalApply(MalAt(args, 0), callArgs)
+          callArgs.list init callValues
+          callArgs.length = collectionCount
+          value:MalValue init MalApply(fn, callArgs)
           if (value.type == $MAL_ERROR_TYPE) ithen
             result init value
             failed = 1
@@ -265,11 +340,92 @@ opcode MalCoreMapv(args:MalValue):MalValue
         od
       endif
       if (failed == 0) ithen
-        result init MalMkValue($MAL_VECTOR_TYPE)
+        result init MalMkValue(resultType)
         result.list init values
         result.length = size
       endif
     endif
+  endif
+  xout result
+endop
+
+opcode MalCoreRange(args:MalValue):MalValue
+  result:MalValue init MalMkError("range: expected 1 to 3 arguments")
+  if (args.length >= 1 && args.length <= 3) ithen
+    start:MalValue init MalMkNumber(0)
+    finish:MalValue init MalAt(args, 0)
+    step:MalValue init MalMkNumber(1)
+    if (args.length >= 2) ithen
+      start init finish
+      finish init MalAt(args, 1)
+    endif
+    if (args.length == 3) ithen
+      step init MalAt(args, 2)
+    endif
+    if (start.type != $MAL_NUMBER_TYPE || finish.type != $MAL_NUMBER_TYPE || step.type != $MAL_NUMBER_TYPE) ithen
+      result init MalMkError("range: expected numeric arguments")
+    elseif (step.number == 0) ithen
+      result init MalMkError("range: step must be nonzero")
+    elseif (start.number - start.number != 0 || finish.number - finish.number != 0 || \
+            step.number - step.number != 0) ithen
+      result init MalMkError("range: arguments must be finite")
+    else
+      size:i = 0
+      if ((step.number > 0 && start.number < finish.number) || \
+          (step.number < 0 && start.number > finish.number)) ithen
+        span:i = finish.number - start.number
+        count:i = span / step.number
+        if (span - span != 0) ithen
+          ;; Opposite finite endpoints can have a span that overflows.
+          count = finish.number / step.number - start.number / step.number
+        endif
+        ;; Test an extra candidate when a rounded ratio is an integer.
+        size = max(1, floor(count) + 1)
+      endif
+      if (size >= 2147483648) ithen
+        result init MalMkError("range: result exceeds the Csound array size limit")
+      else
+        values:MalValue[] init size
+        count = 0
+        if (size > 0) ithen
+          lastOffset:i = (size - 1) * step.number
+          scale:i = lastOffset - lastOffset == 0 ? 1 : 0.5
+          scaledStart:i = start.number * scale
+          scaledStep:i = step.number * scale
+          for index in [0 ... size - 1] do
+            value:i = (scaledStart + index * scaledStep) / scale
+            if ((step.number > 0 && value >= finish.number) || \
+                (step.number < 0 && value <= finish.number)) ithen
+              break
+            endif
+            values[index] init MalMkNumber(value)
+            count += 1
+          od
+        endif
+        result init MalMkValue($MAL_LIST_TYPE)
+        result.list init values
+        result.length = count
+      endif
+    endif
+  endif
+  xout result
+endop
+
+opcode MalCoreExtremum(name:S, args:MalValue):MalValue
+  result:MalValue init MalMkError(sprintf("%s: expected at least one argument", name))
+  if (args.length > 0) ithen
+    result init MalAt(args, 0)
+    smallest:i = strcmp(name, "min") == 0
+    for index in [0 ... args.length - 1] do
+      value:MalValue init MalAt(args, index)
+      if (value.type != $MAL_NUMBER_TYPE) ithen
+        result init MalMkError(sprintf("%s: expected numeric arguments", name))
+        break
+      elseif (value.number != value.number || (smallest == 1 && value.number < result.number) || \
+              (smallest == 0 && value.number > result.number)) ithen
+        result init value
+      endif
+    od
   endif
   xout result
 endop
@@ -410,22 +566,29 @@ opcode MalApplyCoreBuiltin(fn:MalValue, args:MalValue):MalValue
   elseif (strcmp(name, "reduce") == 0) ithen
     result init MalCoreReduce(args)
   elseif (strcmp(name, "mapv") == 0) ithen
-    result init MalCoreMapv(args)
-  elseif (strcmp(name, "mod") == 0) ithen
+    result init MalCoreMap(name, args, $MAL_VECTOR_TYPE)
+  elseif (strcmp(name, "range") == 0) ithen
+    result init MalCoreRange(args)
+  elseif (strcmp(name, "min") == 0 || strcmp(name, "max") == 0) ithen
+    result init MalCoreExtremum(name, args)
+  elseif (strcmp(name, "mod") == 0 || strcmp(name, "quot") == 0 || strcmp(name, "rem") == 0) ithen
     if (args.length != 2) ithen
       result init MalArityError(name, 2, args.length)
     else
       dividend:MalValue init MalAt(args, 0)
       divisor:MalValue init MalAt(args, 1)
       if (dividend.type != $MAL_NUMBER_TYPE || divisor.type != $MAL_NUMBER_TYPE) ithen
-        result init MalMkError("mod: expected numeric arguments")
+        result init MalMkError(sprintf("%s: expected numeric arguments", name))
       elseif (divisor.number == 0) ithen
-        result init MalMkError("mod: division by zero")
+        result init MalMkError(sprintf("%s: division by zero", name))
+      elseif (strcmp(name, "quot") == 0) ithen
+        quotient:i = dividend.number / divisor.number
+        result init MalMkNumber(quotient < 0 ? ceil(quotient) : floor(quotient))
       else
         ;; Csound's remainder follows the dividend. mod follows the divisor.
         remainder:i = dividend.number % divisor.number
-        if ((remainder < 0 && divisor.number > 0) || \
-            (remainder > 0 && divisor.number < 0)) ithen
+        if (strcmp(name, "mod") == 0 && ((remainder < 0 && divisor.number > 0) || \
+            (remainder > 0 && divisor.number < 0))) ithen
           remainder += divisor.number
         endif
         result init MalMkNumber(remainder)
@@ -475,7 +638,7 @@ opcode MalApplyCoreBuiltin(fn:MalValue, args:MalValue):MalValue
     endif
   elseif (strcmp(name, "identity") == 0 || strcmp(name, "boolean") == 0 || \
           strcmp(name, "some?") == 0 || strcmp(name, "inc") == 0 || \
-          strcmp(name, "dec") == 0 || strcmp(name, "zero?") == 0 || \
+          strcmp(name, "dec") == 0 || strcmp(name, "abs") == 0 || strcmp(name, "zero?") == 0 || \
           strcmp(name, "pos?") == 0 || strcmp(name, "neg?") == 0 || \
           strcmp(name, "reduced") == 0 || strcmp(name, "reduced?") == 0 || \
           strcmp(name, "ensure-reduced") == 0 || strcmp(name, "unreduced") == 0) ithen
@@ -514,6 +677,8 @@ opcode MalApplyCoreBuiltin(fn:MalValue, args:MalValue):MalValue
         result init MalMkNumber(value.number + 1)
       elseif (strcmp(name, "dec") == 0) ithen
         result init MalMkNumber(value.number - 1)
+      elseif (strcmp(name, "abs") == 0) ithen
+        result init MalMkNumber(abs(value.number))
       elseif (strcmp(name, "zero?") == 0) ithen
         result init MalMkBool(value.number == 0 ? 1 : 0)
       elseif (strcmp(name, "pos?") == 0) ithen
@@ -575,9 +740,20 @@ opcode MalApplyCoreBuiltin(fn:MalValue, args:MalValue):MalValue
   xout result
 endop
 
+;; Step A adds Clojure arities without changing the earlier MAL lessons.
+opcode MalMkClojureBuiltin(name:S):MalValue
+  result:MalValue init MalMkBuiltin(name)
+  result.number = 1
+  xout result
+endop
+
 opcode MalInstallCoreHelpers(env:MalEnv):MalEnv
   currentEnv:MalEnv init env
-  names:S[] fillarray "identity", "inc", "dec", "mod", "zero?", "pos?", "neg?", \
+  currentEnv init MalEnvSet(currentEnv, "get", MalMkClojureBuiltin("get"))
+  currentEnv init MalEnvSet(currentEnv, "nth", MalMkClojureBuiltin("nth"))
+  currentEnv init MalEnvSet(currentEnv, "map", MalMkClojureBuiltin("map"))
+  names:S[] fillarray "identity", "inc", "dec", "mod", "rem", "quot", "abs", "min", "max", "range", \
+    "zero?", "pos?", "neg?", \
     "some?", "boolean", "not=", "next", "second", "last", "butlast", \
     "reverse", "not-empty", "reduce", "reduced", "reduced?", "ensure-reduced", \
     "unreduced", "filter", "remove", "keep", "mapv", "filterv", "every?", \
@@ -609,19 +785,33 @@ opcode MalInstallCoreHelpers(env:MalEnv):MalEnv
 
   (defmacro and [& forms] (core/logic true forms))
   (defmacro or [& forms] (core/logic false forms))
+  (defmacro if-not [test then & otherwise]
+    (if (> (count otherwise) 1) (throw "if-not: expected 2 or 3 arguments")
+        (list 'if test (first otherwise) then)))
   (defmacro when [test & body] (list 'if test (cons 'do body) nil))
   (defmacro when-not [test & body] (list 'if test nil (cons 'do body)))
+  (defmacro comment [& forms] nil)
+  (defmacro assert [test & message]
+    (if (> (count message) 1) (throw "assert: expected 1 or 2 arguments")
+        (list 'if test nil
+              (list throw
+                    (if (empty? message)
+                        (str "Assert failed: " (pr-str test))
+                        (list str "Assert failed: " (first message) "\n" (pr-str test)))))))
 
   (defn core/binding [bindings then else nil-only?]
-    (if (and (vector? bindings) (= (count bindings) 2) (symbol? (first bindings)))
+    (if (and (vector? bindings) (= (count bindings) 2)
+             (or (symbol? (first bindings)) (vector? (first bindings)) (map? (first bindings))))
       (let* [name (gensym)
-             body (list (list 'fn* (list name)
-                              (list 'let* (list (first bindings) name) then)) name)]
-        (list 'let* (list name (nth bindings 1))
+             pattern (first bindings)
+             body (if (symbol? pattern)
+                    (list 'let* (list pattern name) then)
+                    (list 'let (vector pattern name) then))]
+        (list 'let (vector name (nth bindings 1))
               (if nil-only?
                 (list 'if (list nil? name) else body)
                 (list 'if name body else))))
-      (throw "conditional binding requires [name expression]")))
+      (throw "conditional binding requires [pattern expression]")))
   (defmacro if-let [bindings then & otherwise]
     (if (> (count otherwise) 1) (throw "if-let: expected 2 or 3 arguments")
         (core/binding bindings then (first otherwise) false)))

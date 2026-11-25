@@ -91,6 +91,10 @@ Use `MalEvalFormsEnv(source, env)` for a region or file containing several
 forms. It returns the last value and the updated environment. Keep that
 environment for the next call. `MalEvalSourceEnv` still reads one form.
 
+If you drive `MalEvalJobStep` from a host, compile the driver once and reuse
+it for each step. A fresh `evalCode` compilation per step retains Csound
+instrument-0 allocations.
+
 For repeated host calls, bind a Csound UDO with `MalMkNative` instead of
 building a `csound/eval` string on each call. Native bindings reuse the UDO's
 storage and work with `apply`, `map`, and evaluation jobs. The UDO reads its
