@@ -28,10 +28,21 @@ opcode MalNativeReturn(frame:i, value:MalValue):i
   xout 0
 endop
 
+instr MalNativeRun
+  ignored:i init malNativeInstances[p4], p5
+endin
+
 ;; These instruments use the engine's sample rate and ksmps even when a host
 ;; registers or calls a binding from an instrument with a smaller local block.
 instr MalNativeRegister
   definition:OpcodeDef opcoderef malNativeTarget
+  ;; Keep instance creation out of the evaluator's static call graph.
+  ;; Otherwise evalCode retains its state even for non-native expressions.
+  while (malNativeRunnerCount < $MAL_NATIVE_DEPTH_LIMIT) do
+    runner:Instr = create(MalNativeRun)
+    malNativeRunners[malNativeRunnerCount] = runner
+    malNativeRunnerCount += 1
+  od
   ;; Array create gives each depth its own object. Repeating scalar create
   ;; at one call site can copy the same object into every slot.
   instances:Opcode[] init 0
@@ -43,10 +54,6 @@ endin
 
 malNativeRegister@global:Instr = create(MalNativeRegister)
 delete(malNativeRegister)
-
-instr MalNativeRun
-  ignored:i init malNativeInstances[p4], p5
-endin
 
 opcode MalMkNative(target:S):MalValue
   if (malNativeCount >= $MAL_NATIVE_BINDING_LIMIT) ithen
@@ -74,12 +81,6 @@ opcode MalApplyNative(fn:MalValue, args:MalValue):MalValue
   elseif (frame >= $MAL_NATIVE_DEPTH_LIMIT) ithen
     result:MalValue init MalMkError(sprintf("native: host call nesting exceeds %d", $MAL_NATIVE_DEPTH_LIMIT))
   else
-    if (frame == malNativeRunnerCount) ithen
-      runner:Instr = create(MalNativeRun)
-      malNativeRunners[frame] = runner
-      malNativeRunnerCount += 1
-    endif
-
     depth:i = malNativeDepths[id]
     malNativeArguments[frame] init args
     malNativeResults[frame] init MalMkError("native: host did not return a value")

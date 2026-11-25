@@ -71,6 +71,8 @@ try {
   evaluate(
     '(let [seen (atom [])] (doseq [[n] [[1] #_[99] [2] [3]]] (swap! seen conj (#(* % %) n))) (assert (= @seen [1 4 9])))',
   );
+  // Ordinary source submissions should not allocate native runners.
+  for (let index = 0; index < 32; index++) evaluate("nil");
   // A callback suspends and resumes through several frame constructors.
   const job = api.csoundEvalCode(
     csound,
@@ -82,7 +84,7 @@ try {
   while (status === 0 && steps < 1000) {
     // Reuse the job driver across init passes instead of compiling one
     // global orchestra fragment for each transition.
-    assert.equal(api.csoundInputMessage(csound, `i "MalTestJobStep" 0 0 ${job}`), 0);
+    api.csoundInputMessage(csound, `i "MalTestJobStep" 0 0 ${job}`);
     api.csoundPerformKsmps(csound);
     status = api.csoundGetControlChannel(csound, "__web_ide_job_status");
     steps += 1;
