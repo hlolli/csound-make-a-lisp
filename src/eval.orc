@@ -1266,43 +1266,71 @@ endop
 
 opcode MalFunctionClause(fn:MalValue, count:i):i
   selected:i = -1
-  index:i = 0
-  while (index < malFunctionDefinitions[fn.number].length) do
-    params:MalValue init malFunctionDefinitions[fn.number].list[index]
-    restIndex:i = MalRestParamIndex(params)
-    if (restIndex < 0 && count == params.length) ithen
-      selected = index
-      break
-    elseif (restIndex >= 0 && count >= restIndex) ithen
-      selected = index
-    endif
-    index += 2
-  od
+  if (fn.type == $MAL_LOOP_TARGET_TYPE) ithen
+    selected = 0
+  else
+    index:i = 0
+    while (index < malFunctionDefinitions[fn.number].length) do
+      params:MalValue init malFunctionDefinitions[fn.number].list[index]
+      restIndex:i = MalRestParamIndex(params)
+      if (restIndex < 0 && count == params.length) ithen
+        selected = index
+        break
+      elseif (restIndex >= 0 && count >= restIndex) ithen
+        selected = index
+      endif
+      index += 2
+    od
+  endif
   xout selected
 endop
 
 opcode MalFunctionClauseBody(fn:MalValue, clause:i):MalValue
-  xout malFunctionDefinitions[fn.number].list[clause + 1]
+  if (fn.type == $MAL_LOOP_TARGET_TYPE) ithen
+    body:MalValue init fn.list[1]
+  else
+    body init malFunctionDefinitions[fn.number].list[clause + 1]
+  endif
+  xout body
 endop
 
 opcode MalRecurArgumentCount(fn:MalValue, clause:i):i
-  params:MalValue init malFunctionDefinitions[fn.number].list[clause]
-  restIndex:i = MalRestParamIndex(params)
-  count:i = restIndex >= 0 ? restIndex + 1 : params.length
+  if (fn.type == $MAL_LOOP_TARGET_TYPE) ithen
+    params:MalValue init fn.list[0]
+    count:i = params.length
+  else
+    params init malFunctionDefinitions[fn.number].list[clause]
+    restIndex:i = MalRestParamIndex(params)
+    count = restIndex >= 0 ? restIndex + 1 : params.length
+  endif
   xout count
 endop
 
 opcode MalBindFunctionCall(fn:MalValue, args:MalValue, clause:i, recurCall:i):(MalValue, MalEnv)
   result:MalValue init MalMkValue($MAL_NIL_TYPE)
   callEnv:MalEnv init MalEnvHandle(-1)
-  params:MalValue init malFunctionDefinitions[fn.number].list[max(0, clause)]
-  restIndex:i = MalRestParamIndex(params)
+  outer:MalEnv init callEnv
+  named:S init ""
+  definitionLength:i = 2
+  restIndex:i = -1
+  if (fn.type == $MAL_LOOP_TARGET_TYPE) ithen
+    params:MalValue init fn.list[0]
+    outer init MalEnvHandle(fn.number)
+  else
+    params init malFunctionDefinitions[fn.number].list[max(0, clause)]
+    restIndex = MalRestParamIndex(params)
+    definitionLength = malFunctionDefinitions[fn.number].length
+    named init malFunctionDefinitions[fn.number].string
+    if (lenarray(fn.env) > 0) ithen
+      outer init fn.env[0]
+    endif
+  endif
   requiredCount:i = restIndex >= 0 ? restIndex : params.length
   recurCount:i = restIndex >= 0 ? requiredCount + 1 : requiredCount
 
   if (recurCall == 1 && args.length != recurCount) ithen
     result init MalArityError("recur", recurCount, args.length)
-  elseif (clause < 0 && malFunctionDefinitions[fn.number].length > 2) ithen
+  elseif (clause < 0 && definitionLength > 2) ithen
     result init MalMkError(sprintf("fn: no arity accepts %d arguments", args.length))
   elseif (recurCall == 0 && restIndex < 0 && args.length != params.length) ithen
     result init MalMkError(sprintf("fn*: expected %d arguments, got %d", \
@@ -1310,20 +1338,18 @@ opcode MalBindFunctionCall(fn:MalValue, args:MalValue, clause:i, recurCall:i):(M
   elseif (restIndex >= 0 && args.length < requiredCount) ithen
     result init MalMkError(sprintf("fn*: expected at least %d arguments, got %d", \
       requiredCount, args.length))
-  elseif (lenarray(fn.env) == 0) ithen
+  elseif (fn.type != $MAL_LOOP_TARGET_TYPE && lenarray(fn.env) == 0) ithen
     result init MalMkError("fn*: missing closure environment")
   else
-    closure:MalEnv[] init fn.env
-    callEnv init MalMkEnvWithOuter(closure[0])
+    callEnv init MalMkEnvWithOuter(outer)
 
     if (strlen(fn.string) > 0) ithen
       callEnv.namespace init fn.string
       callEnv init MalEnvStore(callEnv)
     endif
 
-    name:S init malFunctionDefinitions[fn.number].string
-    if (strlen(name) > 0) ithen
-      callEnv init MalEnvSet(callEnv, name, fn)
+    if (strlen(named) > 0) ithen
+      callEnv init MalEnvSet(callEnv, named, fn)
     endif
 
     if (requiredCount > 0) ithen
@@ -2058,10 +2084,16 @@ opcode MalEvalTail(ast:MalValue, env:MalEnv, target:MalValue, clause:i):(MalValu
           endif
         endif
 
+      elseif (head.type == $MAL_LOOP_ENTRY_TYPE) ithen
+        workAst init MalEnterLoop(workAst, evalEnv)
+        if (workAst.type == $MAL_ERROR_TYPE) ithen
+          result init workAst
+          done = 1
+        endif
       else
         recurCall:i = MalIsSymbolNamed(head, "recur")
         if (recurCall == 1) ithen
-          if (recurFn.type != $MAL_FUNCTION_TYPE) ithen
+          if (recurFn.type != $MAL_FUNCTION_TYPE && recurFn.type != $MAL_LOOP_TARGET_TYPE) ithen
             fn:MalValue init MalMkError("recur must be in tail position of a loop or function")
           else
             expected:i = MalRecurArgumentCount(recurFn, recurClause)
@@ -2071,6 +2103,8 @@ opcode MalEvalTail(ast:MalValue, env:MalEnv, target:MalValue, clause:i):(MalValu
               fn init recurFn
             endif
           endif
+        elseif (head.type == $MAL_LOOP_TARGET_TYPE) ithen
+          fn init head
         else
           recursiveInputEnv init MalEnvHandle(evalEnv.id)
           fn, evalEnv = MalEvalInternal(head, recursiveInputEnv)
@@ -2110,7 +2144,7 @@ opcode MalEvalTail(ast:MalValue, env:MalEnv, target:MalValue, clause:i):(MalValu
 
               done = 1
             endif
-          elseif (fn.type == $MAL_FUNCTION_TYPE) ithen
+          elseif (fn.type == $MAL_FUNCTION_TYPE || fn.type == $MAL_LOOP_TARGET_TYPE) ithen
             callClause:i = recurCall == 1 ? recurClause : MalFunctionClause(fn, args.length)
             bindStatus:MalValue, callEnv:MalEnv = MalBindFunctionCall(fn, args, callClause, recurCall)
 
@@ -2120,14 +2154,21 @@ opcode MalEvalTail(ast:MalValue, env:MalEnv, target:MalValue, clause:i):(MalValu
             else
               ;; Binding the callee first preserves any captured scopes.
               while (transientEnvCount > 0) do
+                scope:i = transientEnvIds[transientEnvCount - 1]
+                ;; A loop needs its borrowed lexical parent on every recur.
+                if (fn.type == $MAL_LOOP_TARGET_TYPE && scope == fn.number) ithen
+                  break
+                endif
                 transientEnvCount -= 1
-                MalEnvRelease(MalEnvHandle(transientEnvIds[transientEnvCount]))
+                MalEnvRelease(MalEnvHandle(scope))
               od
               transientEnvId = callEnv.id
               workAst init MalFunctionClauseBody(fn, callClause)
               evalEnv init MalEnvHandle(callEnv.id)
-              recurFn init fn
-              recurClause = callClause
+              if (recurCall == 0) ithen
+                recurFn init fn
+                recurClause = callClause
+              endif
             endif
           else
             result init MalApply(fn, args)

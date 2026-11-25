@@ -7,17 +7,54 @@ opcode MalSpecialForm4(name:S, first:MalValue, second:MalValue, third:MalValue):
   xout MalAppendValue(result, third)
 endop
 
+;; A loop borrows the lexical scope outside its initializers. Put the target
+;; only in call position, where it cannot escape as a user function.
+;; The expanded form stores parameters, body, initializer bindings, and argument symbols.
+opcode MalEnterLoop(ast:MalValue, env:MalEnv):MalValue
+  result:MalValue init MalMkError("loop: invalid expanded form")
+  if (ast.length == 5) ithen
+    params:MalValue init MalAt(ast, 1)
+    arguments:MalValue init MalAt(ast, 4)
+    if (params.type == $MAL_VECTOR_TYPE && arguments.type == $MAL_LIST_TYPE && \
+        params.length == arguments.length) ithen
+      if (MalParamsAreValid(params) == 1 && MalRestParamIndex(params) < 0) ithen
+        lexical:MalEnv init MalEnvResolve(env)
+        target:MalValue init MalMkList2(params, MalAt(ast, 2))
+        target.type = $MAL_LOOP_TARGET_TYPE
+        target.number = env.id
+        target.string init lexical.namespace
+        call:MalValue init MalMkList1(target)
+        if (arguments.length > 0) ithen
+          for index in [0 ... arguments.length - 1] do
+            call init MalAppendValue(call, MalAt(arguments, index))
+          od
+        endif
+        result init MalMkList3(MalMkSymbol("let"), MalAt(ast, 3), call)
+      endif
+    endif
+  endif
+  xout result
+endop
+
 opcode MalExpandLoop(args:MalValue):MalValue
   result:MalValue init MalMkError("loop: expected an even binding vector")
   if (args.length > 0) ithen
     bindings:MalValue init MalAt(args, 0)
     if (bindings.type == $MAL_VECTOR_TYPE && bindings.length % 2 == 0) ithen
+      simple:i = 1
+      index:i = 0
+      while (index < bindings.length) do
+        if (MalBindingSymbol(MalAt(bindings, index)) == 0) ithen
+          simple = 0
+          break
+        endif
+        index += 2
+      od
       initial:MalValue init MalMkValue($MAL_VECTOR_TYPE)
       params:MalValue init MalMkValue($MAL_VECTOR_TYPE)
       iteration:MalValue init MalMkValue($MAL_VECTOR_TYPE)
-      functionName:MalValue init MalFreshLocal()
-      call:MalValue init MalMkList1(functionName)
-      index:i = 0
+      arguments:MalValue init MalMkValue($MAL_LIST_TYPE)
+      index = 0
       while (index < bindings.length) do
         pattern:MalValue init MalAt(bindings, index)
         source:MalValue init MalAt(bindings, index + 1)
@@ -26,18 +63,21 @@ opcode MalExpandLoop(args:MalValue):MalValue
         argument:MalValue init MalFreshLocal()
         initial init MalAppendValue(MalAppendValue(initial, argument), source)
         initial init MalAppendValue(MalAppendValue(initial, pattern), argument)
-        params init MalAppendValue(params, argument)
-        call init MalAppendValue(call, argument)
-        iteration init MalAppendValue(MalAppendValue(iteration, pattern), argument)
+        arguments init MalAppendValue(arguments, argument)
+        if (simple == 1) ithen
+          params init MalAppendValue(params, pattern)
+        else
+          params init MalAppendValue(params, argument)
+          iteration init MalAppendValue(MalAppendValue(iteration, pattern), argument)
+        endif
         index += 2
       od
-      body:MalValue init MalMkList3(MalMkSymbol("let"), iteration, MalBodyForms(args, 1))
-      function:MalValue init MalMkList3(MalMkSymbol("fn"), params, body)
-      ;; Create the closure before the initializer scopes. It only needs the
-      ;; outer lexical scope and the current iteration's parameters.
-      wrapper:MalValue init MalMkValue($MAL_VECTOR_TYPE)
-      wrapper init MalAppendValue(MalAppendValue(wrapper, functionName), function)
-      result init MalMkList3(MalMkSymbol("let"), wrapper, MalMkList3(MalMkSymbol("let"), initial, call))
+      body:MalValue init MalBodyForms(args, 1)
+      if (simple == 0) ithen
+        body init MalMkList3(MalMkSymbol("let"), iteration, body)
+      endif
+      result init MalMkList3(MalMkValue($MAL_LOOP_ENTRY_TYPE), params, body)
+      result init MalAppendValue(MalAppendValue(result, initial), arguments)
     endif
   endif
   xout result

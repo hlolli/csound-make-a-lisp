@@ -120,6 +120,7 @@ clojure-helpers:
 
 clojure-language:
     {{csound}} {{csound_flags}} tests/clojure-language.orc
+    {{csound}} {{csound_flags}} tests/loop-memory.orc
 
 eval-forms:
     {{csound}} {{csound_flags}} tests/eval-forms.orc

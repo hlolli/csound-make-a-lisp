@@ -61,8 +61,9 @@ atom. The standalone bundle check runs these fixtures too.
 
 `just clojure-helpers clojure-language` checks eager collection and number
 helpers, destructuring, function arities, reader forms, and iteration. The
-language fixture runs each case with both evaluators. The standalone bundle
-check runs both fixtures.
+language and loop memory fixtures run with both evaluators. They check that
+nested loops reuse storage, escaped closures keep their bindings, and cancelled
+jobs release their scopes. The standalone bundle check runs these fixtures too.
 
 To test the Web-IDE example against its browser engine, build `dist/mal.inc`
 and pass the installed browser package to the Node check:

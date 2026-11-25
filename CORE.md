@@ -269,6 +269,8 @@ bindings and `:let`, `:when`, and `:while` modifiers.
 `recur` resumes the nearest loop or function arity in tail position. Supply
 one value for each binding, including one for the rest binding in a variadic
 function. The interpreter checks tail position when it evaluates the form.
+The interpreter reuses loop scopes as iterations end. Functions created
+inside a loop retain their captured scopes under the usual MAL closure rules.
 
 `#(...)` reads an anonymous function. Use `%` or `%1` for its first argument,
 `%2` through `%20` for later ones, and `%&` for the rest. `#_` discards the

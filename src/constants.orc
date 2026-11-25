@@ -30,6 +30,9 @@
 #define MAL_REDUCED_TYPE #24#
 // Reader marker for a discarded form. It never reaches evaluation.
 #define MAL_DISCARDED_TYPE #25#
+// Internal loop entry in expanded code and the evaluator's active loop target.
+#define MAL_LOOP_ENTRY_TYPE #26#
+#define MAL_LOOP_TARGET_TYPE #27#
 
 // Csound graph node kinds
 #define MAL_CSOUND_PARAM_NODE #1#

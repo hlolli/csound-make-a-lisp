@@ -188,6 +188,12 @@ opcode pr_str_unreadably(ast:MalValue):S
     case $MAL_FUNCTION_TYPE
       Sout init sprintf("%c<function:fn*>", 35)
 
+    case $MAL_LOOP_ENTRY_TYPE
+      Sout init sprintf("%c<loop>", 35)
+
+    case $MAL_LOOP_TARGET_TYPE
+      Sout init sprintf("%c<loop>", 35)
+
     case $MAL_REDUCED_TYPE
       Sout init sprintf("#<reduced %s>", pr_str(MalAt(ast, 0)))
 
@@ -291,6 +297,12 @@ opcode pr_str(ast:MalValue):S
 
     case $MAL_FUNCTION_TYPE
       Sout init sprintf("%c<function:fn*>", 35)
+
+    case $MAL_LOOP_ENTRY_TYPE
+      Sout init sprintf("%c<loop>", 35)
+
+    case $MAL_LOOP_TARGET_TYPE
+      Sout init sprintf("%c<loop>", 35)
 
     case $MAL_REDUCED_TYPE
       Sout init sprintf("#<reduced %s>", pr_str(MalAt(ast, 0)))

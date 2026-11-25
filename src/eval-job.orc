@@ -338,7 +338,8 @@ opcode MalEvalJobRecur(slot:i, frame:MalEvalFrame):void
     if (malEvalJobFrames[index].kind != 9) ithen
       break
     endif
-    if (malEvalJobFrames[index].form.type == $MAL_FUNCTION_TYPE) ithen
+    kind:i = malEvalJobFrames[index].form.type
+    if (kind == $MAL_FUNCTION_TYPE || kind == $MAL_LOOP_TARGET_TYPE) ithen
       target init malEvalJobFrames[index].form
       clause = malEvalJobFrames[index].index
       break
@@ -391,7 +392,25 @@ opcode MalEvalJobEval(slot:i):void
     MalEvalJobReturn(slot, MalMkValue($MAL_LIST_TYPE))
   else
     head:MalValue init MalAt(ast, 0)
-    if (MalIsSymbolNamed(head, "ns") == 1) ithen
+    if (head.type == $MAL_LOOP_ENTRY_TYPE) ithen
+      expanded:MalValue init MalEnterLoop(ast, env)
+      if (expanded.type == $MAL_ERROR_TYPE) ithen
+        MalEvalJobReturn(slot, expanded)
+      else
+        MalEvalJobSetEval(slot, expanded, env.id)
+      endif
+    elseif (head.type == $MAL_LOOP_TARGET_TYPE) ithen
+      if (ast.length == 1) ithen
+        MalEvalJobSetApply(slot, head, MalMkValue($MAL_LIST_TYPE))
+      else
+        frame.kind = 1
+        frame.aux init head
+        frame.data init MalMkValue($MAL_LIST_TYPE)
+        frame.index = 1
+        frame.flag = 1
+        MalEvalJobSequenceStart(slot, frame)
+      endif
+    elseif (MalIsSymbolNamed(head, "ns") == 1) ithen
       MalEvalJobReturn(slot, MalEvalJobNamespace(ast, env))
     elseif (MalIsSymbolNamed(head, "quote") == 1) ithen
       MalEvalJobReturn(slot, MalEvalQuote(ast))
@@ -621,7 +640,7 @@ endop
 opcode MalEvalJobApply(slot:i):void
   fn:MalValue init malEvalJobFunctions[slot]
   args:MalValue init malEvalJobArguments[slot]
-  if (fn.type == $MAL_FUNCTION_TYPE) ithen
+  if (fn.type == $MAL_FUNCTION_TYPE || fn.type == $MAL_LOOP_TARGET_TYPE) ithen
     clause:i = malEvalJobCallClause[slot]
     recurCall:i = clause >= 0
     if (recurCall == 0) ithen
@@ -686,6 +705,10 @@ opcode MalEvalJobStep(id:i, budget:i):i
         if (malEvalJobs[slot].depth > 0) ithen
           top:i = malEvalJobs[slot].top
           tailScope = malEvalJobFrames[top].kind == 9
+          if (malEvalJobFunctions[slot].type == $MAL_LOOP_TARGET_TYPE && \
+              malEvalJobFrames[top].env == malEvalJobFunctions[slot].number) ithen
+            tailScope = 0
+          endif
         endif
         if (tailScope == 1) ithen
           frame:MalEvalFrame init MalEvalJobPop(slot)

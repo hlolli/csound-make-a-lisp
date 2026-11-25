@@ -142,6 +142,7 @@ def check_standalone(csound=None):
         print("PASS: bundled region evaluation", flush=True)
         for name, marker in [
                 ("clojure-language.orc", "PASS: Clojure reader, binding, arity, and iteration forms"),
+                ("loop-memory.orc", "PASS: nested loop storage stays bounded"),
                 ("eval-job.orc", "PASS: cooperative evaluation"),
                 ("eval-job-builtins.orc", "All cooperative builtin comparisons passed")]:
             source = (ROOT / "tests" / name).read_text(encoding="utf-8")
