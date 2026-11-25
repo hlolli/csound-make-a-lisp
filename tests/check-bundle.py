@@ -145,6 +145,12 @@ def check_standalone(csound=None):
                 source.replace(original_include, bundled_include), encoding="utf-8")
             run([csound, "-n", "-d", "-m128", "--orc", name], directory, marker)
         print("PASS: bundled resumable evaluation and atom retries", flush=True)
+        native = (ROOT / "tests/native.orc").read_text(encoding="utf-8")
+        (directory / "native.orc").write_text(
+            native.replace(original_include, bundled_include), encoding="utf-8")
+        run([sys.executable, str(ROOT / "tests/check-native-host.py"), csound,
+             "-n", "-d", "-m128", "--orc", "native.orc"], directory, "PASS: native functions")
+        print("PASS: bundled native host calls and init error recovery", flush=True)
         run([csound, "-n", "-d", "-m128", "--orc", "src/run.orc", "--",
              "tests/namespaces.mal"], directory, " namespace checks")
         sessions = (ROOT / "tests/namespace-sessions.orc").read_text(encoding="utf-8")

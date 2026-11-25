@@ -91,6 +91,26 @@ Use `MalEvalFormsEnv(source, env)` for a region or file containing several
 forms. It returns the last value and the updated environment. Keep that
 environment for the next call. `MalEvalSourceEnv` still reads one form.
 
+For repeated host calls, bind a Csound UDO with `MalMkNative` instead of
+building a `csound/eval` string on each call. Native bindings reuse the UDO's
+storage and work with `apply`, `map`, and evaluation jobs. The UDO reads its
+arguments and returns its MAL value through an i-rate frame number.
+
+```csound
+opcode HostEcho(frame:i):i
+  args:MalValue init MalNativeArgs(frame)
+  xout MalNativeReturn(frame, args)
+endop
+;; Bind once, after creating env. Lisp can then call (host-echo 1 :two).
+env init MalEnvSet(env, "host-echo", MalMkNative("HostEcho"))
+```
+
+Each engine supports 64 native bindings and 64 nested host calls. Return
+`MalMkError(...)` through `MalNativeReturn` for errors Lisp can catch. Csound
+also logs and counts ordinary init failures, and the binding returns a MAL error.
+The UDO runs at init time using the orchestra's sample rate and block size,
+including when an instrument registers or calls it with a local `setksmps`.
+
 ## Check the bundle
 
 ```sh

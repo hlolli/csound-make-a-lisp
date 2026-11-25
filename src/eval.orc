@@ -502,7 +502,10 @@ endop
 opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
   result:MalValue init MalMkValue($MAL_NIL_TYPE)
 
-  if (strcmp(fn.string, "throw") == 0) ithen
+  if (strcmp(fn.string, "__mal-native") == 0) ithen
+    result init MalApplyNative(fn, args)
+
+  elseif (strcmp(fn.string, "throw") == 0) ithen
     if (args.length != 1) ithen
       result init MalArityError(fn.string, 1, args.length)
     else

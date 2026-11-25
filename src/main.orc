@@ -12,5 +12,6 @@
 #include "src/reader.orc"
 #include "src/printer.orc"
 #include "src/csound.orc"
+#include "src/native.orc"
 #include "src/eval.orc"
 #include "src/eval-job.orc"

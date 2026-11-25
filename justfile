@@ -121,11 +121,15 @@ eval-forms:
 eval-jobs:
     {{csound}} {{csound_flags}} tests/eval-job.orc
     {{csound}} {{csound_flags}} tests/eval-job-builtins.orc
+    python3 tests/check-native-host.py "{{csound}}" {{csound_flags}} tests/native.orc
 
 namespaces:
     ./run tests/namespaces.mal
     {{csound}} {{csound_flags}} tests/namespace-sessions.orc
     python3 tests/check-namespaces.py --csound "{{csound}}"
+
+wasm-native module bundle:
+    node tests/check-native-host.mjs "{{module}}" "{{bundle}}"
 
 harness-threading:
     python3 mal/runtest.py --test-timeout 120 --no-deferrable --no-optional tests/harness/threading.mal -- tests/harness/run-stepA-mal
