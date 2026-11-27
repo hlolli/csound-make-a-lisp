@@ -276,14 +276,6 @@ opcode MalNsPublics(root:MalEnv, namespace:S):MalValue
   xout result
 endop
 
-opcode MalMkNamespaceBuiltin(name:S, root:MalEnv):MalValue
-  value:MalValue init MalMkBuiltin(name)
-  closure:MalEnv[] init 1
-  closure[0] init MalEnvHandle(root.id)
-  value.env init closure
-  xout value
-endop
-
 opcode MalInstallNamespaces(env:MalEnv):MalEnv
   root:MalEnv init MalEnvRoot(env)
   coreIndex:i = MalNsEnsure(root, "clojure.core", 1)
@@ -375,7 +367,7 @@ opcode MalNsRefer(root:MalEnv, target:MalValue, names:MalValue):MalValue
           endif
           qualified:S init sprintf("%s/%s", target.string, name.string)
           existing:i = MalMapFindKey(refers, name)
-          if (MalEnvFind(current, sprintf("%s/%s", current.namespace, name.string)) >= 0) ithen
+          if (MalNsSlot(current.id, current.namespace, name.string) >= 0) ithen
             result init MalMkError(sprintf("refer: '%s' already has a definition", name.string))
             break
           elseif (existing >= 0) ithen
@@ -544,6 +536,11 @@ opcode MalNsRequire(root:MalEnv, specs:MalValue):MalValue
       endif
     od
     if (result.type != $MAL_ERROR_TYPE) ithen
+      current:MalEnv init MalEnvResolve(root)
+      nsIndex:i = MalNsFind(current.id, current.namespace)
+      record:MalNamespace init malNamespaces[nsIndex]
+      savedAliases:MalValue init record.aliases
+      savedRefers:MalValue init record.refers
       for index in [0 ... specs.length - 1] do
         spec:MalValue init MalAt(specs, index)
         library:MalValue init spec
@@ -572,6 +569,12 @@ opcode MalNsRequire(root:MalEnv, specs:MalValue):MalValue
           break
         endif
       od
+      if (result.type == $MAL_ERROR_TYPE) ithen
+        record init malNamespaces[nsIndex]
+        record.aliases init savedAliases
+        record.refers init savedRefers
+        malNamespaces[nsIndex] init record
+      endif
     endif
   endif
   xout result
@@ -642,7 +645,13 @@ opcode MalApplyNamespaceBuiltin(fn:MalValue, args:MalValue):MalValue
   root:MalEnv init MalEnvRoot(fn.env[0])
   result:MalValue init MalMkValue($MAL_NIL_TYPE)
   name:S init fn.string
-  if (strcmp(name, "require") == 0) ithen
+  if (strcmp(name, "eval") == 0) ithen
+    if (args.length != 1) ithen
+      result init MalArityError(name, 1, args.length)
+    else
+      result, updated:MalEnv = MalEvalInternal(MalAt(args, 0), root)
+    endif
+  elseif (strcmp(name, "require") == 0) ithen
     result init MalNsRequire(root, args)
   elseif (strcmp(name, "all-ns") == 0) ithen
     if (args.length != 0) ithen

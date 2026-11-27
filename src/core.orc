@@ -31,13 +31,11 @@ opcode MalCoreLookup(collection:MalValue, key:MalValue):(MalValue, i)
     endif
   elseif (collection.type == $MAL_VECTOR_TYPE || collection.type == $MAL_STRING_TYPE) ithen
     if (key.type == $MAL_NUMBER_TYPE && key.number == int(key.number)) ithen
-      size:i = collection.type == $MAL_STRING_TYPE ? strlen(collection.string) : collection.length
-      if (key.number >= 0 && key.number < size) ithen
-        if (collection.type == $MAL_STRING_TYPE) ithen
-          result init MalMkString(strsub(collection.string, key.number, key.number + 1))
-        else
-          result init MalAt(collection, key.number)
-        endif
+      if (collection.type == $MAL_STRING_TYPE) ithen
+        result init MalStringCharacter(collection.string, key.number)
+        found = result.type != $MAL_NIL_TYPE
+      elseif (key.number >= 0 && key.number < collection.length) ithen
+        result init MalAt(collection, key.number)
         found = 1
       endif
     endif
@@ -61,17 +59,21 @@ opcode MalCoreNth(sequence:MalValue, index:MalValue, fallback:MalValue, hasFallb
   elseif (indexedNil == 1) ithen
     result init fallback
   else
-    size:i = indexedString == 1 ? strlen(sequence.string) : sequence.length
-    if (index.number < 0 || index.number >= size) ithen
+    missing:i = 0
+    if (indexedString == 1) ithen
+      result init MalStringCharacter(sequence.string, index.number)
+      missing = result.type == $MAL_NIL_TYPE
+    elseif (index.number < 0 || index.number >= sequence.length) ithen
+      missing = 1
+    else
+      result init MalAt(sequence, index.number)
+    endif
+    if (missing == 1) ithen
       if (hasFallback == 1) ithen
         result init fallback
       else
         result init MalMkError("nth: index out of range")
       endif
-    elseif (indexedString == 1) ithen
-      result init MalMkString(strsub(sequence.string, index.number, index.number + 1))
-    else
-      result init MalAt(sequence, index.number)
     endif
   endif
   xout result

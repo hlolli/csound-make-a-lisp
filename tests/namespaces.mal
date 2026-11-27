@@ -116,6 +116,17 @@
                 (def *ns* 'bad) (def missing-ns/value 2)])))
 (check "failed ns leaves caller namespace" 'user *ns*)
 (check "namespace maps are immutable" {} (do (assoc (ns-aliases 'user) 'x 'alpha) (ns-aliases 'user)))
+(check "failed require reports a missing refer" true
+       (fails? (fn [] (require '[alpha :as temporary :refer [missing]]))))
+(check "failed require leaves no alias" false (contains? (ns-aliases 'user) 'temporary))
+(require '[beta :as temporary])
+(check "failed require leaves the alias free for retry" :beta temporary/value)
+(check "failed require leaves no earlier refers" true
+       (do (fails? (fn [] (require '[alpha :refer [read-value]] '[beta :refer [missing]])))
+           (fails? (fn [] read-value))))
+(ns clojure.core)
+(user/check "refer detects an existing clojure.core definition" true
+            (user/fails? (fn [] (refer 'beta :only '[inc]))))
 (ns ordered-names)
 (def zebra 9)
 (def a 1)

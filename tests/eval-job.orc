@@ -46,6 +46,7 @@ instr TEST
   CHECK_JOB("(let [a 1] (+ a 2) (+ a 3))", syncEnv, jobEnv)
   CHECK_JOB("(do (defn f [a & more] [a more]) (f 1 2 3))", syncEnv, jobEnv)
   CHECK_JOB("(do (defn sum [n acc] (if (= n 0) acc (sum (- n 1) (+ acc n)))) (sum 100 0))", syncEnv, jobEnv)
+  CHECK_JOB("(do (defn sum-via-catch [n acc] (if (= n 0) acc (try* (throw n) (catch* caught (sum-via-catch (- caught 1) (+ acc caught)))))) (sum-via-catch 10 0))", syncEnv, jobEnv)
   CHECK_JOB("(do (defmacro unless [test a b] (list 'if test b a)) (unless false 11 missing))", syncEnv, jobEnv)
   CHECK_JOB("(do (defmacro! twice (fn* [x] (list '+ x x))) (twice 9))", syncEnv, jobEnv)
   CHECK_JOB("`(a ~(+ 1 2) ~@(list 4 5))", syncEnv, jobEnv)
@@ -122,24 +123,31 @@ instr TEST
 
   ;; Tail calls release their prior call scopes rather than retaining one
   ;; scope and continuation per iteration until the whole job finishes.
-  beforeLive:i = malEnvCount - malEnvFreeCount
-  maximumLive:i = beforeLive
-  maximumDepth:i = 0
-  id = MalEvalJobStart(read_str("(sum 2000 0)"), jobEnv)
-  status = 0
-  ticks = 0
-  while (status == 0 && ticks < 200000) do
-    status = MalEvalJobStep(id, 1)
-    maximumLive = max(maximumLive, malEnvCount - malEnvFreeCount)
-    maximumDepth = max(maximumDepth, malEvalJobs[MalEvalJobSlot(id)].depth)
-    ticks += 1
+  tailFunctions:S[] fillarray "sum", "sum-via-catch"
+  tailIterations:i[] fillarray 2000, 60
+  for index in [0 ... lenarray(tailFunctions) - 1] do
+    iterations:i = tailIterations[index]
+    source:S init sprintf("(%s %d 0)", tailFunctions[index], iterations)
+    expected:i = iterations * (iterations + 1) / 2
+    beforeLive:i = malEnvCount - malEnvFreeCount
+    maximumLive:i = beforeLive
+    maximumDepth:i = 0
+    id = MalEvalJobStart(read_str(source), jobEnv)
+    status = 0
+    ticks = 0
+    while (status == 0 && ticks < 200000) do
+      status = MalEvalJobStep(id, 1)
+      maximumLive = max(maximumLive, malEnvCount - malEnvFreeCount)
+      maximumDepth = max(maximumDepth, malEvalJobs[MalEvalJobSlot(id)].depth)
+      ticks += 1
+    od
+    value init MalEvalJobResult(id)
+    if (status != 1 || value.type != $MAL_NUMBER_TYPE || value.number != expected || maximumLive > beforeLive + 8 || maximumDepth > 16) ithen
+      prints "FAIL: %s grew live scopes or continuations: live %d -> %d, depth %d, value %s\n", source, beforeLive, maximumLive, maximumDepth, pr_str(value)
+      exitnow(1)
+    endif
+    MalEvalJobCancel(id)
   od
-  value init MalEvalJobResult(id)
-  if (status != 1 || value.type != $MAL_NUMBER_TYPE || value.number != 2001000 || maximumLive > beforeLive + 8 || maximumDepth > 16) ithen
-    prints "FAIL: tail calls grew live scopes or continuations: live %d -> %d, depth %d, value %s\n", beforeLive, maximumLive, maximumDepth, pr_str(value)
-    exitnow(1)
-  endif
-  MalEvalJobCancel(id)
 
   first:i = MalEvalJobStart(read_str("(let [x 10] (+ x 1))"), jobEnv)
   second:i = MalEvalJobStart(read_str("(let [x 20] (+ x 1))"), jobEnv)

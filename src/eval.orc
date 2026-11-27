@@ -306,14 +306,16 @@ opcode MalSeq(value:MalValue):MalValue
       endif
 
     case $MAL_STRING_TYPE
-      characterCount:i = strlen(value.string)
-
-      if (characterCount > 0) ithen
-        characters:MalValue[] init characterCount
-
-        for index in [0 ... characterCount - 1] do
-          character:S init strsub(value.string, index, index + 1)
-          characters[index] init MalMkString(character)
+      byteCount:i = strlen(value.string)
+      if (byteCount > 0) ithen
+        characters:MalValue[] init byteCount
+        characterCount:i = 0
+        offset:i = 0
+        while (offset < byteCount) do
+          finish:i = MalStringCharacterEnd(value.string, offset, byteCount)
+          characters[characterCount] init MalMkString(strsub(value.string, offset, finish))
+          characterCount += 1
+          offset = finish
         od
 
         result init MalMkValue($MAL_LIST_TYPE)
@@ -1174,19 +1176,23 @@ opcode MalApplyBuiltin(fn:MalValue, args:MalValue):MalValue
         result init MalMkError("swap!: first argument must be an atom")
       else
         applyFn:MalValue init MalAt(args, 1)
-        applyArgs:MalValue init MalMkValue($MAL_LIST_TYPE)
-        applyArgs init MalAppendValue(applyArgs, MalAtomValue(atom))
-
-        if (args.length > 2) ithen
-          for index in [2 ... args.length - 1] do
-            applyArgs init MalAppendValue(applyArgs, MalAt(args, index))
-          od
-        endif
-
-        result init MalApply(applyFn, applyArgs)
-        if (result.type != $MAL_ERROR_TYPE) ithen
-          result init MalAtomSetValue(atom, result)
-        endif
+        retry:i = 1
+        while (retry == 1) do
+          version:i = malAtomVersions[atom.number]
+          applyArgs:MalValue init MalMkList1(MalAtomValue(atom))
+          if (args.length > 2) ithen
+            for index in [2 ... args.length - 1] do
+              applyArgs init MalAppendValue(applyArgs, MalAt(args, index))
+            od
+          endif
+          result init MalApply(applyFn, applyArgs)
+          if (result.type == $MAL_ERROR_TYPE) ithen
+            retry = 0
+          elseif (version == malAtomVersions[atom.number]) ithen
+            result init MalAtomSetValue(atom, result)
+            retry = 0
+          endif
+        od
       endif
     endif
 
@@ -2131,19 +2137,6 @@ opcode MalEvalTail(ast:MalValue, env:MalEnv, target:MalValue, clause:i):(MalValu
           if (args.type == $MAL_ERROR_TYPE) ithen
             result init args
             done = 1
-          elseif (fn.type == $MAL_BUILTIN_TYPE && strcmp(fn.string, "eval") == 0) ithen
-            if (args.length != 1) ithen
-              result init MalArityError(fn.string, 1, args.length)
-              done = 1
-            else
-              evalAst:MalValue init MalAt(args, 0)
-              evalRoot:MalEnv init MalEnvRoot(evalEnv)
-              recursiveInputEnv init MalEnvHandle(evalRoot.id)
-              result, evalRoot = MalEvalInternal(evalAst, recursiveInputEnv)
-              evalEnv init MalEnvSetRoot(evalEnv, evalRoot)
-
-              done = 1
-            endif
           elseif (fn.type == $MAL_FUNCTION_TYPE || fn.type == $MAL_LOOP_TARGET_TYPE) ithen
             callClause:i = recurCall == 1 ? recurClause : MalFunctionClause(fn, args.length)
             bindStatus:MalValue, callEnv:MalEnv = MalBindFunctionCall(fn, args, callClause, recurCall)

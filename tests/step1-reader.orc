@@ -46,6 +46,17 @@ opcode ASSERT_PRINT_UNREADABLY(input:S, expected:S):void
   endif
 endop
 
+opcode ASSERT_NUMBER_ROUND_TRIP(input:S):void
+  original:MalValue init READ(input)
+  printed:S init pr_str(original)
+  reread:MalValue init READ(printed)
+  if (original.type != $MAL_NUMBER_TYPE || reread.type != $MAL_NUMBER_TYPE || \
+      original.number != reread.number) ithen
+    prints "Number did not round trip: %s printed as %s\n", input, printed
+    exitnow(1)
+  endif
+endop
+
 instr TEST
   prints "Testing basic reader functionality\n"
   NumberAst:MalValue = READ("123")
@@ -306,6 +317,12 @@ instr TEST
   ASSERT_REP("123", "123")
   ASSERT_REP("-123", "-123")
   ASSERT_REP("1.5", "1.5")
+  ASSERT_REP("3000000000", "3000000000")
+  ASSERT_REP("+2.5E+1", "25")
+  ASSERT_REP("[1e 1e- 1e-2.3]", "[1e 1e- 1e-2.3]")
+  ASSERT_NUMBER_ROUND_TRIP("1.2345678901234567")
+  ASSERT_NUMBER_ROUND_TRIP("0.0000000001")
+  ASSERT_NUMBER_ROUND_TRIP("-1.2345678901234567e+30")
   ASSERT_REP("1/2", "0.5")
   ASSERT_REP("-1/4", "-0.25")
   ASSERT_REP("[1/4 1/2 3/4]", "[0.25 0.5 0.75]")
@@ -344,6 +361,8 @@ instr TEST
   ASSERT_REP("(nil :keyword abc)", "(nil :keyword abc)")
   ASSERT_REP(sprintf("(%s1%s2%s3%s)", Stab, Stab, Stab, Stab), "(1 2 3)")
   ASSERT_REP("(1 2, 3,,,,)", "(1 2 3)")
+  ASSERT_REP(sprintf("[1%c%c2; comment%c3]", $MAL_CARRIAGE_RETURN_TOKEN, \
+    $MAL_NEWLINE_TOKEN, $MAL_CARRIAGE_RETURN_TOKEN), "[1 2 3]")
   ASSERT_REP("'abc", "(quote abc)")
   ASSERT_REP("`abc", "(quasiquote abc)")
   ASSERT_REP("~abc", "(unquote abc)")

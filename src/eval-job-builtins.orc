@@ -285,12 +285,12 @@ opcode MalEvalJobBuiltinStart(slot:i, fn:MalValue, args:MalValue):i
         endif
       endif
 
-    elseif (strcmp(name, "eval") == 0 && lenarray(fn.env) == 0) ithen
+    elseif (strcmp(name, "eval") == 0 && lenarray(fn.env) > 0) ithen
       handled = 1
       if (args.length != 1) ithen
         MalEvalJobReturn(slot, MalArityError(name, 1, args.length))
       else
-        root:MalEnv init MalEnvRoot(MalEnvHandle(frame.env))
+        root:MalEnv init MalEnvRoot(fn.env[0])
         frame.kind = 108
         MalEvalJobPush(slot, frame)
         MalEvalJobSetEval(slot, MalAt(args, 0), root.id)

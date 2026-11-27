@@ -95,12 +95,20 @@ opcode MalPrintDelimitedFormsUnreadably(ast:MalValue, left:S, right:S):S
 endop
 
 opcode MalPrintNumber(number:i):S
-  iwhole = int(number)
-
-  if (number == iwhole) ithen
-    Sout init sprintf("%d", iwhole)
+  if (number == 0) ithen
+    Sout init "0"
+  elseif (abs(number) < 1e16 && number == floor(number)) ithen
+    Sout init sprintf("%.0f", number)
   else
     Sout init sprintf("%g", number)
+    if (number - number == 0) ithen
+      precision:i = 7
+      while (precision <= 17 && strtod:i(Sout) != number) do
+        format:S init sprintf("%%.%dg", precision)
+        Sout init sprintf(format, number)
+        precision += 1
+      od
+    endif
   endif
 
   xout Sout

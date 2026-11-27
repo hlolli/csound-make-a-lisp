@@ -7,7 +7,7 @@
 ;; time. Jobs share ordinary environments and atoms, so writes remain visible
 ;; between steps. Cancellation releases scopes; it does not undo writes.
 ;; Core frames: 1 collection/arguments, 2 if, 3 do, 4 let binding, 5 call
-;; head, 6 definition, 7 try, 8 macro expansion, 9 scope cleanup, 10 catch. Builtin
+;; head, 6 definition, 7 try, 8 macro expansion, 9 scope cleanup. Builtin
 ;; continuations use kinds 100 and above.
 struct MalEvalFrame kind:i, env:i, form:MalValue, data:MalValue, aux:MalValue, extra:MalValue, index:i, limit:i, flag:i
 struct MalEvalJob id:i, status:i, env:i, mode:i, top:i, depth:i
@@ -335,7 +335,7 @@ opcode MalEvalJobRecur(slot:i, frame:MalEvalFrame):void
   target:MalValue init MalMkValue($MAL_NIL_TYPE)
   clause:i = -1
   while (index >= 0) do
-    if (malEvalJobFrames[index].kind != 9) ithen
+    if (malEvalJobFrames[index].kind != 9 || malEvalJobFrames[index].flag == 1) ithen
       break
     endif
     kind:i = malEvalJobFrames[index].form.type
@@ -531,13 +531,16 @@ opcode MalEvalJobResume(slot:i):void
     elseif (value.type == $MAL_ERROR_TYPE) ithen
       if (frame.kind == 7) ithen
         catchEnv:MalEnv init MalMkEnvWithOuter(MalEnvHandle(frame.env))
-        MalEvalJobOwnEnv(slot, catchEnv.id)
         binding:MalValue init MalAt(frame.form, 1)
         catchEnv init MalEnvSet(catchEnv, binding.string, MalErrorPayload(value))
-        frame.kind = 10
+        handler:MalValue init MalAt(frame.form, 2)
+        frame.kind = 9
         frame.env = catchEnv.id
+        frame.form init MalMkValue($MAL_NIL_TYPE)
+        ;; A catch blocks recur to an outer scope but permits other tail calls.
+        frame.flag = 1
         MalEvalJobPush(slot, frame)
-        MalEvalJobSetEval(slot, MalAt(frame.form, 2), catchEnv.id)
+        MalEvalJobSetEval(slot, handler, catchEnv.id)
       elseif (frame.kind == 1) ithen
         MalEvalJobDiscardCollection(frame.extra.number)
         MalEvalJobDiscardCollection(frame.limit)

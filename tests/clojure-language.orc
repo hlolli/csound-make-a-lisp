@@ -39,6 +39,10 @@ instr TEST
   CheckLanguage("(try* (read-string \"#_%\") (catch* e :caught))", "nil", env)
   CheckLanguage("(try* (read-string \"#_\") (catch* e :caught))", ":caught", env)
   CheckLanguage("(try* (read-string \"#(list %9999999999)\") (catch* e :caught))", ":caught", env)
+  CheckLanguage("(seq \"AæΩ€🦊B\")", "(\"A\" \"æ\" \"Ω\" \"€\" \"🦊\" \"B\")", env)
+  CheckLanguage("[(get \"más\" 1) (nth \"🦊æ\" 1) (get-in {:word \"a€\"} [:word 1]) \
+    (get \"🦊\" 1 :missing) (nth \"€\" 1 :missing)]", \
+    "[\"á\" \"æ\" \"€\" :missing :missing]", env)
   value:MalValue, env = MalEvalFormsEnv("#_ (bad) (def region 41) #_ (bad) (inc region) #_ (bad)", env)
   if (strcmp(pr_str(value), "42") != 0) ithen
     prints "FAIL discarded region form: %s\n", pr_str(value)
@@ -72,6 +76,7 @@ instr TEST
   CheckLanguage("(loop [[x] [0] max (+ x 3)] (if (< x max) (recur [(inc x)] max) x))", "3", env)
   CheckLanguage("(loop [i 0] (when (< i 5) (recur (inc i))))", "nil", env)
   CheckLanguage("(loop [i 0] (if-let [x (if (< i 6) (inc i) nil)] (recur x) i))", "6", env)
+  CheckLanguage("(loop [n 1 result 0] (if (pos? n) (as-> n x (recur (dec x) 42)) result))", "42", env)
   CheckLanguage("(loop [i 0 f nil] (if (= i 0) (recur 1 (fn [] i)) (f)))", "0", env)
   CheckLanguage("(try* (recur 0) (catch* e :caught))", ":caught", env)
   CheckLanguage("(try* (loop [i 0] (+ 1 (recur 1))) (catch* e :caught))", ":caught", env)

@@ -83,11 +83,12 @@ unchanged for MAL collections. Csound arrays use native reads and writes;
 see [collection operators on Csound arrays](INTEROP.md#collection-operators-on-csound-arrays).
 For MAL values, `assoc` accepts maps, vectors, and `nil`; a vector index equal to
 its length appends an item. Saved values from `@voice` stay unchanged after
-`swap!` or `reset!`. A failed swap leaves the atom's value in place. Atoms have
-shared identity: two names for the same atom see the same updates, including
-when the atom sits inside a collection. These atoms run in the interpreter's
-single init-time evaluation; they do not add Clojure's thread coordination,
-validators, or watches.
+`swap!` or `reset!`. If the target atom changes while a swap callback runs,
+`swap!` calls it again with the latest value. If the callback throws, any
+effects it already ran remain visible. Two names for the same atom see the
+same updates, including when the atom sits inside a collection. These atoms run
+in the interpreter's single init-time evaluation. They do not add Clojure's
+thread coordination, validators, or watches.
 
 Map keys use the same equality rules as `=`. Lists and vectors with equal
 items select the same entry, including nested collections. Map keys ignore

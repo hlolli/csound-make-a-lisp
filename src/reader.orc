@@ -8,12 +8,16 @@ malAnonymousReaderId@global:i init 0
 malAnonymousReaderArity@global:i init 0
 malAnonymousReaderRest@global:i init 0
 
+opcode MalIsReaderWhitespace(char:i):i
+  ;; Accept LF, CRLF, and CR in files and source passed by the host.
+  whitespace:i = char == $MAL_NEWLINE_TOKEN || char == $MAL_CARRIAGE_RETURN_TOKEN || \
+    char == $MAL_SPACE_TOKEN || char == $MAL_TAB_TOKEN || char == $MAL_COMMA_TOKEN
+  xout whitespace
+endop
+
 opcode isCharWordBoundry(char:i):i
   ires = 0
-  if (char == $MAL_NEWLINE_TOKEN || \
-      char == $MAL_SPACE_TOKEN || \
-      char == $MAL_TAB_TOKEN || \
-      char == $MAL_COMMA_TOKEN || \
+  if (MalIsReaderWhitespace(char) == 1 || \
       char == $MAL_SEMICOLON_TOKEN || \
       char == $MAL_DOUBLE_QUOTE_TOKEN || \
       char == $MAL_PAREN_OPEN_TOKEN || \
@@ -48,7 +52,7 @@ opcode nextEndOfLine(input:S, from:i, maxLookahead:i):i
   ifound = 0
   while (indx < maxLookahead && ifound == 0) do
     ipeek = strchar:i(input, indx)
-    if (ipeek == $MAL_NEWLINE_TOKEN) ithen
+    if (ipeek == $MAL_NEWLINE_TOKEN || ipeek == $MAL_CARRIAGE_RETURN_TOKEN) ithen
       ifound = 1
     else
       indx += 1
@@ -96,8 +100,7 @@ opcode tokenize(input:S):MalTokens
     ;; prints "ipeek %d ipeek2 %d \n", ipeek, ipeek2
 
     ;; ignore whitespaces and commas
-    if (ipeek == $MAL_SPACE_TOKEN || ipeek == $MAL_TAB_TOKEN || \
-        ipeek == $MAL_COMMA_TOKEN || ipeek == $MAL_NEWLINE_TOKEN) ithen
+    if (MalIsReaderWhitespace(ipeek) == 1) ithen
       indx += 1
       igoto END
     endif

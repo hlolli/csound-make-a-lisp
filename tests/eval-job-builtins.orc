@@ -32,7 +32,13 @@ opcode AssertJobBuiltin(source:S, env:MalEnv):void
 endop
 
 opcode AssertJobBuiltinExpected(source:S, expected:S, env:MalEnv):void
-  token:i = MalEvalJobStart(read_str(source), env)
+  ast:MalValue init read_str(source)
+  synchronous:MalValue init EVAL(ast, env)
+  if (synchronous.type == $MAL_ERROR_TYPE || strcmp(pr_str(synchronous), expected) != 0) ithen
+    prints "Synchronous evaluation failed: %s\nexpected %s, got %s\n", source, expected, pr_str(synchronous)
+    exitnow(1)
+  endif
+  token:i = MalEvalJobStart(ast, env)
   steps:i = 0
   status:i = 0
   while (status == 0 && steps < 100000) do
@@ -124,6 +130,14 @@ instr TEST
   AssertJobBuiltin("(drop 2 12)", env)
   AssertJobBuiltin("(let [a (atom 3)] (list (swap! a + 4 5) (deref a)))", env)
   AssertJobBuiltin("(let [a (atom 3)] (list (try* (swap! a (fn [x] (throw :bad))) (catch* e e)) (deref a)))", env)
+  AssertJobBuiltinExpected({{
+    (let [a (atom 0) calls (atom 0)]
+      [(swap! a (fn [x]
+                  (swap! calls inc)
+                  (when (= x 0) (reset! a 10))
+                  (inc x)))
+       @a @calls])
+  }}, "[11 11 2]", env)
   AssertJobBuiltin("(swap! 1 inc)", env)
   AssertJobBuiltin("(swap!)", env)
   AssertJobBuiltin("(update {:x 2} :x + 3 4)", env)
@@ -147,10 +161,11 @@ instr TEST
   AssertJobBuiltin("(load-file 1)", env)
   AssertJobBuiltin("(map inc (csound/array :i [1 2 3]))", env)
   AssertJobBuiltin("(reduce + (csound/array :i [1 2 3]))", env)
-  ;; Jobs also allow eval as a function value, beyond direct eval forms.
+  ;; eval is callable both directly and as a higher-order argument.
   AssertJobBuiltinExpected("(apply eval ['(+ 1 2)])", "3", env)
   AssertJobBuiltinExpected("(map eval ['(+ 1 2) '(+ 3 4)])", "(3 7)", env)
   AssertJobBuiltinExpected("(let [x 9] (list (apply eval ['(+ 1 2)]) x))", "(3 9)", env)
+  AssertJobBuiltinExpected("(let [only-local 9] (try* (apply eval ['only-local]) (catch* e :caught)))", ":caught", env)
   AssertJobCollectionsReleased()
 
   size:i = lenarray(malEvalJobCollectionValues) + 1

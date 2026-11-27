@@ -180,6 +180,42 @@ opcode MalMkString(value:S):MalValue
   xout val
 endop
 
+opcode MalStringCharacterEnd(value:S, start:i, length:i):i
+  lead:i = strchar:i(value, start)
+  finish:i = start + 1
+  if (lead >= 194 && lead <= 244) ithen
+    width:i = lead < 224 ? 2 : (lead < 240 ? 3 : 4)
+    if (start + width <= length) ithen
+      while (finish < start + width) do
+        byte:i = strchar:i(value, finish)
+        if (byte < 128 || byte >= 192) ithen
+          finish = start + 1
+          break
+        endif
+        finish += 1
+      od
+    endif
+  endif
+  xout finish
+endop
+
+opcode MalStringCharacter(value:S, index:i):MalValue
+  result:MalValue init MalMkValue($MAL_NIL_TYPE)
+  length:i = strlen(value)
+  if (index >= 0 && index < length) ithen
+    offset:i = 0
+    position:i = 0
+    while (offset < length && position < index) do
+      offset = MalStringCharacterEnd(value, offset, length)
+      position += 1
+    od
+    if (offset < length) ithen
+      result init MalMkString(strsub(value, offset, MalStringCharacterEnd(value, offset, length)))
+    endif
+  endif
+  xout result
+endop
+
 opcode MalStringArrayToList(values:S[], startIndex:i):MalValue
   result:MalValue MalMkValue $MAL_LIST_TYPE
   valueCount:i = lenarray(values)
@@ -523,36 +559,35 @@ opcode MalReadResultReader(result:MalReadResult):MalReader
 endop
 
 opcode MalIsNumericString(token:S):i
-  itokenLen = strlen(token)
-  ires = 0
-  indx = 0
-  idigitCount = 0
-  iperiodCount = 0
-  iinvalid = 0
-
-  if (itokenLen > 0 && strchar:i(token, 0) == $MAL_MINUS_TOKEN) ithen
-    indx = 1
+  length:i = strlen(token)
+  index:i = 0
+  digitCount:i = 0
+  periodSeen:i = 0
+  exponentSeen:i = 0
+  first:i = strchar:i(token, 0)
+  if (first == $MAL_MINUS_TOKEN || first == $MAL_PLUS_TOKEN) ithen
+    index += 1
   endif
-
-  if (indx < itokenLen) ithen
-    for indx in [indx ... itokenLen - 1] do
-      ichar = strchar:i(token, indx)
-
-      if (ichar >= 48 && ichar < 58) ithen
-        idigitCount += 1
-      elseif (ichar == $MAL_PERIOD_TOKEN && \
-              iperiodCount == 0 && idigitCount > 0) ithen
-        iperiodCount = 1
-      else
-        iinvalid = 1
-        break
+  while (index < length) do
+    character:i = strchar:i(token, index)
+    if (character >= 48 && character <= 57) ithen
+      digitCount += 1
+    elseif (character == $MAL_PERIOD_TOKEN && digitCount > 0 && periodSeen == 0 && exponentSeen == 0) ithen
+      periodSeen = 1
+    elseif ((character == 101 || character == 69) && digitCount > 0 && exponentSeen == 0) ithen
+      exponentSeen = 1
+      digitCount = 0
+      if (index + 1 < length) ithen
+        sign:i = strchar:i(token, index + 1)
+        if (sign == $MAL_MINUS_TOKEN || sign == $MAL_PLUS_TOKEN) ithen
+          index += 1
+        endif
       endif
-    od
-  endif
-
-  if (idigitCount > 0 && iinvalid == 0) ithen
-    ires = 1
-  endif
-
-  xout ires
+    else
+      digitCount = 0
+      break
+    endif
+    index += 1
+  od
+  xout digitCount > 0 ? 1 : 0
 endop

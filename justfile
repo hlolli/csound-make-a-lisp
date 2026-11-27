@@ -4,80 +4,84 @@
 
 set shell := ["zsh", "-cu"]
 
-csound := "csound"
+csound := env_var_or_default("CSOUND", "csound")
+export CSOUND := csound
 csound_flags := "-n -d -m128 --orc"
 
 default:
     @just --list
 
 version:
-    @{{csound}} --version
+    @"$CSOUND" --version
 
 build:
     python3 tools/bundle.py
 
 bundle-check:
-    python3 tests/check-bundle.py --csound "{{csound}}"
+    python3 tests/check-bundle.py --csound "$CSOUND"
 
 release-check:
     python3 tests/check-bundle.py --build-only
     python3 tests/check-release.py
 
-test: launchers bundle-check release-check smoke reader eval step3 step4 step5 step6 file-loading step7 step8 step9 step-a script-args unit core-helpers clojure-forms clojure-helpers clojure-language eval-jobs namespaces harness-reader harness-eval harness-env harness-step4 harness-step5 harness-step6 harness-step7 harness-step8 harness-step9 harness-stepA harness-threading harness-csound csound-interop
+test: launchers bundle-check release-check smoke repl-check reader eval step3 step4 step5 step6 file-loading step7 step8 step9 step-a script-args unit core-helpers clojure-forms clojure-helpers clojure-language eval-jobs namespaces harness-reader harness-eval harness-env harness-step4 harness-step5 harness-step6 harness-step7 harness-step8 harness-step9 harness-stepA harness-threading harness-csound csound-interop
 
 launchers:
     python3 tests/check-launchers.py
 
 smoke:
-    {{csound}} {{csound_flags}} tests/step0-repl.orc
+    "$CSOUND" {{csound_flags}} tests/step0-repl.orc
 
 repl:
-    @{{csound}} -d -m0 -odac -+rtaudio=null --orc src/repl.orc
+    @"$CSOUND" -d -m0 -odac -+rtaudio=null --orc src/repl.orc
+
+repl-check:
+    python3 tests/check-repl.py "$CSOUND"
 
 row-row-row:
     ./play examples/row-row-row.mal
 
 reader:
-    {{csound}} {{csound_flags}} tests/step1-reader.orc
+    "$CSOUND" {{csound_flags}} tests/step1-reader.orc
 
 eval:
-    {{csound}} {{csound_flags}} tests/step2-eval.orc
+    "$CSOUND" {{csound_flags}} tests/step2-eval.orc
 
 step3:
-    {{csound}} {{csound_flags}} tests/step3-env.orc
+    "$CSOUND" {{csound_flags}} tests/step3-env.orc
 
 step4:
-    {{csound}} {{csound_flags}} tests/step4-if-do.orc
+    "$CSOUND" {{csound_flags}} tests/step4-if-do.orc
 
 step4-if:
     @just step4
 
 step5:
-    {{csound}} {{csound_flags}} tests/step5-tco.orc
+    "$CSOUND" {{csound_flags}} tests/step5-tco.orc
 
 step6:
-    {{csound}} {{csound_flags}} tests/step6-file.orc
+    "$CSOUND" {{csound_flags}} tests/step6-file.orc
 
 file-loading:
-    python3 tests/check-file-loading.py --csound "{{csound}}"
+    python3 tests/check-file-loading.py --csound "$CSOUND"
 
 step7:
-    {{csound}} {{csound_flags}} tests/step7-quote.orc
+    "$CSOUND" {{csound_flags}} tests/step7-quote.orc
 
 step8:
-    {{csound}} {{csound_flags}} tests/step8-macros.orc
+    "$CSOUND" {{csound_flags}} tests/step8-macros.orc
 
 step9:
-    {{csound}} {{csound_flags}} tests/step9-try.orc
+    "$CSOUND" {{csound_flags}} tests/step9-try.orc
 
 step-a:
-    {{csound}} {{csound_flags}} tests/stepA-mal.orc
+    "$CSOUND" {{csound_flags}} tests/stepA-mal.orc
 
 script-args:
     ./run tests/stepA-script-args.mal first "two words" --gain=0.5 ""
 
 unit:
-    {{csound}} {{csound_flags}} tests/unit-tests.orc
+    "$CSOUND" {{csound_flags}} tests/unit-tests.orc
 
 harness-reader:
     python3 mal/runtest.py --deferrable --optional tests/harness/step1_read_print.mal -- tests/harness/run-step1-reader
@@ -119,21 +123,21 @@ clojure-helpers:
     ./run tests/clojure-helpers.mal
 
 clojure-language:
-    {{csound}} {{csound_flags}} tests/clojure-language.orc
-    {{csound}} {{csound_flags}} tests/loop-memory.orc
+    "$CSOUND" {{csound_flags}} tests/clojure-language.orc
+    "$CSOUND" {{csound_flags}} tests/loop-memory.orc
 
 eval-forms:
-    {{csound}} {{csound_flags}} tests/eval-forms.orc
+    "$CSOUND" {{csound_flags}} tests/eval-forms.orc
 
 eval-jobs:
-    {{csound}} {{csound_flags}} tests/eval-job.orc
-    {{csound}} {{csound_flags}} tests/eval-job-builtins.orc
-    python3 tests/check-native-host.py "{{csound}}" {{csound_flags}} tests/native.orc
+    "$CSOUND" {{csound_flags}} tests/eval-job.orc
+    "$CSOUND" {{csound_flags}} tests/eval-job-builtins.orc
+    python3 tests/check-native-host.py "$CSOUND" {{csound_flags}} tests/native.orc
 
 namespaces:
     ./run tests/namespaces.mal
-    {{csound}} {{csound_flags}} tests/namespace-sessions.orc
-    python3 tests/check-namespaces.py --csound "{{csound}}"
+    "$CSOUND" {{csound_flags}} tests/namespace-sessions.orc
+    python3 tests/check-namespaces.py --csound "$CSOUND"
 
 wasm-native module bundle:
     node tests/check-native-host.mjs "{{module}}" "{{bundle}}"
@@ -145,13 +149,13 @@ harness-csound:
     python3 mal/runtest.py --no-deferrable --no-optional tests/harness/csound_interop.mal -- tests/harness/run-csound-interop
 
 csound-interop:
-    python3 tests/check-csound-interop.py --csound "{{csound}}"
+    python3 tests/check-csound-interop.py --csound "$CSOUND"
 
 selfhost:
-    python3 tests/selfhost/check.py --csound "{{csound}}"
+    python3 tests/selfhost/check.py --csound "$CSOUND"
 
 selfhost-step-a:
-    python3 tests/selfhost/check.py --csound "{{csound}}" --steps A
+    python3 tests/selfhost/check.py --csound "$CSOUND" --steps A
 
 status:
     @git status --short

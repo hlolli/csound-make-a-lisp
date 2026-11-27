@@ -297,18 +297,12 @@ opcode MalEnvRoot(env:MalEnv):MalEnv
   xout root
 endop
 
-opcode MalEnvSetRoot(env:MalEnv, root:MalEnv):MalEnv
-  resolved:MalEnv MalEnvResolve env
-
-  if (lenarray(resolved.outer) > 0) ithen
-    updatedOuter:MalEnv MalEnvSetRoot resolved.outer[0], root
-    resolved.outer[0] MalEnvHandle updatedOuter.id
-    result:MalEnv MalEnvStore resolved
-  else
-    result:MalEnv MalEnvResolve root
-  endif
-
-  xout result
+opcode MalMkNamespaceBuiltin(name:S, root:MalEnv):MalValue
+  value:MalValue init MalMkBuiltin(name)
+  closure:MalEnv[] init 1
+  closure[0] init MalEnvHandle(root.id)
+  value.env init closure
+  xout value
 endop
 
 opcode MalMkStep2Env():MalEnv
@@ -330,7 +324,7 @@ opcode MalMkStep2Env():MalEnv
   env init MalEnvSet(env, "str", MalMkBuiltin("str"))
   env init MalEnvSet(env, "read-string", MalMkBuiltin("read-string"))
   env init MalEnvSet(env, "slurp", MalMkBuiltin("slurp"))
-  env init MalEnvSet(env, "eval", MalMkBuiltin("eval"))
+  env init MalEnvSet(env, "eval", MalMkNamespaceBuiltin("eval", env))
   env init MalEnvSet(env, "atom", MalMkBuiltin("atom"))
   env init MalEnvSet(env, "atom?", MalMkBuiltin("atom?"))
   env init MalEnvSet(env, "deref", MalMkBuiltin("deref"))

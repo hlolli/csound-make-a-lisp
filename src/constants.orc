@@ -52,6 +52,7 @@
 // tokens
 #define MAL_TAB_TOKEN #9#
 #define MAL_NEWLINE_TOKEN #10#
+#define MAL_CARRIAGE_RETURN_TOKEN #13#
 #define MAL_SPACE_TOKEN #32#
 #define MAL_STAR_TOKEN #42#
 #define MAL_PLUS_TOKEN #43#

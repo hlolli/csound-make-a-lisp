@@ -27,6 +27,11 @@ instr MAL_REPL
   kgoto READY
 
 EVALUATE:
+  iInputStatus:i = i(kstatus)
+  if (iInputStatus < 0 && iAwaitingInput == 0) ithen
+    rireturn
+  endif
+
   iQuit:i = strcmp(Sline, ":quit") == 0 || strcmp(Sline, ":q") == 0
 
   if (iAwaitingInput == 0 && iQuit == 1) ithen
@@ -35,14 +40,15 @@ EVALUATE:
   endif
 
   if (iAwaitingInput == 1) ithen
-    iQueued:i = MalInputEnqueue(Sline, $MAL_INPUT_LINE)
+    iLineStatus:i = iInputStatus < 0 ? $MAL_INPUT_EOF : $MAL_INPUT_LINE
+    iQueued:i = MalInputEnqueue(Sline, iLineStatus)
     Sinput strcpy SpendingSource
     Sprompt strcpy SreplPrompt
     iAwaitingInput = 0
   else
     candidate:MalValue init read_str(Sline)
     SrequestedPrompt:S, iIsRequest:i = MalInputPromptFromForm(candidate)
-    readlineFn:MalValue init MalEnvGet(malReplEnv, "readline")
+    readlineFn:MalValue init MalResolveSymbol(malReplEnv, "readline")
     iUsesBuiltin:i = readlineFn.type == $MAL_BUILTIN_TYPE && \
       strcmp(readlineFn.string, "readline") == 0
 
@@ -101,10 +107,11 @@ EVALUATE:
 READY:
   Sline, kstatus readline Sprompt
 
-  if (kstatus == 1) then
+  if (kstatus != 0) then
     reinit EVALUATE
-  elseif (kstatus < 0) then
-    event "i", "MAL_EXIT", 0, 0
+    if (kstatus < 0) then
+      event "i", "MAL_EXIT", 0, 0
+    endif
   endif
 endin
 

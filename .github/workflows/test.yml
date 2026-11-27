@@ -1,0 +1,51 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: kanaka/mal
+          ref: 2bbfaa54cca4908efc90b4173b1406e260788e8a
+          path: mal
+          persist-credentials: false
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y just zsh libasound2t64 libjack-jackd2-0 libportmidi0
+      - name: Install Csound 7
+        env:
+          CSOUND_VERSION: 7.0.0
+          CSOUND_SHA256: f74e897cbd1f266d85aaa0dc9d331dfb8fe4b976d8724b44aefe7eb5f4f6a43f
+        run: |
+          package="csound-linux-minimal-x86_64-$CSOUND_VERSION"
+          archive="$RUNNER_TEMP/$package.zip"
+          curl --fail --location --retry 3 \
+            "https://github.com/csound/csound/releases/download/$CSOUND_VERSION/$package.zip" \
+            --output "$archive"
+          printf '%s  %s\n' "$CSOUND_SHA256" "$archive" | sha256sum --check -
+          unzip -q "$archive" -d "$RUNNER_TEMP"
+          csound_dir="$RUNNER_TEMP/$package"
+          chmod +x "$csound_dir/csound"
+          {
+            printf 'CSOUND=%s/csound\n' "$csound_dir"
+            printf 'LD_LIBRARY_PATH=%s\n' "$csound_dir"
+            printf 'OPCODE7DIR64=%s/plugins\n' "$csound_dir"
+          } >> "$GITHUB_ENV"
+      - name: Run the test suite
+        run: |
+          just version
+          just test
