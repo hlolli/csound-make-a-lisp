@@ -26,7 +26,9 @@ release-check:
 
 test: test-native test-reference
 
-test-native: launchers bundle-check release-check smoke repl-check reader eval step3 step4 step5 step6 file-loading step7 step8 step9 step-a script-args unit core-helpers clojure-forms clojure-helpers clojure-language eval-jobs namespaces csound-interop
+test-native: test-native-core step5
+
+test-native-core: launchers bundle-check release-check smoke repl-check reader eval step3 step4 step6 file-loading step7 step8 step9 step-a script-args unit core-helpers clojure-forms clojure-helpers clojure-language eval-jobs namespaces csound-interop
 
 test-reference: test-reference-basic test-reference-language test-reference-host
 
