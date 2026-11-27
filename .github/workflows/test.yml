@@ -12,11 +12,16 @@ jobs:
   test:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [test-native, test-reference-basic, test-reference-language]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        if: matrix.suite != 'test-native'
         with:
           repository: kanaka/mal
           ref: 2bbfaa54cca4908efc90b4173b1406e260788e8a
@@ -46,6 +51,8 @@ jobs:
             printf 'OPCODE7DIR64=%s/plugins\n' "$csound_dir"
           } >> "$GITHUB_ENV"
       - name: Run the test suite
+        env:
+          TEST_SUITE: ${{ matrix.suite }}
         run: |
           just version
-          just test
+          just "$TEST_SUITE"

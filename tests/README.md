@@ -9,8 +9,9 @@ Run the current checks with:
 just test
 ```
 
-GitHub Actions runs `just test` on pull requests and pushes to `main` with
-the official Linux build of Csound 7.0.0 and a pinned MAL test harness.
+GitHub Actions runs the native checks and reference MAL harness in parallel
+on pull requests and pushes to `main`, using the official Linux build of
+Csound 7.0.0 and a pinned MAL test harness.
 Locally, set `CSOUND` or use `just --set csound /path/to/csound test` to
 select the same executable for every recipe.
 

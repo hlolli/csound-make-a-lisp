@@ -24,7 +24,15 @@ release-check:
     python3 tests/check-bundle.py --build-only
     python3 tests/check-release.py
 
-test: launchers bundle-check release-check smoke repl-check reader eval step3 step4 step5 step6 file-loading step7 step8 step9 step-a script-args unit core-helpers clojure-forms clojure-helpers clojure-language eval-jobs namespaces harness-reader harness-eval harness-env harness-step4 harness-step5 harness-step6 harness-step7 harness-step8 harness-step9 harness-stepA harness-threading harness-csound csound-interop
+test: test-native test-reference
+
+test-native: launchers bundle-check release-check smoke repl-check reader eval step3 step4 step5 step6 file-loading step7 step8 step9 step-a script-args unit core-helpers clojure-forms clojure-helpers clojure-language eval-jobs namespaces csound-interop
+
+test-reference: test-reference-basic test-reference-language
+
+test-reference-basic: harness-reader harness-eval harness-env harness-step4 harness-step5 harness-step6
+
+test-reference-language: harness-step7 harness-step8 harness-step9 harness-stepA harness-threading harness-csound
 
 launchers:
     python3 tests/check-launchers.py
@@ -97,6 +105,7 @@ harness-step4:
 
 harness-step5:
     python3 mal/runtest.py --test-timeout 120 --no-deferrable --no-optional tests/harness/step5_tco.mal -- tests/harness/run-step5-tco
+    python3 mal/runtest.py --test-timeout 120 --no-deferrable --no-optional tests/harness/step5_mutual_tco.mal -- tests/harness/run-step5-tco
 
 harness-step6:
     python3 mal/runtest.py --test-timeout 120 --no-deferrable --no-optional tests/harness/step6_file.mal -- tests/harness/run-step6-file

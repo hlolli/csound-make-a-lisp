@@ -16,12 +16,3 @@
 (def! res2 (sum2 10000 0))
 res2
 ;=>50005000
-
-
-;; Test mutually recursive tail-call functions
-
-(def! foo (fn* (n) (if (= n 0) 0 (bar (- n 1)))))
-(def! bar (fn* (n) (if (= n 0) 0 (foo (- n 1)))))
-
-(foo 10000)
-;=>0
