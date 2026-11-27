@@ -28,11 +28,13 @@ test: test-native test-reference
 
 test-native: launchers bundle-check release-check smoke repl-check reader eval step3 step4 step5 step6 file-loading step7 step8 step9 step-a script-args unit core-helpers clojure-forms clojure-helpers clojure-language eval-jobs namespaces csound-interop
 
-test-reference: test-reference-basic test-reference-language
+test-reference: test-reference-basic test-reference-language test-reference-host
 
 test-reference-basic: harness-reader harness-eval harness-env harness-step4 harness-step5 harness-step6
 
-test-reference-language: harness-step7 harness-step8 harness-step9 harness-stepA harness-threading harness-csound
+test-reference-language: harness-step7 harness-step8 harness-step9
+
+test-reference-host: harness-stepA harness-threading harness-csound
 
 launchers:
     python3 tests/check-launchers.py
